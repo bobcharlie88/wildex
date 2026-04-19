@@ -1,0 +1,217 @@
+# WildEx — Project Briefing for Claude Code
+
+## What Is WildEx
+
+WildEx is a real-world wildlife discovery and battle game. Players film real animals and insects using their phone camera to fill a living wildlife encyclopedia. Every creature card is generated from a real photograph, verified against real-world data, and assigned stats derived from actual biology.
+
+The core loop: Go outside. Find a creature. Film it. Add it to your WildDex. Battle with it.
+
+---
+
+## What We Are Building Right Now — Phase 1 MVP Only
+
+Do not build anything outside this list. Everything else comes later.
+
+### The Five Features That Ship in Phase 1
+
+1. **Live video capture** — Player records a 3-5 second video through the app. GPS, timestamp, device ID, and motion data locked to the recording.
+2. **Species identification** — Best frame extracted from video, sent to iNaturalist and Google Vision API. Species name returned with confidence rating. Uncertain results flagged as provisional.
+3. **Card generation** — Gemini Flash writes a Pokédex-style blurb from real species data. Biology-based stats generated. AI cartoon illustration created.
+4. **WildDex** — Personal collection of all cards captured. Shows species name, card, stats, rarity tag, invasive flag if applicable, and capture location.
+5. **Collection milestones** — Simple progress goals. First capture. 10 species. First rare. First invasive. No battles, no Gyms, no respect system yet.
+
+---
+
+## Tech Stack
+
+| Layer | Tool |
+|---|---|
+| Backend language | Python |
+| API framework | FastAPI |
+| Database | PostgreSQL |
+| Species ID primary | iNaturalist API |
+| Species ID backup | Google Vision API |
+| Species data | GBIF API |
+| Blurb generation | Google Gemini Flash |
+| Card illustration | Grok Imagine API |
+| Zoo detection | Google Places API |
+| Weather cross-check | Open-Meteo API (free, no key needed) |
+| Frame extraction | OpenCV (cv2) |
+| Mobile frontend | Flutter (later — web prototype first) |
+
+---
+
+## Project Folder Structure
+
+Build this structure inside E:\wildex:
+
+```
+E:\wildex\
+├── README.md                  # This file
+├── main.py                    # FastAPI entry point
+├── requirements.txt           # Python dependencies
+├── .env                       # API keys (never commit this)
+├── app\
+│   ├── __init__.py
+│   ├── config.py              # Load environment variables and settings
+│   ├── database.py            # PostgreSQL connection
+│   ├── models.py              # Database models
+│   ├── schemas.py             # Pydantic schemas
+│   ├── pipeline\
+│   │   ├── __init__.py
+│   │   ├── frame_extractor.py # Extract best frame from video using OpenCV
+│   │   ├── species_id.py      # iNaturalist + Google Vision identification
+│   │   ├── species_data.py    # GBIF range and rarity data
+│   │   ├── card_generator.py  # Gemini Flash blurb + stats generation
+│   │   ├── illustration.py    # Grok Imagine card art generation
+│   │   ├── credential.py      # Anti-cheat credential bundle verification
+│   │   └── zoo_check.py       # Google Places zoo boundary detection
+│   ├── routers\
+│   │   ├── __init__.py
+│   │   ├── capture.py         # POST /capture — main pipeline endpoint
+│   │   ├── wildex.py          # GET /wildex — user collection
+│   │   └── cards.py           # GET /cards/{id} — individual card
+│   └── utils\
+│       ├── __init__.py
+│       └── weather.py         # Open-Meteo weather cross-check
+├── tests\
+│   ├── test_species_id.py
+│   ├── test_pipeline.py
+│   └── test_credentials.py
+└── uploads\                   # Temporary video storage
+```
+
+---
+
+## Build Order — Follow This Exactly
+
+### Step 1 — Project Setup and API Connections (Current Step)
+
+Set up the project structure and prove every API works individually before connecting them together.
+
+**Tasks:**
+- Create the folder structure above
+- Create requirements.txt with all dependencies
+- Create .env file template (with placeholder keys, no real keys)
+- Create main.py with a basic FastAPI hello world endpoint
+- Confirm the server runs on localhost
+
+**Dependencies to install:**
+```
+fastapi
+uvicorn
+python-dotenv
+psycopg2-binary
+sqlalchemy
+opencv-python
+pillow
+requests
+httpx
+google-generativeai
+```
+
+### Step 2 — The Capture Pipeline
+
+Chain all APIs together. One video in, one complete card out.
+
+**Pipeline order:**
+1. Accept video file as input
+2. Extract best frame using OpenCV
+3. Send frame to iNaturalist API — receive species name and confidence score
+4. If confidence below 0.7, send to Google Vision as backup
+5. If still uncertain, flag as provisional and continue — never block card creation
+6. Send species name to GBIF — receive rarity and range data
+7. Cross-check capture GPS against species known range — flag mismatch
+8. Cross-check capture GPS against zoo boundaries via Google Places
+9. Check invasive status for species in that GPS region
+10. Send all data to Gemini Flash — receive Pokédex-style blurb
+11. Generate biology-based stats from species data
+12. Send species name to Grok Imagine — receive cartoon illustration
+13. Assemble complete card object
+14. Store in PostgreSQL database
+15. Return card to caller
+
+### Step 3 — Credential Bundle
+
+Add anti-cheat verification to every submission.
+
+**Checks to implement:**
+- Device ID present and consistent
+- Timestamp is plausible and not manually manipulated
+- GPS coordinates present and plausible for claimed species
+- Accelerometer/gyroscope data shows natural movement
+- Weather API cross-check — conditions in video match weather at GPS location and timestamp
+- Reverse image search — reject if frame found online
+- AI generation detection — flag if image appears AI generated
+- Confidence score calculated across all checks
+- Outcome: instant approval (8-10), flagged for review (6-7), rejected (below 6)
+
+### Step 4 — Web Prototype
+
+Minimal web interface running in a mobile browser. No app store needed yet.
+
+**Pages needed:**
+- Login page — email and password
+- Capture page — camera access, record button, submit
+- Loading page — shows pipeline progress while card is being generated
+- Card reveal page — shows completed card
+- WildDex page — grid of all captured cards
+- Map page — shows capture locations
+- Milestones page — progress tracker
+
+### Step 5 — Flutter App
+
+Only after web prototype is tested with real users. Wraps everything in a native Android app for Play Store submission.
+
+---
+
+## API Keys Needed
+
+Add these to the .env file. Get keys before starting Step 1.
+
+```
+GOOGLE_VISION_API_KEY=
+GOOGLE_PLACES_API_KEY=
+GEMINI_API_KEY=
+GROK_API_KEY=
+INATURALIST_API_KEY=
+DATABASE_URL=postgresql://user:password@localhost/wildex
+```
+
+iNaturalist, GBIF, and Open-Meteo are free with no key required for basic usage.
+
+---
+
+## Key Rules
+
+- Never build outside the current step
+- Every API must be tested individually before the pipeline is assembled
+- Card generation must never be blocked by a failed check — flag it, never stop it
+- Provisional cards are fine — uncertain species ID just gets a provisional tag
+- Test the full pipeline with 20 different Australian species before building any frontend
+- Target card generation time: under 15 seconds end to end
+
+---
+
+## Success Criteria Before Moving to Phase 2
+
+- 50 active beta users completing at least 5 captures each
+- Species ID accuracy above 80 percent on Australian species
+- Credential bundle passing legitimate captures above 90 percent
+- Card generation completing in under 15 seconds on average
+- At least 30 percent of beta users returning within 7 days of first session
+
+---
+
+## Current Status
+
+- Vision Document: Complete
+- MVP Build Plan: Complete
+- Project folder created: E:\wildex
+- Code: Not started — begin with Step 1
+
+---
+
+## Notes for Claude Code
+
+This is a solo build by a developer with strong Python skills and FastAPI experience. Flutter is a new skill being learned alongside the build. Prioritise getting the backend pipeline working perfectly before touching any frontend. Ask before making assumptions about API behaviour — test everything against real responses, not mocked data.

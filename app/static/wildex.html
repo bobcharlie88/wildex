@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>WildDex</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080f14;
+      --surface:  #0e1a24;
+      --surface2: #152130;
+      --accent:   #22c55e;
+      --accent2:  #16a34a;
+      --warn:     #f59e0b;
+      --danger:   #ef4444;
+      --text:     #e8f0e9;
+      --muted:    #5a7a62;
+      --radius:   14px;
+    }
+
+    html, body {
+      min-height: 100%; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────── */
+    .header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+      height: 56px;
+      background: rgba(8,15,20,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex; align-items: center; padding: 0 16px; gap: 12px;
+    }
+    .back-btn {
+      color: var(--accent); font-size: 1.5rem; line-height: 1;
+      text-decoration: none; padding: 6px 4px; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .header-title { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--accent); flex: 1; }
+    .header-count {
+      font-size: 0.75rem; font-weight: 700; color: var(--muted);
+      background: var(--surface2); padding: 4px 10px;
+      border-radius: 20px; flex-shrink: 0;
+    }
+
+    /* ── Grid ────────────────────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      padding: 10px;
+      padding-top: calc(56px + 10px);
+      padding-bottom: 90px;
+    }
+
+    /* ── Card ────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface); border-radius: var(--radius);
+      overflow: hidden; cursor: pointer;
+      transition: transform 0.12s, box-shadow 0.12s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .card:active { transform: scale(0.96); }
+
+    .card-thumb {
+      width: 100%; aspect-ratio: 1 / 1;
+      background: var(--surface2); position: relative; overflow: hidden;
+    }
+    .card-thumb img {
+      width: 100%; height: 100%; object-fit: cover;
+      display: block;
+    }
+    .card-placeholder {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.8rem;
+    }
+
+    .card-body { padding: 9px 10px 11px; }
+    .card-name {
+      font-size: 0.8rem; font-weight: 700; line-height: 1.25;
+      margin-bottom: 7px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+
+    /* ── Badges ──────────────────────────────────────────────────────── */
+    .badge {
+      padding: 2px 7px; border-radius: 20px; font-size: 0.65rem;
+      font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .badge-legendary { background: rgba(245,158,11,0.18); color: var(--warn);  border: 1px solid rgba(245,158,11,0.3); }
+    .badge-rare      { background: rgba(239,68,68,0.14);  color: #f87171;     border: 1px solid rgba(239,68,68,0.25); }
+    .badge-uncommon  { background: rgba(96,165,250,0.14); color: #60a5fa;     border: 1px solid rgba(96,165,250,0.25); }
+    .badge-common    { background: rgba(34,197,94,0.12);  color: var(--accent); border: 1px solid rgba(34,197,94,0.22); }
+    .badge-unknown   { background: var(--surface2); color: var(--muted); }
+    .badge-invasive  { background: rgba(239,68,68,0.14); color: var(--danger); border: 1px solid rgba(239,68,68,0.25); }
+    .badge-amber     { background: rgba(245,158,11,0.14); color: var(--warn);  border: 1px solid rgba(245,158,11,0.25); }
+    .badge-muted     { background: var(--surface2); color: var(--muted); }
+
+    /* ── FAB ─────────────────────────────────────────────────────────── */
+    .fab {
+      position: fixed; bottom: 28px; right: 20px; z-index: 20;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--accent); color: #000;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.7rem; font-weight: 300; line-height: 1;
+      text-decoration: none; box-shadow: 0 4px 20px rgba(34,197,94,0.4);
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .fab:active { transform: scale(0.93); box-shadow: 0 2px 10px rgba(34,197,94,0.3); }
+
+    /* ── Empty / Loading / Error states ─────────────────────────────── */
+    .state-box {
+      position: fixed; inset: 0; padding-top: 56px;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 16px; text-align: center;
+      padding-left: 32px; padding-right: 32px;
+    }
+    .state-box svg { opacity: 0.2; }
+    .state-box p { color: var(--muted); font-size: 0.92rem; line-height: 1.5; }
+    .state-box a { color: var(--accent); font-size: 0.9rem; font-weight: 600;
+      text-decoration: none; }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--surface2);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.75s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Backdrop ────────────────────────────────────────────────────── */
+    .backdrop {
+      position: fixed; inset: 0; z-index: 30;
+      background: rgba(0,0,0,0.65);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .backdrop.open { opacity: 1; pointer-events: all; }
+
+    /* ── Modal (bottom sheet) ────────────────────────────────────────── */
+    .modal {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+      max-height: 90vh;
+      background: var(--bg);
+      border-radius: 20px 20px 0 0;
+      transform: translateY(100%);
+      transition: transform 0.36s cubic-bezier(0.32,0.72,0,1);
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      display: flex; flex-direction: column;
+    }
+    .modal.open { transform: translateY(0); }
+
+    .modal-drag {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: var(--surface2); margin: 12px auto 0; flex-shrink: 0;
+    }
+
+    /* ── Modal photo ─────────────────────────────────────────────────── */
+    .modal-photo {
+      width: 100%; max-height: 38vh; object-fit: cover;
+      flex-shrink: 0; display: block;
+    }
+    .modal-photo-placeholder {
+      width: 100%; height: 220px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--surface); font-size: 5rem;
+    }
+
+    /* ── Modal body ──────────────────────────────────────────────────── */
+    .modal-body {
+      padding: 18px 18px 48px;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+
+    .name-block { display: flex; flex-direction: column; gap: 3px; }
+    .common-name { font-size: 1.6rem; font-weight: 700; line-height: 1.15; }
+    .sci-name { font-size: 0.88rem; font-style: italic; color: var(--muted); }
+
+    .badges-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .conf-row { display: flex; flex-direction: column; gap: 6px; }
+    .conf-label { display: flex; justify-content: space-between; font-size: 0.79rem; }
+    .conf-label span:first-child { color: var(--muted); }
+    .conf-label span:last-child  { font-weight: 700; }
+    .conf-track { height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .conf-fill  { height: 100%; border-radius: 3px;
+      transition: width 0.7s cubic-bezier(0.34,1.56,0.64,1); }
+
+    .stats-card {
+      background: var(--surface); border-radius: 14px;
+      padding: 14px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .stats-title { font-size: 0.7rem; font-weight: 700; color: var(--muted);
+      letter-spacing: 0.1em; text-transform: uppercase; }
+    .stat-row { display: flex; align-items: center; gap: 10px; }
+    .stat-label { font-size: 0.7rem; font-weight: 700; color: var(--muted);
+      letter-spacing: 0.06em; width: 30px; flex-shrink: 0; }
+    .stat-track { flex: 1; height: 6px; background: var(--surface2);
+      border-radius: 3px; overflow: hidden; }
+    .stat-fill  { height: 100%; border-radius: 3px;
+      transition: width 0.65s cubic-bezier(0.34,1.56,0.64,1); }
+    .stat-val   { font-size: 0.78rem; font-weight: 700; width: 24px;
+      text-align: right; flex-shrink: 0; }
+
+    .blurb {
+      font-size: 0.88rem; line-height: 1.6; color: var(--muted);
+      padding: 13px 14px; background: var(--surface); border-radius: 14px;
+      border-left: 2px solid var(--accent2);
+    }
+
+    .detail-card {
+      background: var(--surface); border-radius: 14px;
+      padding: 12px 14px; display: flex; flex-direction: column; gap: 9px;
+    }
+    .detail-row {
+      display: flex; justify-content: space-between;
+      align-items: flex-start; gap: 10px; font-size: 0.82rem;
+    }
+    .detail-key { color: var(--muted); flex-shrink: 0; }
+    .detail-val { color: var(--text); font-weight: 500; text-align: right; word-break: break-all; }
+
+    .modal-back {
+      display: flex; align-items: center; gap: 6px;
+      background: none; border: none; cursor: pointer;
+      color: var(--accent); font-size: 0.92rem; font-weight: 600;
+      padding: 10px 16px 4px; align-self: flex-start; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <div class="header">
+    <a class="back-btn" href="/">&#8592;</a>
+    <div class="header-title">WildDex</div>
+    <div class="header-count" id="count" style="display:none"></div>
+  </div>
+
+  <!-- ── States ─────────────────────────────────────────────────────── -->
+  <div class="state-box" id="loading-state">
+    <div class="spinner"></div>
+    <p>Loading your collection...</p>
+  </div>
+
+  <div class="state-box" id="empty-state" style="display:none">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="1.2">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1
+               2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+    <p>No creatures captured yet.<br>Go outside and find something!</p>
+    <a href="/">Capture your first card &rarr;</a>
+  </div>
+
+  <div class="state-box" id="error-state" style="display:none">
+    <p>Could not load collection.<br>Check your connection and try again.</p>
+    <a href="#" onclick="loadCards();return false;">Retry</a>
+  </div>
+
+  <!-- ── Card grid ──────────────────────────────────────────────────── -->
+  <div class="grid" id="grid"></div>
+
+  <!-- ── FAB — go capture ───────────────────────────────────────────── -->
+  <a class="fab" href="/" title="Capture">+</a>
+
+  <!-- ── Modal ──────────────────────────────────────────────────────── -->
+  <div class="backdrop" id="backdrop" onclick="closeModal()"></div>
+  <div class="modal" id="modal">
+    <div class="modal-drag"></div>
+    <button class="modal-back" onclick="closeModal()">&#8592; Back</button>
+    <div id="modal-inner"></div>
+  </div>
+
+  <script>
+    // ── Data ────────────────────────────────────────────────────────────
+    let cards = [];
+
+    const TAXON_ICON = {
+      Mammalia:        '🦁', Aves:      '🐦', Reptilia:   '🦎',
+      Amphibia:        '🐸', Actinopterygii: '🐟', Insecta: '🦋',
+      Arachnida:       '🕷', Mollusca:  '🐌', Plantae:    '🌿',
+      Fungi:           '🍄', Animalia:  '🐾', Chromista:  '🌊',
+    };
+
+    const TAXON_BG = {
+      Mammalia:        '#1a1230', Aves:      '#0d1a26', Reptilia:  '#0f1a0f',
+      Amphibia:        '#0d1f0d', Actinopterygii: '#0d1a26', Insecta: '#1f1a0d',
+      Arachnida:       '#1f0d0d', Mollusca:  '#1a0d1f', Plantae:   '#0d1f0d',
+      Fungi:           '#1a130d', Animalia:  '#1a1a1a',
+    };
+
+    const STAT_COLORS = {
+      speed: '#38bdf8', attack: '#f87171', defence: '#a78bfa',
+      hp:    '#34d399',  stamina_regen: '#fb923c',
+    };
+    const STAT_LABELS = { speed:'SPD', attack:'ATK', defence:'DEF', hp:'HP', stamina_regen:'STM' };
+
+    // ── Badge helpers ────────────────────────────────────────────────────
+    function rarityClass(tier) {
+      return { common:'badge-common', uncommon:'badge-uncommon',
+               rare:'badge-rare', very_rare:'badge-legendary' }[tier] || 'badge-unknown';
+    }
+
+    // ── Load cards ───────────────────────────────────────────────────────
+    async function loadCards() {
+      show('loading-state');
+      try {
+        const resp = await fetch('/cards');
+        if (!resp.ok) throw new Error('fetch failed');
+        cards = await resp.json();
+        if (cards.length === 0) { show('empty-state'); return; }
+        renderGrid();
+        show(null); // hide states, show grid
+        const count = document.getElementById('count');
+        count.textContent = cards.length + ' card' + (cards.length !== 1 ? 's' : '');
+        count.style.display = '';
+      } catch(e) {
+        show('error-state');
+      }
+    }
+
+    function show(id) {
+      ['loading-state','empty-state','error-state'].forEach(s => {
+        document.getElementById(s).style.display = s === id ? '' : 'none';
+      });
+    }
+
+    // ── Render grid ──────────────────────────────────────────────────────
+    function renderGrid() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = cards.map(c => `
+        <div class="card" onclick="openModal(${c.id})">
+          <div class="card-thumb" style="background:${TAXON_BG[c.iconic_taxon] || 'var(--surface2)'}">
+            <img src="${esc(c.photo_url)}" alt=""
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <div class="card-placeholder" style="display:none">
+              ${TAXON_ICON[c.iconic_taxon] || '🐾'}
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-name">${esc(c.species_name)}</div>
+            <div class="card-badges">
+              <span class="badge ${rarityClass(c.rarity_tier)}">${esc(c.rarity_display)}</span>
+              ${c.invasive_at_location ? '<span class="badge badge-invasive">Invasive</span>' : ''}
+            </div>
+          </div>
+        </div>`).join('');
+    }
+
+    // ── Modal ────────────────────────────────────────────────────────────
+    function openModal(id) {
+      const c = cards.find(x => x.id === id);
+      if (!c) return;
+
+      const pct      = c.confidence ? Math.round(c.confidence * 100) : 0;
+      const confColor = c.provisional ? 'var(--warn)' : 'var(--accent)';
+
+      // Photo section
+      const photoHtml = `
+        <img class="modal-photo" src="${esc(c.photo_url)}" alt=""
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="modal-photo-placeholder" style="display:none">
+          ${TAXON_ICON[c.iconic_taxon] || '🐾'}
+        </div>`;
+
+      // Badges
+      const badges = [];
+      if (c.rarity_display)
+        badges.push(`<span class="badge ${rarityClass(c.rarity_tier)}">${esc(c.rarity_display)}</span>`);
+      if (c.invasive_at_location)
+        badges.push('<span class="badge badge-invasive">Invasive</span>');
+      if (c.provisional)
+        badges.push('<span class="badge badge-amber">Provisional ID</span>');
+      if (c.iconic_taxon)
+        badges.push(`<span class="badge badge-muted">${esc(c.iconic_taxon)}</span>`);
+
+      // Stats
+      const statRows = Object.entries(c.stats || {}).map(([k, v]) => `
+        <div class="stat-row">
+          <span class="stat-label">${STAT_LABELS[k]}</span>
+          <div class="stat-track">
+            <div class="stat-fill" data-val="${v}"
+                 style="width:0;background:${STAT_COLORS[k]}"></div>
+          </div>
+          <span class="stat-val">${v}</span>
+        </div>`).join('');
+
+      // Details
+      const details = [];
+      if (c.conservation_status)
+        details.push(row('Conservation', c.conservation_status));
+      if (c.observations_count)
+        details.push(row('iNat sightings', c.observations_count.toLocaleString()));
+      if (c.taxon_id)
+        details.push(row('Taxon ID', c.taxon_id));
+      if (c.capture_country)
+        details.push(row('Country', c.capture_country.toUpperCase()));
+      if (c.latitude != null)
+        details.push(row('GPS', `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`));
+      if (c.captured_at)
+        details.push(row('Captured', fmtDate(c.captured_at)));
+
+      document.getElementById('modal-inner').innerHTML = `
+        ${photoHtml}
+        <div class="modal-body">
+          <div class="name-block">
+            <div class="common-name">${esc(c.species_name)}</div>
+            <div class="sci-name">${esc(c.scientific_name)}</div>
+          </div>
+
+          ${badges.length ? `<div class="badges-row">${badges.join('')}</div>` : ''}
+
+          <div class="conf-row">
+            <div class="conf-label">
+              <span>Confidence</span>
+              <span>${pct}%${c.provisional ? ' — uncertain' : ''}</span>
+            </div>
+            <div class="conf-track">
+              <div class="conf-fill" id="modal-conf"
+                   style="width:0;background:${confColor}"></div>
+            </div>
+          </div>
+
+          <div class="stats-card">
+            <div class="stats-title">Stats</div>
+            ${statRows}
+          </div>
+
+          ${c.blurb ? `<div class="blurb">${esc(c.blurb)}</div>` : ''}
+
+          ${details.length ? `<div class="detail-card">${details.join('')}</div>` : ''}
+        </div>`;
+
+      document.getElementById('backdrop').classList.add('open');
+      document.getElementById('modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+
+      // Animate bars after paint
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const cf = document.getElementById('modal-conf');
+        if (cf) cf.style.width = pct + '%';
+        document.querySelectorAll('#modal .stat-fill').forEach(el => {
+          el.style.width = el.dataset.val + '%';
+        });
+      }));
+    }
+
+    function closeModal() {
+      document.getElementById('backdrop').classList.remove('open');
+      document.getElementById('modal').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    // Close modal on swipe down
+    const modal = document.getElementById('modal');
+    let touchStartY = 0;
+    modal.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+    modal.addEventListener('touchend', e => {
+      if (e.changedTouches[0].clientY - touchStartY > 80 && modal.scrollTop === 0)
+        closeModal();
+    }, { passive: true });
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    function row(k, v) {
+      return `<div class="detail-row">
+        <span class="detail-key">${esc(String(k))}</span>
+        <span class="detail-val">${esc(String(v))}</span>
+      </div>`;
+    }
+
+    function fmtDate(iso) {
+      try {
+        const d = new Date(iso);
+        return d.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' })
+          + ' ' + d.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+      } catch { return iso; }
+    }
+
+    function esc(s) {
+      return String(s ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadCards();
+  </script>
+</body>
+</html>

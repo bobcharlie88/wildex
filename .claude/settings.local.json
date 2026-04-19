@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install *)",
+      "Bash(timeout 8 python -m uvicorn main:app --host 127.0.0.1 --port 8000)",
+      "Bash(curl -s http://127.0.0.1:8000/)",
+      "Bash(curl -s http://127.0.0.1:8000/health)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://api.inaturalist.org/v1/computervision/score_image\" -X POST)",
+      "Bash(curl -s \"https://api.inaturalist.org/v1/taxa?q=kangaroo&rank=species&per_page=2\")",
+      "Bash(python -m json.tool)",
+      "Bash(curl -sL \"https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Kangaroo_at_sunset.jpg/640px-Kangaroo_at_sunset.jpg\" -o /tmp/test_kangaroo.jpg)",
+      "Bash(curl -s -X POST https://api.inaturalist.org/v1/computervision/score_image -F file=@/tmp/test_kangaroo.jpg -w '\\\\nHTTP status: %{http_code}')",
+      "Bash(curl -s \"https://api.inaturalist.org/v1/observations?taxon_name=Macropus+giganteus&quality_grade=research&per_page=1\")",
+      "Bash(python -c ' *)",
+      "Bash(curl -sL \"https://inaturalist-open-data.s3.amazonaws.com/photos/640006929/medium.jpg\" -o /tmp/test_kangaroo.jpg)",
+      "Bash(curl -s -X POST https://api.inaturalist.org/v1/computervision/score_image -F file=@/tmp/test_kangaroo.jpg -w '\\\\nHTTP_STATUS:%{http_code}')",
+      "Bash(curl -s -X POST https://api.inaturalist.org/v1/computervision/score_image -F image_url=https://inaturalist-open-data.s3.amazonaws.com/photos/640006929/medium.jpg -w '\\\\nHTTP_STATUS:%{http_code}')",
+      "Bash(curl -s -X POST https://api.inaturalist.org/v1/computervision/score_image -H 'Authorization: Bearer fake_token_test' -F file=@/tmp/test_kangaroo.jpg -w '\\\\nHTTP_STATUS:%{http_code}')",
+      "Bash(python tests/test_species_id.py)",
+      "Bash(python tests/test_species_id.py --live)"
+    ]
+  }
+}

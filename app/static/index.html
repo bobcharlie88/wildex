@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>WildEx</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080f14;
+      --surface:  #0e1a24;
+      --surface2: #152130;
+      --accent:   #22c55e;
+      --accent2:  #16a34a;
+      --warn:     #f59e0b;
+      --danger:   #ef4444;
+      --text:     #e8f0e9;
+      --muted:    #5a7a62;
+      --radius:   16px;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden; }
+
+    /* ── Screens ─────────────────────────────────────────────────── */
+    .screen {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column; align-items: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+    }
+    .screen.active { opacity: 1; pointer-events: all; }
+
+    /* ── Capture screen ──────────────────────────────────────────── */
+    #preview-bg {
+      position: absolute; inset: 0; background: var(--surface); overflow: hidden;
+    }
+    #preview-img {
+      width: 100%; height: 100%; object-fit: cover;
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    #preview-img.visible { opacity: 1; }
+
+    .placeholder {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; color: var(--muted);
+    }
+    .placeholder svg { opacity: 0.35; }
+    .placeholder p { font-size: 0.9rem; }
+
+    .capture-bar {
+      position: relative; z-index: 10; width: 100%;
+      padding: 20px 24px 44px;
+      background: linear-gradient(to top, rgba(8,15,20,0.96) 65%, transparent);
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      margin-top: auto;
+    }
+    #wordmark { font-size: 1rem; font-weight: 700; letter-spacing: 0.14em;
+      color: var(--accent); text-transform: uppercase; }
+    #gps-status { font-size: 0.75rem; color: var(--muted); display: flex;
+      align-items: center; gap: 6px; }
+    #gps-dot { width: 7px; height: 7px; border-radius: 50%;
+      background: var(--muted); flex-shrink: 0; transition: background 0.4s; }
+    #gps-dot.acquired { background: var(--accent); }
+
+    .btn {
+      width: 100%; max-width: 340px; padding: 15px; border: none;
+      border-radius: var(--radius); font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: transform 0.1s, opacity 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.97); opacity: 0.88; }
+    .btn-primary  { background: var(--accent); color: #000; }
+    .btn-secondary { background: var(--surface2); color: var(--text);
+      border: 1px solid rgba(255,255,255,0.07); }
+
+    #capture-btn { display: none; }
+    #capture-btn.visible { display: block; }
+
+    /* ── Loading screen ──────────────────────────────────────────── */
+    #loading-screen { background: var(--bg); justify-content: center; gap: 32px; }
+    .spinner { width: 52px; height: 52px; border: 3px solid var(--surface2);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.75s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .steps { display: flex; flex-direction: column; gap: 10px; }
+    .step { display: flex; align-items: center; gap: 10px;
+      font-size: 0.85rem; color: var(--muted); transition: color 0.35s; }
+    .step.active { color: var(--text); }
+    .step.done   { color: var(--accent); }
+    .step-dot { width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor; flex-shrink: 0; }
+
+    /* ── Result screen ───────────────────────────────────────────── */
+    #result-screen { background: var(--bg); justify-content: flex-start;
+      overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+    #result-photo { width: 100%; max-height: 38vh; object-fit: cover; flex-shrink: 0; }
+
+    .result-body { width: 100%; padding: 20px 18px 52px;
+      display: flex; flex-direction: column; gap: 18px; }
+
+    /* Save banner */
+    .save-banner {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; border-radius: 12px; font-size: 0.88rem; font-weight: 600;
+    }
+    .save-banner.saved { background: rgba(34,197,94,0.12); color: var(--accent);
+      border: 1px solid rgba(34,197,94,0.25); }
+    .save-banner.unsaved { background: rgba(245,158,11,0.1); color: var(--warn);
+      border: 1px solid rgba(245,158,11,0.2); }
+    .save-icon { font-size: 1.1rem; }
+
+    /* Species name */
+    .name-block { display: flex; flex-direction: column; gap: 3px; }
+    .common-name { font-size: 1.7rem; font-weight: 700; line-height: 1.15; }
+    .sci-name { font-size: 0.9rem; font-style: italic; color: var(--muted); }
+
+    /* Badges */
+    .badges { display: flex; flex-wrap: wrap; gap: 7px; }
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.74rem;
+      font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+    .badge-green  { background: rgba(34,197,94,0.14);  color: var(--accent); }
+    .badge-amber  { background: rgba(245,158,11,0.14); color: var(--warn); }
+    .badge-red    { background: rgba(239,68,68,0.14);  color: var(--danger); }
+    .badge-muted  { background: var(--surface2); color: var(--muted); }
+
+    /* Confidence */
+    .conf-row { display: flex; flex-direction: column; gap: 7px; }
+    .conf-label { display: flex; justify-content: space-between; font-size: 0.8rem; }
+    .conf-label span:first-child { color: var(--muted); }
+    .conf-label span:last-child  { font-weight: 700; }
+    .conf-track { height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .conf-fill  { height: 100%; border-radius: 3px;
+      transition: width 0.7s cubic-bezier(0.34,1.56,0.64,1); }
+
+    /* Stats */
+    .stats-card { background: var(--surface); border-radius: var(--radius);
+      padding: 16px; display: flex; flex-direction: column; gap: 11px; }
+    .stats-title { font-size: 0.72rem; font-weight: 700; color: var(--muted);
+      letter-spacing: 0.1em; text-transform: uppercase; }
+    .stat-row { display: flex; align-items: center; gap: 10px; }
+    .stat-label { font-size: 0.72rem; font-weight: 700; color: var(--muted);
+      letter-spacing: 0.06em; width: 32px; flex-shrink: 0; }
+    .stat-track { flex: 1; height: 6px; background: var(--surface2);
+      border-radius: 3px; overflow: hidden; }
+    .stat-fill  { height: 100%; border-radius: 3px;
+      transition: width 0.65s cubic-bezier(0.34,1.56,0.64,1); }
+    .stat-val   { font-size: 0.8rem; font-weight: 700; width: 26px;
+      text-align: right; flex-shrink: 0; }
+
+    /* Blurb */
+    .blurb { font-size: 0.9rem; line-height: 1.6; color: var(--muted);
+      padding: 14px 16px; background: var(--surface); border-radius: var(--radius);
+      border-left: 2px solid var(--accent2); }
+
+    /* Details */
+    .detail-card { background: var(--surface); border-radius: var(--radius);
+      padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .detail-row { display: flex; justify-content: space-between;
+      align-items: flex-start; gap: 10px; font-size: 0.84rem; }
+    .detail-key { color: var(--muted); flex-shrink: 0; }
+    .detail-val { color: var(--text); font-weight: 500; text-align: right; }
+
+    .error-box { background: rgba(239,68,68,0.07);
+      border: 1px solid rgba(239,68,68,0.2); border-radius: var(--radius);
+      padding: 20px; text-align: center; color: var(--danger);
+      font-size: 0.88rem; line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Capture screen ────────────────────────────────────────────── -->
+  <div class="screen active" id="capture-screen">
+    <div id="preview-bg">
+      <img id="preview-img" alt="">
+      <div class="placeholder" id="placeholder">
+        <svg width="60" height="60" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.4">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <p>Point your camera at any animal</p>
+      </div>
+    </div>
+
+    <div class="capture-bar">
+      <div id="wordmark">WildEx</div>
+
+      <div id="gps-status">
+        <div id="gps-dot"></div>
+        <span id="gps-text">Acquiring GPS...</span>
+      </div>
+
+      <label class="btn btn-primary" for="camera-input">Take Photo</label>
+      <input type="file" id="camera-input" accept="image/*" capture="environment"
+             style="display:none">
+
+      <button class="btn btn-secondary" id="capture-btn">Capture &amp; Save to WildDex</button>
+    </div>
+  </div>
+
+  <!-- ── Loading screen ────────────────────────────────────────────── -->
+  <div class="screen" id="loading-screen">
+    <div class="spinner"></div>
+    <div class="steps">
+      <div class="step active" id="s1"><div class="step-dot"></div>Identifying species</div>
+      <div class="step"        id="s2"><div class="step-dot"></div>Looking up species data</div>
+      <div class="step"        id="s3"><div class="step-dot"></div>Getting rarity &amp; range</div>
+      <div class="step"        id="s4"><div class="step-dot"></div>Writing card</div>
+      <div class="step"        id="s5"><div class="step-dot"></div>Saving to WildDex</div>
+    </div>
+  </div>
+
+  <!-- ── Result screen ─────────────────────────────────────────────── -->
+  <div class="screen" id="result-screen">
+    <img id="result-photo" alt="">
+    <div class="result-body" id="result-body"></div>
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const screens = ['capture-screen','loading-screen','result-screen'].map($);
+
+    function show(id) {
+      screens.forEach(s => s.classList.remove('active'));
+      $(id).classList.add('active');
+    }
+
+    // ── GPS ───────────────────────────────────────────────────────────
+    let gpsCoords = null;
+
+    function initGPS() {
+      if (!navigator.geolocation) {
+        $('gps-text').textContent = 'GPS not available';
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          gpsCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+          $('gps-dot').classList.add('acquired');
+          $('gps-text').textContent =
+            `GPS locked (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lon.toFixed(4)})`;
+        },
+        () => {
+          $('gps-text').textContent = 'GPS unavailable — invasive check skipped';
+        },
+        { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false }
+      );
+    }
+
+    initGPS();
+
+    // ── Camera ────────────────────────────────────────────────────────
+    let capturedFile = null;
+
+    $('camera-input').addEventListener('change', () => {
+      const f = $('camera-input').files[0];
+      if (!f) return;
+      capturedFile = f;
+      const url = URL.createObjectURL(f);
+      $('preview-img').src = url;
+      $('preview-img').classList.add('visible');
+      $('placeholder').style.display = 'none';
+      $('capture-btn').classList.add('visible');
+    });
+
+    // ── Capture & Save ────────────────────────────────────────────────
+    $('capture-btn').addEventListener('click', async () => {
+      if (!capturedFile) return;
+
+      // Reset loading steps
+      ['s1','s2','s3','s4','s5'].forEach((id,i) =>
+        $(id).className = 'step' + (i === 0 ? ' active' : '')
+      );
+      show('loading-screen');
+
+      // Advance loading steps on timers (UX only — pipeline is server-side)
+      const timings = [[4000,'s1','s2'],[7000,'s2','s3'],[10000,'s3','s4'],[14000,'s4','s5']];
+      const timers  = timings.map(([ms, done, next]) =>
+        setTimeout(() => {
+          $(done).className = 'step done';
+          if (next) $(next).className = 'step active';
+        }, ms)
+      );
+
+      const form = new FormData();
+      form.append('file', capturedFile);
+      if (gpsCoords) {
+        form.append('lat', gpsCoords.lat);
+        form.append('lon', gpsCoords.lon);
+      }
+
+      try {
+        const resp = await fetch('/capture', { method: 'POST', body: form });
+        timers.forEach(clearTimeout);
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ detail: `Server error ${resp.status}` }));
+          showError(err.detail || `Capture failed (${resp.status})`);
+          return;
+        }
+
+        const data = await resp.json();
+        // Mark all steps done
+        ['s1','s2','s3','s4','s5'].forEach(id => $(id).className = 'step done');
+        await new Promise(r => setTimeout(r, 400));
+        renderCard(data);
+
+      } catch (e) {
+        timers.forEach(clearTimeout);
+        showError('Could not reach server. Check your connection.');
+      }
+    });
+
+    // ── Render card ───────────────────────────────────────────────────
+    function renderCard(resp) {
+      const c = resp.card;
+
+      $('result-photo').src = URL.createObjectURL(capturedFile);
+
+      // Save banner
+      const banner = resp.saved
+        ? `<div class="save-banner saved">
+             <span class="save-icon">&#10003;</span>
+             Saved to WildDex &mdash; card #${resp.card_id}
+           </div>`
+        : `<div class="save-banner unsaved">
+             <span class="save-icon">&#9888;</span>
+             Card generated &mdash; database offline
+           </div>`;
+
+      // Badges
+      const badges = [];
+      const rarity = c.rarity_display || c.rarity_tier || '';
+      if (rarity) {
+        const rc = rarity === 'Legendary' ? 'badge-amber'
+                 : rarity === 'Rare'      ? 'badge-amber'
+                 : 'badge-green';
+        badges.push(`<span class="badge ${rc}">${esc(rarity)}</span>`);
+      }
+      if (c.invasive_at_location)
+        badges.push(`<span class="badge badge-red">Invasive</span>`);
+      if (c.provisional)
+        badges.push(`<span class="badge badge-amber">Provisional ID</span>`);
+      if (c.iconic_taxon)
+        badges.push(`<span class="badge badge-muted">${esc(c.iconic_taxon)}</span>`);
+
+      // Confidence
+      const pct = Math.round(c.confidence * 100);
+      const confColor = c.provisional ? 'var(--warn)' : 'var(--accent)';
+
+      // Stats
+      const STAT_COLORS = {
+        speed:         '#38bdf8',
+        attack:        '#f87171',
+        defence:       '#a78bfa',
+        hp:            '#34d399',
+        stamina_regen: '#fb923c',
+      };
+      const STAT_LABELS = {
+        speed:'SPD', attack:'ATK', defence:'DEF', hp:'HP', stamina_regen:'STM'
+      };
+      const statRows = Object.entries(c.stats).map(([k, v]) => `
+        <div class="stat-row">
+          <span class="stat-label">${STAT_LABELS[k]}</span>
+          <div class="stat-track">
+            <div class="stat-fill" data-val="${v}"
+                 style="width:0;background:${STAT_COLORS[k]}"></div>
+          </div>
+          <span class="stat-val">${v}</span>
+        </div>`).join('');
+
+      // Detail rows
+      const details = [];
+      if (c.conservation_status)
+        details.push(detailRow('Conservation', c.conservation_status));
+      if (c.observations_count)
+        details.push(detailRow('iNat sightings', c.observations_count.toLocaleString()));
+      if (c.taxon_id)
+        details.push(detailRow('Taxon ID', c.taxon_id));
+      if (c.latitude != null)
+        details.push(detailRow('Captured at', `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`));
+
+      $('result-body').innerHTML = `
+        ${banner}
+
+        <div class="name-block">
+          <div class="common-name">${esc(c.species_name)}</div>
+          <div class="sci-name">${esc(c.scientific_name)}</div>
+        </div>
+
+        ${badges.length ? `<div class="badges">${badges.join('')}</div>` : ''}
+
+        <div class="conf-row">
+          <div class="conf-label">
+            <span>Confidence</span>
+            <span>${pct}%${c.provisional ? ' — uncertain' : ''}</span>
+          </div>
+          <div class="conf-track">
+            <div class="conf-fill" id="conf-fill"
+                 style="width:0;background:${confColor}"></div>
+          </div>
+        </div>
+
+        <div class="stats-card">
+          <div class="stats-title">Stats</div>
+          ${statRows}
+        </div>
+
+        ${c.blurb ? `<div class="blurb">${esc(c.blurb)}</div>` : ''}
+
+        ${details.length ? `<div class="detail-card">${details.join('')}</div>` : ''}
+
+        <button class="btn btn-secondary" onclick="reset()">Capture Another</button>
+      `;
+
+      show('result-screen');
+
+      // Animate bars after paint
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const fill = $('conf-fill');
+        if (fill) fill.style.width = pct + '%';
+
+        document.querySelectorAll('.stat-fill').forEach(el => {
+          el.style.width = el.dataset.val + '%';
+        });
+      }));
+    }
+
+    function showError(msg) {
+      $('result-photo').src = capturedFile ? URL.createObjectURL(capturedFile) : '';
+      $('result-body').innerHTML = `
+        <div class="error-box">${esc(msg)}</div>
+        <button class="btn btn-secondary" style="margin-top:16px" onclick="reset()">
+          Try Again
+        </button>`;
+      show('result-screen');
+    }
+
+    function reset() {
+      capturedFile = null;
+      $('camera-input').value = '';
+      $('preview-img').src = '';
+      $('preview-img').classList.remove('visible');
+      $('placeholder').style.display = '';
+      $('capture-btn').classList.remove('visible');
+      show('capture-screen');
+    }
+
+    function detailRow(k, v) {
+      return `<div class="detail-row">
+        <span class="detail-key">${esc(String(k))}</span>
+        <span class="detail-val">${esc(String(v))}</span>
+      </div>`;
+    }
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+</body>
+</html>
