@@ -9,3 +9,5 @@ requests
 httpx
 google-genai
 pycountry
+python-multipart
+pycountry
