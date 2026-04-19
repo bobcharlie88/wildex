@@ -1,4 +1,5 @@
 import logging
+import os
 import socket
 
 from dotenv import load_dotenv
@@ -31,6 +32,19 @@ def startup():
         try:
             create_tables()
             log.info("Database tables ready")
+            # Migrate: add columns introduced after initial schema
+            from app.database import engine
+            with engine.connect() as conn:
+                from sqlalchemy import text
+                for col, typedef in [
+                    ("category",     "VARCHAR(50)"),
+                    ("sub_category", "VARCHAR(100)"),
+                ]:
+                    try:
+                        conn.execute(text(f"ALTER TABLE cards ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
         except Exception as e:
             log.warning(f"Could not create tables: {e}")
     else:
@@ -42,6 +56,11 @@ def startup():
 
 @app.get("/")
 def root():
+    return FileResponse("app/static/home.html")
+
+
+@app.get("/capture")
+def capture_page():
     return FileResponse("app/static/index.html")
 
 

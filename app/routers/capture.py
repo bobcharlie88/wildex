@@ -10,12 +10,15 @@ from PIL import Image
 from app.database import SessionLocal, db_available
 from app.models import Card
 from app.pipeline.card_generator import generate_card
+from app.pipeline.frame_extractor import extract_best_frame, save_frame
 from app.pipeline.species_data import get_species_data
 from app.pipeline.species_id import identify_species
 
 router = APIRouter()
 
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
+IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
+VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm", "video/3gpp", "video/x-m4v"}
+ALLOWED_TYPES = IMAGE_TYPES | VIDEO_TYPES
 
 
 # ── /capture — full pipeline ──────────────────────────────────────────────
@@ -41,15 +44,35 @@ async def capture(
     if not content:
         raise HTTPException(400, "Empty file received")
 
-    suffix = ".png" if (file.content_type or "").endswith("png") else ".jpg"
+    is_video = (file.content_type or "").lower() in VIDEO_TYPES
+    suffix = ".mp4" if is_video else (".png" if (file.content_type or "").endswith("png") else ".jpg")
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
 
+    # For video: extract best frame into a separate temp JPEG for the pipeline
+    frame_path = None
+    try:
+        if is_video:
+            try:
+                frame, _, _ = extract_best_frame(tmp_path)
+                frame_tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                frame_tmp.close()
+                frame_path = frame_tmp.name
+                save_frame(frame, frame_path)
+                identify_path = frame_path
+            except Exception as e:
+                raise HTTPException(422, f"Could not extract frame from video: {e}")
+        else:
+            identify_path = tmp_path
+    except HTTPException:
+        os.unlink(tmp_path)
+        raise
+
     try:
         # 1 — Species identification (Gemini Vision + iNaturalist)
         try:
-            species = identify_species(tmp_path)
+            species = identify_species(identify_path)
         except EnvironmentError as e:
             raise HTTPException(503, str(e))
         except Exception as e:
@@ -92,6 +115,8 @@ async def capture(
                     gbif_key             = card.gbif_key,
                     rarity_tier          = card.rarity_tier,
                     invasive_at_location = card.invasive_at_location,
+                    category             = species.category,
+                    sub_category         = species.sub_category,
                     blurb                = card.blurb,
                     speed                = card.stats.speed,
                     attack               = card.stats.attack,
@@ -114,17 +139,21 @@ async def capture(
         else:
             db_error = "Database not configured — update DATABASE_URL in .env"
 
-        # Save captured photo so WildDex can show thumbnails
+        # Save thumbnail for WildDex (use extracted frame for video)
         if saved and card_id:
             try:
                 uploads = Path("uploads")
                 uploads.mkdir(exist_ok=True)
-                img = Image.open(io.BytesIO(content))
-                if img.mode != "RGB":
-                    img = img.convert("RGB")
-                img.save(str(uploads / f"{card_id}.jpg"), "JPEG", quality=85, optimize=True)
+                src = frame_path if (is_video and frame_path) else None
+                if src:
+                    import shutil; shutil.copy2(src, str(uploads / f"{card_id}.jpg"))
+                else:
+                    img = Image.open(io.BytesIO(content))
+                    if img.mode != "RGB":
+                        img = img.convert("RGB")
+                    img.save(str(uploads / f"{card_id}.jpg"), "JPEG", quality=85, optimize=True)
             except Exception:
-                pass  # non-blocking — missing thumbnail is fine
+                pass
 
         return {
             "saved":    saved,
@@ -160,6 +189,8 @@ async def capture(
 
     finally:
         os.unlink(tmp_path)
+        if frame_path and os.path.exists(frame_path):
+            os.unlink(frame_path)
 
 
 # ── /identify — lightweight species-name-only check (no card, no DB) ─────

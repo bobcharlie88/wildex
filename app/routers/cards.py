@@ -30,6 +30,8 @@ def _card_dict(c: Card) -> dict:
         "observations_count":   c.observations_count,
         "taxon_id":             c.taxon_id,
         "gbif_key":             c.gbif_key,
+        "category":             c.category,
+        "sub_category":         c.sub_category,
         "blurb":                c.blurb,
         "stats": {
             "speed":         c.speed,

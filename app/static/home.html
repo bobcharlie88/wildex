@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>WildEx</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080f14;
+      --surface:  #0e1a24;
+      --surface2: #152130;
+      --accent:   #22c55e;
+      --accent2:  #16a34a;
+      --warn:     #f59e0b;
+      --text:     #e8f0e9;
+      --muted:    #5a7a62;
+      --radius:   16px;
+    }
+
+    html, body {
+      height: 100%; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    .page {
+      height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 32px 28px 48px;
+      gap: 0;
+    }
+
+    /* ── Hero ────────────────────────────────────────────────── */
+    .hero { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 52px; }
+
+    .wordmark {
+      font-size: 2.8rem; font-weight: 800; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--accent);
+      line-height: 1;
+    }
+
+    .tagline {
+      font-size: 0.9rem; color: var(--muted); text-align: center; line-height: 1.5;
+    }
+
+    .badge-count {
+      margin-top: 4px;
+      font-size: 0.78rem; color: var(--muted);
+      background: var(--surface); padding: 4px 14px;
+      border-radius: 20px;
+    }
+    .badge-count span { color: var(--accent); font-weight: 700; }
+
+    /* ── Nav buttons ─────────────────────────────────────────── */
+    .nav { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 340px; }
+
+    .nav-btn {
+      display: flex; align-items: center; gap: 16px;
+      padding: 18px 22px; border: none; border-radius: var(--radius);
+      font-size: 1.05rem; font-weight: 700; cursor: pointer;
+      text-decoration: none; color: inherit;
+      transition: transform 0.12s, opacity 0.12s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .nav-btn:active { transform: scale(0.97); opacity: 0.88; }
+
+    .nav-btn-primary { background: var(--accent); color: #000; }
+    .nav-btn-surface { background: var(--surface); color: var(--text);
+      border: 1px solid rgba(255,255,255,0.07); }
+
+    .nav-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .nav-text { display: flex; flex-direction: column; gap: 1px; }
+    .nav-label { font-size: 1rem; font-weight: 700; }
+    .nav-sub   { font-size: 0.75rem; font-weight: 400; opacity: 0.7; }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .footer {
+      position: fixed; bottom: 24px;
+      font-size: 0.7rem; color: var(--muted); opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page">
+    <div class="hero">
+      <div class="wordmark">WildEx</div>
+      <div class="tagline">Go outside. Find a creature.<br>Film it. Add it to your WildDex.</div>
+      <div class="badge-count" id="count-badge" style="display:none">
+        <span id="card-count">0</span> cards captured
+      </div>
+    </div>
+
+    <div class="nav">
+      <a class="nav-btn nav-btn-primary" href="/capture">
+        <span class="nav-icon">📷</span>
+        <div class="nav-text">
+          <span class="nav-label">Take Photo or Video</span>
+          <span class="nav-sub">Capture your next card</span>
+        </div>
+      </a>
+
+      <a class="nav-btn nav-btn-surface" href="/wildex">
+        <span class="nav-icon">📖</span>
+        <div class="nav-text">
+          <span class="nav-label">My WildDex</span>
+          <span class="nav-sub">Browse your collection</span>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <div class="footer">WildEx &mdash; Phase 1 MVP</div>
+
+  <script>
+    // Show card count if DB is available
+    fetch('/cards')
+      .then(r => r.ok ? r.json() : [])
+      .then(cards => {
+        if (cards.length > 0) {
+          document.getElementById('card-count').textContent = cards.length;
+          document.getElementById('count-badge').style.display = '';
+        }
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>

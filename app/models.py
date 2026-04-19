@@ -24,6 +24,10 @@ class Card(Base):
     conservation_status: Mapped[str | None] = mapped_column(String(100))
     observations_count:  Mapped[int]        = mapped_column(Integer, default=0)
 
+    # ── Category ──────────────────────────────────────────────────
+    category:            Mapped[str | None] = mapped_column(String(50))   # animal/plant/fungi/terrain
+    sub_category:        Mapped[str | None] = mapped_column(String(100))  # mammal/bird/tree/rock/etc.
+
     # ── GBIF ──────────────────────────────────────────────────────
     gbif_key:            Mapped[int | None] = mapped_column(Integer)
     rarity_tier:         Mapped[str | None] = mapped_column(String(50))

@@ -1,496 +1,653 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WildDex</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>WildDex</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    :root {
-      --bg:       #080f14;
-      --surface:  #0e1a24;
-      --surface2: #152130;
-      --accent:   #22c55e;
-      --accent2:  #16a34a;
-      --warn:     #f59e0b;
-      --danger:   #ef4444;
-      --text:     #e8f0e9;
-      --muted:    #5a7a62;
-      --radius:   14px;
-    }
+  :root {
+    --bg: #0a0f0a;
+    --surface: #111811;
+    --surface2: #1a221a;
+    --border: #2a362a;
+    --accent: #4caf50;
+    --accent2: #81c784;
+    --text: #e8f5e9;
+    --text2: #a5d6a7;
+    --text3: #6a9b6e;
+    --tab-h: 44px;
+    --subtab-h: 36px;
+    --header-h: 56px;
+  }
 
-    html, body {
-      min-height: 100%; background: var(--bg); color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-    /* ── Header ──────────────────────────────────────────────────────── */
-    .header {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 20;
-      height: 56px;
-      background: rgba(8,15,20,0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      display: flex; align-items: center; padding: 0 16px; gap: 12px;
-    }
-    .back-btn {
-      color: var(--accent); font-size: 1.5rem; line-height: 1;
-      text-decoration: none; padding: 6px 4px; flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .header-title { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--accent); flex: 1; }
-    .header-count {
-      font-size: 0.75rem; font-weight: 700; color: var(--muted);
-      background: var(--surface2); padding: 4px 10px;
-      border-radius: 20px; flex-shrink: 0;
-    }
+  /* ── Header ── */
+  header {
+    height: var(--header-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .back-btn {
+    color: var(--accent2);
+    text-decoration: none;
+    font-size: 22px;
+    line-height: 1;
+    padding: 4px 8px 4px 0;
+  }
+  header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    flex: 1;
+  }
+  #total-count {
+    font-size: 13px;
+    color: var(--text3);
+    background: var(--surface2);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
 
-    /* ── Grid ────────────────────────────────────────────────────────── */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      padding: 10px;
-      padding-top: calc(56px + 10px);
-      padding-bottom: 90px;
-    }
+  /* ── Kingdom tabs ── */
+  .kingdom-tabs {
+    height: var(--tab-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+  }
+  .kingdom-tabs::-webkit-scrollbar { display: none; }
+  .kingdom-tabs button {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text3);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 0 16px;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+    white-space: nowrap;
+  }
+  .kingdom-tabs button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
 
-    /* ── Card ────────────────────────────────────────────────────────── */
-    .card {
-      background: var(--surface); border-radius: var(--radius);
-      overflow: hidden; cursor: pointer;
-      transition: transform 0.12s, box-shadow 0.12s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .card:active { transform: scale(0.96); }
+  /* ── Sub-tabs ── */
+  .sub-tabs {
+    height: var(--subtab-h);
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: none;
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+  }
+  .sub-tabs::-webkit-scrollbar { display: none; }
+  .sub-tabs.visible { display: flex; }
+  .sub-tabs button {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text3);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 0 12px;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    transition: color .15s, border-color .15s;
+  }
+  .sub-tabs button.active {
+    color: var(--accent2);
+    border-bottom-color: var(--accent2);
+  }
 
-    .card-thumb {
-      width: 100%; aspect-ratio: 1 / 1;
-      background: var(--surface2); position: relative; overflow: hidden;
-    }
-    .card-thumb img {
-      width: 100%; height: 100%; object-fit: cover;
-      display: block;
-    }
-    .card-placeholder {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 2.8rem;
-    }
+  /* ── Card grid ── */
+  #grid-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  #card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
 
-    .card-body { padding: 9px 10px 11px; }
-    .card-name {
-      font-size: 0.8rem; font-weight: 700; line-height: 1.25;
-      margin-bottom: 7px;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .card-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+  .card-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .1s, border-color .1s;
+  }
+  .card-tile:active { transform: scale(0.97); }
+  .card-tile:hover { border-color: var(--accent); }
 
-    /* ── Badges ──────────────────────────────────────────────────────── */
-    .badge {
-      padding: 2px 7px; border-radius: 20px; font-size: 0.65rem;
-      font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-    }
-    .badge-legendary { background: rgba(245,158,11,0.18); color: var(--warn);  border: 1px solid rgba(245,158,11,0.3); }
-    .badge-rare      { background: rgba(239,68,68,0.14);  color: #f87171;     border: 1px solid rgba(239,68,68,0.25); }
-    .badge-uncommon  { background: rgba(96,165,250,0.14); color: #60a5fa;     border: 1px solid rgba(96,165,250,0.25); }
-    .badge-common    { background: rgba(34,197,94,0.12);  color: var(--accent); border: 1px solid rgba(34,197,94,0.22); }
-    .badge-unknown   { background: var(--surface2); color: var(--muted); }
-    .badge-invasive  { background: rgba(239,68,68,0.14); color: var(--danger); border: 1px solid rgba(239,68,68,0.25); }
-    .badge-amber     { background: rgba(245,158,11,0.14); color: var(--warn);  border: 1px solid rgba(245,158,11,0.25); }
-    .badge-muted     { background: var(--surface2); color: var(--muted); }
+  .card-thumb {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+  }
+  .card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .card-thumb.no-img { font-size: 40px; }
 
-    /* ── FAB ─────────────────────────────────────────────────────────── */
-    .fab {
-      position: fixed; bottom: 28px; right: 20px; z-index: 20;
-      width: 56px; height: 56px; border-radius: 50%;
-      background: var(--accent); color: #000;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.7rem; font-weight: 300; line-height: 1;
-      text-decoration: none; box-shadow: 0 4px 20px rgba(34,197,94,0.4);
-      -webkit-tap-highlight-color: transparent;
-      transition: transform 0.1s, box-shadow 0.1s;
-    }
-    .fab:active { transform: scale(0.93); box-shadow: 0 2px 10px rgba(34,197,94,0.3); }
+  .card-info {
+    padding: 8px;
+  }
+  .card-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 4px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+  .badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    letter-spacing: 0.3px;
+  }
+  .badge-common    { background: #1a2e1a; color: #81c784; border: 1px solid #2e4e2e; }
+  .badge-uncommon  { background: #1a2a3a; color: #64b5f6; border: 1px solid #2a3a5a; }
+  .badge-rare      { background: #2a1a3a; color: #ce93d8; border: 1px solid #4a2a5a; }
+  .badge-legendary { background: #3a2a0a; color: #ffb74d; border: 1px solid #5a3a0a; }
+  .badge-invasive  { background: #3a1a1a; color: #ef9a9a; border: 1px solid #5a2a2a; }
+  .badge-unknown   { background: #1e2e1e; color: #6a9b6e; border: 1px solid #2e3e2e; }
 
-    /* ── Empty / Loading / Error states ─────────────────────────────── */
-    .state-box {
-      position: fixed; inset: 0; padding-top: 56px;
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 16px; text-align: center;
-      padding-left: 32px; padding-right: 32px;
-    }
-    .state-box svg { opacity: 0.2; }
-    .state-box p { color: var(--muted); font-size: 0.92rem; line-height: 1.5; }
-    .state-box a { color: var(--accent); font-size: 0.9rem; font-weight: 600;
-      text-decoration: none; }
-    .spinner { width: 40px; height: 40px; border: 3px solid var(--surface2);
-      border-top-color: var(--accent); border-radius: 50%;
-      animation: spin 0.75s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+  /* ── Empty state ── */
+  #empty-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text3);
+    text-align: center;
+    gap: 12px;
+  }
+  #empty-state.visible { display: flex; }
+  #empty-state .empty-icon { font-size: 64px; }
+  #empty-state p { font-size: 15px; line-height: 1.5; }
+  #empty-state a {
+    margin-top: 8px;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 15px;
+    background: var(--surface);
+    padding: 10px 20px;
+    border-radius: 24px;
+    border: 1px solid var(--accent);
+  }
 
-    /* ── Backdrop ────────────────────────────────────────────────────── */
-    .backdrop {
-      position: fixed; inset: 0; z-index: 30;
-      background: rgba(0,0,0,0.65);
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.3s;
-    }
-    .backdrop.open { opacity: 1; pointer-events: all; }
+  /* ── Loading ── */
+  #loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text3);
+    gap: 12px;
+    font-size: 15px;
+  }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Modal (bottom sheet) ────────────────────────────────────────── */
-    .modal {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
-      max-height: 90vh;
-      background: var(--bg);
-      border-radius: 20px 20px 0 0;
-      transform: translateY(100%);
-      transition: transform 0.36s cubic-bezier(0.32,0.72,0,1);
-      overflow-y: auto; -webkit-overflow-scrolling: touch;
-      display: flex; flex-direction: column;
-    }
-    .modal.open { transform: translateY(0); }
+  /* ── Modal ── */
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.7);
+    z-index: 100;
+    align-items: flex-end;
+  }
+  #modal-overlay.open { display: flex; }
+  #modal {
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    width: 100%;
+    max-height: 90dvh;
+    overflow-y: auto;
+    padding: 0 0 env(safe-area-inset-bottom) 0;
+    animation: slideUp .25s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
-    .modal-drag {
-      width: 36px; height: 4px; border-radius: 2px;
-      background: var(--surface2); margin: 12px auto 0; flex-shrink: 0;
-    }
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 12px auto 0;
+  }
 
-    /* ── Modal photo ─────────────────────────────────────────────────── */
-    .modal-photo {
-      width: 100%; max-height: 38vh; object-fit: cover;
-      flex-shrink: 0; display: block;
-    }
-    .modal-photo-placeholder {
-      width: 100%; height: 220px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      background: var(--surface); font-size: 5rem;
-    }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px 0;
+  }
+  .modal-back {
+    background: none;
+    border: none;
+    color: var(--accent2);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px 8px 4px 0;
+    line-height: 1;
+  }
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    flex: 1;
+  }
 
-    /* ── Modal body ──────────────────────────────────────────────────── */
-    .modal-body {
-      padding: 18px 18px 48px;
-      display: flex; flex-direction: column; gap: 16px;
-    }
+  #modal-photo {
+    width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+    margin-top: 12px;
+    background: var(--surface2);
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 80px;
+  }
+  #modal-photo img {
+    width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+  }
 
-    .name-block { display: flex; flex-direction: column; gap: 3px; }
-    .common-name { font-size: 1.6rem; font-weight: 700; line-height: 1.15; }
-    .sci-name { font-size: 0.88rem; font-style: italic; color: var(--muted); }
+  .modal-body {
+    padding: 16px;
+  }
+  .modal-sci {
+    font-size: 13px;
+    color: var(--text3);
+    font-style: italic;
+    margin-bottom: 10px;
+  }
+  .modal-blurb {
+    font-size: 14px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
 
-    .badges-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .stat-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: 9px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+  }
 
-    .conf-row { display: flex; flex-direction: column; gap: 6px; }
-    .conf-label { display: flex; justify-content: space-between; font-size: 0.79rem; }
-    .conf-label span:first-child { color: var(--muted); }
-    .conf-label span:last-child  { font-weight: 700; }
-    .conf-track { height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
-    .conf-fill  { height: 100%; border-radius: 3px;
-      transition: width 0.7s cubic-bezier(0.34,1.56,0.64,1); }
-
-    .stats-card {
-      background: var(--surface); border-radius: 14px;
-      padding: 14px; display: flex; flex-direction: column; gap: 10px;
-    }
-    .stats-title { font-size: 0.7rem; font-weight: 700; color: var(--muted);
-      letter-spacing: 0.1em; text-transform: uppercase; }
-    .stat-row { display: flex; align-items: center; gap: 10px; }
-    .stat-label { font-size: 0.7rem; font-weight: 700; color: var(--muted);
-      letter-spacing: 0.06em; width: 30px; flex-shrink: 0; }
-    .stat-track { flex: 1; height: 6px; background: var(--surface2);
-      border-radius: 3px; overflow: hidden; }
-    .stat-fill  { height: 100%; border-radius: 3px;
-      transition: width 0.65s cubic-bezier(0.34,1.56,0.64,1); }
-    .stat-val   { font-size: 0.78rem; font-weight: 700; width: 24px;
-      text-align: right; flex-shrink: 0; }
-
-    .blurb {
-      font-size: 0.88rem; line-height: 1.6; color: var(--muted);
-      padding: 13px 14px; background: var(--surface); border-radius: 14px;
-      border-left: 2px solid var(--accent2);
-    }
-
-    .detail-card {
-      background: var(--surface); border-radius: 14px;
-      padding: 12px 14px; display: flex; flex-direction: column; gap: 9px;
-    }
-    .detail-row {
-      display: flex; justify-content: space-between;
-      align-items: flex-start; gap: 10px; font-size: 0.82rem;
-    }
-    .detail-key { color: var(--muted); flex-shrink: 0; }
-    .detail-val { color: var(--text); font-weight: 500; text-align: right; word-break: break-all; }
-
-    .modal-back {
-      display: flex; align-items: center; gap: 6px;
-      background: none; border: none; cursor: pointer;
-      color: var(--accent); font-size: 0.92rem; font-weight: 600;
-      padding: 10px 16px 4px; align-self: flex-start; flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
-    }
-  </style>
+  .modal-meta {
+    font-size: 12px;
+    color: var(--text3);
+    line-height: 1.8;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .modal-meta span { color: var(--text2); }
+</style>
 </head>
 <body>
 
-  <!-- ── Header ─────────────────────────────────────────────────────── -->
-  <div class="header">
-    <a class="back-btn" href="/">&#8592;</a>
-    <div class="header-title">WildDex</div>
-    <div class="header-count" id="count" style="display:none"></div>
+<header>
+  <a class="back-btn" href="/">←</a>
+  <h1>WildDex</h1>
+  <div id="total-count">0 cards</div>
+</header>
+
+<!-- Kingdom tabs -->
+<div class="kingdom-tabs" id="kingdom-tabs">
+  <button class="active" data-kingdom="all">🌍 All</button>
+  <button data-kingdom="animal">🦁 Animals</button>
+  <button data-kingdom="plant">🌿 Plants</button>
+  <button data-kingdom="fungi">🍄 Fungi</button>
+  <button data-kingdom="terrain">🪨 Terrain</button>
+</div>
+
+<!-- Animal sub-tabs -->
+<div class="sub-tabs" id="sub-animal">
+  <button class="active" data-sub="all">All</button>
+  <button data-sub="mammal">Mammals</button>
+  <button data-sub="bird">Birds</button>
+  <button data-sub="reptile">Reptiles</button>
+  <button data-sub="insect">Insects</button>
+  <button data-sub="amphibian">Amphibians</button>
+  <button data-sub="fish">Fish</button>
+  <button data-sub="arachnid">Arachnids</button>
+  <button data-sub="marine">Marine</button>
+</div>
+
+<!-- Plant sub-tabs -->
+<div class="sub-tabs" id="sub-plant">
+  <button class="active" data-sub="all">All</button>
+  <button data-sub="tree">Trees</button>
+  <button data-sub="flower">Flowers</button>
+  <button data-sub="grass">Grasses</button>
+  <button data-sub="cactus">Cacti</button>
+  <button data-sub="aquatic_plant">Aquatic</button>
+  <button data-sub="shrub">Shrubs</button>
+</div>
+
+<!-- Terrain sub-tabs -->
+<div class="sub-tabs" id="sub-terrain">
+  <button class="active" data-sub="all">All</button>
+  <button data-sub="rock">Rock</button>
+  <button data-sub="soil">Soil</button>
+  <button data-sub="water">Water</button>
+  <button data-sub="landscape">Landscape</button>
+</div>
+
+<!-- Fungi sub-tabs -->
+<div class="sub-tabs" id="sub-fungi">
+  <button class="active" data-sub="all">All</button>
+  <button data-sub="mushroom">Mushrooms</button>
+  <button data-sub="bracket_fungus">Bracket</button>
+  <button data-sub="mould">Mould</button>
+</div>
+
+<div id="grid-scroll">
+  <div id="loading"><div class="spinner"></div>Loading WildDex…</div>
+  <div id="card-grid"></div>
+  <div id="empty-state">
+    <div class="empty-icon">🌍</div>
+    <p>No creatures here yet.<br>Go outside and capture some!</p>
+    <a href="/capture">📷 Capture Now</a>
   </div>
+</div>
 
-  <!-- ── States ─────────────────────────────────────────────────────── -->
-  <div class="state-box" id="loading-state">
-    <div class="spinner"></div>
-    <p>Loading your collection...</p>
+<!-- Modal -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <button class="modal-back" onclick="closeModal()">←</button>
+      <div class="modal-title" id="modal-name"></div>
+    </div>
+    <div id="modal-photo"></div>
+    <div class="modal-body">
+      <div class="modal-sci" id="modal-sci"></div>
+      <div class="modal-blurb" id="modal-blurb"></div>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-val" id="s-spd">—</div><div class="stat-label">Speed</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-atk">—</div><div class="stat-label">Attack</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-def">—</div><div class="stat-label">Defence</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-hp">—</div><div class="stat-label">HP</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-sta">—</div><div class="stat-label">Stamina</div></div>
+      </div>
+      <div class="modal-meta" id="modal-meta"></div>
+    </div>
   </div>
+</div>
 
-  <div class="state-box" id="empty-state" style="display:none">
-    <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
-         stroke="currentColor" stroke-width="1.2">
-      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1
-               2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-      <circle cx="12" cy="13" r="4"/>
-    </svg>
-    <p>No creatures captured yet.<br>Go outside and find something!</p>
-    <a href="/">Capture your first card &rarr;</a>
-  </div>
+<script>
+const TAXON_EMOJI = {
+  Mammalia: '🦁', Aves: '🐦', Reptilia: '🦎', Amphibia: '🐸',
+  Actinopterygii: '🐟', Insecta: '🦋', Arachnida: '🕷', Mollusca: '🐌',
+  Animalia: '🐾', Plantae: '🌿', Fungi: '🍄', Terrain: '🪨',
+  mammal: '🦁', bird: '🐦', reptile: '🦎', insect: '🦋',
+  amphibian: '🐸', fish: '🐟', arachnid: '🕷', marine: '🐠',
+  tree: '🌳', flower: '🌸', grass: '🌾', cactus: '🌵',
+  aquatic_plant: '🌊', shrub: '🌿',
+  rock: '🪨', soil: '🌍', water: '💧', landscape: '🏔',
+  mushroom: '🍄', bracket_fungus: '🍄', mould: '🦠',
+};
+const RARITY_CLASS = {
+  common: 'badge-common', uncommon: 'badge-uncommon',
+  rare: 'badge-rare', very_rare: 'badge-legendary'
+};
 
-  <div class="state-box" id="error-state" style="display:none">
-    <p>Could not load collection.<br>Check your connection and try again.</p>
-    <a href="#" onclick="loadCards();return false;">Retry</a>
-  </div>
+let allCards = [];
+let activeKingdom = 'all';
+let activeSub = 'all';
 
-  <!-- ── Card grid ──────────────────────────────────────────────────── -->
-  <div class="grid" id="grid"></div>
+async function loadCards() {
+  try {
+    const res = await fetch('/cards');
+    if (!res.ok) throw new Error(res.status);
+    allCards = await res.json();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('total-count').textContent =
+      allCards.length + (allCards.length === 1 ? ' card' : ' cards');
+    renderGrid();
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      '<p style="color:#ef9a9a">Could not load WildDex. Check your connection.</p>';
+  }
+}
 
-  <!-- ── FAB — go capture ───────────────────────────────────────────── -->
-  <a class="fab" href="/" title="Capture">+</a>
+function filterCards() {
+  return allCards.filter(c => {
+    const cat = (c.category || '').toLowerCase();
+    const sub = (c.sub_category || '').toLowerCase();
+    const iconic = (c.iconic_taxon || '').toLowerCase();
 
-  <!-- ── Modal ──────────────────────────────────────────────────────── -->
-  <div class="backdrop" id="backdrop" onclick="closeModal()"></div>
-  <div class="modal" id="modal">
-    <div class="modal-drag"></div>
-    <button class="modal-back" onclick="closeModal()">&#8592; Back</button>
-    <div id="modal-inner"></div>
-  </div>
+    if (activeKingdom === 'all') return true;
 
-  <script>
-    // ── Data ────────────────────────────────────────────────────────────
-    let cards = [];
-
-    const TAXON_ICON = {
-      Mammalia:        '🦁', Aves:      '🐦', Reptilia:   '🦎',
-      Amphibia:        '🐸', Actinopterygii: '🐟', Insecta: '🦋',
-      Arachnida:       '🕷', Mollusca:  '🐌', Plantae:    '🌿',
-      Fungi:           '🍄', Animalia:  '🐾', Chromista:  '🌊',
-    };
-
-    const TAXON_BG = {
-      Mammalia:        '#1a1230', Aves:      '#0d1a26', Reptilia:  '#0f1a0f',
-      Amphibia:        '#0d1f0d', Actinopterygii: '#0d1a26', Insecta: '#1f1a0d',
-      Arachnida:       '#1f0d0d', Mollusca:  '#1a0d1f', Plantae:   '#0d1f0d',
-      Fungi:           '#1a130d', Animalia:  '#1a1a1a',
-    };
-
-    const STAT_COLORS = {
-      speed: '#38bdf8', attack: '#f87171', defence: '#a78bfa',
-      hp:    '#34d399',  stamina_regen: '#fb923c',
-    };
-    const STAT_LABELS = { speed:'SPD', attack:'ATK', defence:'DEF', hp:'HP', stamina_regen:'STM' };
-
-    // ── Badge helpers ────────────────────────────────────────────────────
-    function rarityClass(tier) {
-      return { common:'badge-common', uncommon:'badge-uncommon',
-               rare:'badge-rare', very_rare:'badge-legendary' }[tier] || 'badge-unknown';
+    if (activeKingdom === 'animal') {
+      const isAnimal = cat === 'animal' ||
+        (cat === '' && iconic !== 'plantae' && iconic !== 'fungi' && iconic !== 'terrain');
+      if (!isAnimal) return false;
+      return activeSub === 'all' || sub === activeSub;
     }
-
-    // ── Load cards ───────────────────────────────────────────────────────
-    async function loadCards() {
-      show('loading-state');
-      try {
-        const resp = await fetch('/cards');
-        if (!resp.ok) throw new Error('fetch failed');
-        cards = await resp.json();
-        if (cards.length === 0) { show('empty-state'); return; }
-        renderGrid();
-        show(null); // hide states, show grid
-        const count = document.getElementById('count');
-        count.textContent = cards.length + ' card' + (cards.length !== 1 ? 's' : '');
-        count.style.display = '';
-      } catch(e) {
-        show('error-state');
-      }
+    if (activeKingdom === 'plant') {
+      const isPlant = cat === 'plant' || iconic === 'plantae';
+      if (!isPlant) return false;
+      return activeSub === 'all' || sub === activeSub;
     }
-
-    function show(id) {
-      ['loading-state','empty-state','error-state'].forEach(s => {
-        document.getElementById(s).style.display = s === id ? '' : 'none';
-      });
+    if (activeKingdom === 'fungi') {
+      const isFungi = cat === 'fungi' || iconic === 'fungi';
+      if (!isFungi) return false;
+      return activeSub === 'all' || sub === activeSub;
     }
-
-    // ── Render grid ──────────────────────────────────────────────────────
-    function renderGrid() {
-      const grid = document.getElementById('grid');
-      grid.innerHTML = cards.map(c => `
-        <div class="card" onclick="openModal(${c.id})">
-          <div class="card-thumb" style="background:${TAXON_BG[c.iconic_taxon] || 'var(--surface2)'}">
-            <img src="${esc(c.photo_url)}" alt=""
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-            <div class="card-placeholder" style="display:none">
-              ${TAXON_ICON[c.iconic_taxon] || '🐾'}
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="card-name">${esc(c.species_name)}</div>
-            <div class="card-badges">
-              <span class="badge ${rarityClass(c.rarity_tier)}">${esc(c.rarity_display)}</span>
-              ${c.invasive_at_location ? '<span class="badge badge-invasive">Invasive</span>' : ''}
-            </div>
-          </div>
-        </div>`).join('');
+    if (activeKingdom === 'terrain') {
+      const isTerrain = cat === 'terrain' || iconic === 'terrain';
+      if (!isTerrain) return false;
+      return activeSub === 'all' || sub === activeSub;
     }
+    return true;
+  });
+}
 
-    // ── Modal ────────────────────────────────────────────────────────────
-    function openModal(id) {
-      const c = cards.find(x => x.id === id);
-      if (!c) return;
+function renderGrid() {
+  const cards = filterCards();
+  const grid = document.getElementById('card-grid');
+  const empty = document.getElementById('empty-state');
 
-      const pct      = c.confidence ? Math.round(c.confidence * 100) : 0;
-      const confColor = c.provisional ? 'var(--warn)' : 'var(--accent)';
+  if (cards.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.add('visible');
+    return;
+  }
+  empty.classList.remove('visible');
 
-      // Photo section
-      const photoHtml = `
-        <img class="modal-photo" src="${esc(c.photo_url)}" alt=""
-             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-        <div class="modal-photo-placeholder" style="display:none">
-          ${TAXON_ICON[c.iconic_taxon] || '🐾'}
-        </div>`;
+  grid.innerHTML = cards.map(c => {
+    const emoji = TAXON_EMOJI[c.sub_category] || TAXON_EMOJI[c.iconic_taxon] || '🌍';
+    const rarity = c.rarity_tier || 'unknown';
+    const rClass = RARITY_CLASS[rarity] || 'badge-unknown';
+    const rLabel = c.rarity_display || 'Unknown';
+    const invasiveBadge = c.invasive_at_location
+      ? `<span class="badge badge-invasive">Invasive</span>` : '';
+    const safeEmoji = emoji.replace(/'/g, '');
+    const thumb = c.photo_url
+      ? `<img src="${c.photo_url}" alt="" loading="lazy" onerror="this.parentNode.classList.add('no-img');this.parentNode.innerHTML='${safeEmoji}'">`
+      : '';
 
-      // Badges
-      const badges = [];
-      if (c.rarity_display)
-        badges.push(`<span class="badge ${rarityClass(c.rarity_tier)}">${esc(c.rarity_display)}</span>`);
-      if (c.invasive_at_location)
-        badges.push('<span class="badge badge-invasive">Invasive</span>');
-      if (c.provisional)
-        badges.push('<span class="badge badge-amber">Provisional ID</span>');
-      if (c.iconic_taxon)
-        badges.push(`<span class="badge badge-muted">${esc(c.iconic_taxon)}</span>`);
+    return `<div class="card-tile" onclick="openModal(${c.id})">
+      <div class="card-thumb${thumb ? '' : ' no-img'}">${thumb || emoji}</div>
+      <div class="card-info">
+        <div class="card-name">${c.species_name || c.scientific_name}</div>
+        <div class="card-badges">
+          <span class="badge ${rClass}">${rLabel}</span>${invasiveBadge}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
 
-      // Stats
-      const statRows = Object.entries(c.stats || {}).map(([k, v]) => `
-        <div class="stat-row">
-          <span class="stat-label">${STAT_LABELS[k]}</span>
-          <div class="stat-track">
-            <div class="stat-fill" data-val="${v}"
-                 style="width:0;background:${STAT_COLORS[k]}"></div>
-          </div>
-          <span class="stat-val">${v}</span>
-        </div>`).join('');
+document.getElementById('kingdom-tabs').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  document.querySelectorAll('.kingdom-tabs button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeKingdom = btn.dataset.kingdom;
+  activeSub = 'all';
 
-      // Details
-      const details = [];
-      if (c.conservation_status)
-        details.push(row('Conservation', c.conservation_status));
-      if (c.observations_count)
-        details.push(row('iNat sightings', c.observations_count.toLocaleString()));
-      if (c.taxon_id)
-        details.push(row('Taxon ID', c.taxon_id));
-      if (c.capture_country)
-        details.push(row('Country', c.capture_country.toUpperCase()));
-      if (c.latitude != null)
-        details.push(row('GPS', `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`));
-      if (c.captured_at)
-        details.push(row('Captured', fmtDate(c.captured_at)));
+  document.querySelectorAll('.sub-tabs').forEach(el => el.classList.remove('visible'));
+  const subEl = document.getElementById('sub-' + activeKingdom);
+  if (subEl) {
+    subEl.classList.add('visible');
+    subEl.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    subEl.querySelector('[data-sub="all"]').classList.add('active');
+  }
+  renderGrid();
+});
 
-      document.getElementById('modal-inner').innerHTML = `
-        ${photoHtml}
-        <div class="modal-body">
-          <div class="name-block">
-            <div class="common-name">${esc(c.species_name)}</div>
-            <div class="sci-name">${esc(c.scientific_name)}</div>
-          </div>
+document.querySelectorAll('.sub-tabs').forEach(panel => {
+  panel.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    panel.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeSub = btn.dataset.sub;
+    renderGrid();
+  });
+});
 
-          ${badges.length ? `<div class="badges-row">${badges.join('')}</div>` : ''}
+function openModal(id) {
+  const c = allCards.find(x => x.id === id);
+  if (!c) return;
 
-          <div class="conf-row">
-            <div class="conf-label">
-              <span>Confidence</span>
-              <span>${pct}%${c.provisional ? ' — uncertain' : ''}</span>
-            </div>
-            <div class="conf-track">
-              <div class="conf-fill" id="modal-conf"
-                   style="width:0;background:${confColor}"></div>
-            </div>
-          </div>
+  const emoji = TAXON_EMOJI[c.sub_category] || TAXON_EMOJI[c.iconic_taxon] || '🌍';
 
-          <div class="stats-card">
-            <div class="stats-title">Stats</div>
-            ${statRows}
-          </div>
+  document.getElementById('modal-name').textContent = c.species_name || c.scientific_name;
+  document.getElementById('modal-sci').textContent = c.scientific_name || '';
+  document.getElementById('modal-blurb').textContent = c.blurb || '';
 
-          ${c.blurb ? `<div class="blurb">${esc(c.blurb)}</div>` : ''}
+  const photo = document.getElementById('modal-photo');
+  if (c.photo_url) {
+    photo.innerHTML = `<img src="${c.photo_url}" alt="" onerror="this.parentNode.textContent='${emoji}'">`;
+  } else {
+    photo.textContent = emoji;
+  }
 
-          ${details.length ? `<div class="detail-card">${details.join('')}</div>` : ''}
-        </div>`;
+  const stats = c.stats || {};
+  document.getElementById('s-spd').textContent = stats.speed ?? '—';
+  document.getElementById('s-atk').textContent = stats.attack ?? '—';
+  document.getElementById('s-def').textContent = stats.defence ?? '—';
+  document.getElementById('s-hp').textContent = stats.hp ?? '—';
+  document.getElementById('s-sta').textContent = stats.stamina_regen ?? '—';
 
-      document.getElementById('backdrop').classList.add('open');
-      document.getElementById('modal').classList.add('open');
-      document.body.style.overflow = 'hidden';
+  const rarity = c.rarity_display || 'Unknown';
+  const invasive = c.invasive_at_location ? ' · ⚠️ Invasive' : '';
+  const date = c.captured_at ? new Date(c.captured_at).toLocaleDateString() : '—';
+  const location = (c.latitude && c.longitude)
+    ? `${Number(c.latitude).toFixed(4)}, ${Number(c.longitude).toFixed(4)}`
+    : (c.capture_country || '—');
+  const obs = c.observations_count
+    ? `${Number(c.observations_count).toLocaleString()} iNat sightings` : '';
 
-      // Animate bars after paint
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        const cf = document.getElementById('modal-conf');
-        if (cf) cf.style.width = pct + '%';
-        document.querySelectorAll('#modal .stat-fill').forEach(el => {
-          el.style.width = el.dataset.val + '%';
-        });
-      }));
-    }
+  document.getElementById('modal-meta').innerHTML = `
+    <div>Rarity: <span>${rarity}${invasive}</span></div>
+    ${c.conservation_status ? `<div>Conservation: <span>${c.conservation_status}</span></div>` : ''}
+    ${obs ? `<div>Sightings: <span>${obs}</span></div>` : ''}
+    <div>Captured: <span>${date}</span></div>
+    <div>Location: <span>${location}</span></div>
+    ${c.confidence ? `<div>Confidence: <span>${Math.round(c.confidence * 100)}%</span></div>` : ''}
+  `;
 
-    function closeModal() {
-      document.getElementById('backdrop').classList.remove('open');
-      document.getElementById('modal').classList.remove('open');
-      document.body.style.overflow = '';
-    }
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
 
-    // Close modal on swipe down
-    const modal = document.getElementById('modal');
-    let touchStartY = 0;
-    modal.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
-    modal.addEventListener('touchend', e => {
-      if (e.changedTouches[0].clientY - touchStartY > 80 && modal.scrollTop === 0)
-        closeModal();
-    }, { passive: true });
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
 
-    // ── Helpers ──────────────────────────────────────────────────────────
-    function row(k, v) {
-      return `<div class="detail-row">
-        <span class="detail-key">${esc(String(k))}</span>
-        <span class="detail-val">${esc(String(v))}</span>
-      </div>`;
-    }
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
 
-    function fmtDate(iso) {
-      try {
-        const d = new Date(iso);
-        return d.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' })
-          + ' ' + d.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
-      } catch { return iso; }
-    }
-
-    function esc(s) {
-      return String(s ?? '')
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    loadCards();
-  </script>
+loadCards();
+</script>
 </body>
 </html>

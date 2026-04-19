@@ -24,10 +24,9 @@ from app.pipeline.species_data import SpeciesData
 
 GEMINI_MODEL = "gemini-2.5-flash"
 
-STAT_PROMPT = """\
+STAT_PROMPT_ANIMAL = """\
 You are the game designer of WildEx, a real-world wildlife discovery game.
-Your job is to create a card for the species below using real biology — not
-guesswork. Read the species data carefully before writing anything.
+Create a card for the creature below using real biology — not guesswork.
 
 ── SPECIES DATA ──────────────────────────────────────────────────────────
 Common name    : {common_name}
@@ -39,37 +38,97 @@ GBIF rarity    : {rarity_tier}
 {invasive_line}
 ── TASKS ─────────────────────────────────────────────────────────────────
 
-1. BLURB — Write 2-3 sentences in the style of an exciting wildlife
-   encyclopaedia for a game. Present tense. Name the animal in the first
-   sentence. Highlight 1-2 genuinely distinctive biological traits.
-   Do NOT start with "The {common_name} is". Be creative.
+1. BLURB — 2-3 sentences, exciting wildlife encyclopaedia style. Present tense.
+   Name the creature in the first sentence. Highlight 1-2 distinctive biological
+   traits. Do NOT start with "The {common_name} is".
 
-2. STATS — Five integers, each 1–100, calibrated against the anchors below.
-   Reason from actual biology. Do not use round numbers unless they truly fit.
+2. STATS — Five integers 1–100. Reason from real biology. Avoid round numbers.
 
    SPEED — locomotion capability
-     97 Cheetah · 88 Peregrine Falcon (dive) · 80 Greyhound · 72 Thoroughbred
-     55 Human sprinter · 38 Domestic Cat · 22 Elephant · 15 Tortoise · 3 Slug
+     97 Cheetah · 88 Peregrine Falcon · 55 Human sprinter · 22 Elephant · 3 Slug
 
-   ATTACK — offensive threat from natural weapons (teeth, claws, venom, size)
-     96 Saltwater Crocodile · 85 Grizzly Bear · 75 Golden Eagle · 68 Honey Badger
-     58 Domestic Dog (large) · 45 Domestic Cat · 30 Rabbit · 8 Earthworm
+   ATTACK — offensive threat (teeth, claws, venom, size)
+     96 Saltwater Crocodile · 85 Grizzly Bear · 68 Honey Badger · 8 Earthworm
 
-   DEFENCE — passive defences (armour, quills, toxins, thick hide, camouflage)
-     95 Armadillo · 90 Tortoise · 82 Porcupine · 72 Pangolin · 55 Wild Boar
-     40 Wolf · 32 Domestic Dog · 22 Rabbit · 12 Butterfly
+   DEFENCE — passive defences (armour, quills, toxins, camouflage)
+     95 Armadillo · 82 Porcupine · 55 Wild Boar · 12 Butterfly
 
-   HP — vitality and toughness; correlates with body mass, lifespan, wound recovery
-     97 Elephant · 88 Grizzly Bear · 78 Hippo · 70 Wolf · 62 Domestic Dog (large)
-     50 Domestic Cat · 40 Rabbit · 25 Pigeon · 14 Mouse · 8 Butterfly
+   HP — vitality; correlates with body mass, lifespan, wound recovery
+     97 Elephant · 70 Wolf · 50 Domestic Cat · 14 Mouse · 8 Butterfly
 
    STAMINA_REGEN — endurance and recovery; high for migratory / working animals
-     97 Arctic Tern · 90 Sled Dog (Iditarod) · 82 Migratory Swallow · 75 Wolf
-     68 Human (marathon) · 58 Domestic Dog (average) · 45 Lion · 28 Giant Panda
-     18 Koala · 10 Bulldog
+     97 Arctic Tern · 90 Sled Dog · 75 Wolf · 18 Koala · 10 Bulldog
 
 ── OUTPUT FORMAT ─────────────────────────────────────────────────────────
-Respond with ONLY this JSON object — no markdown, no commentary:
+Respond with ONLY this JSON — no markdown, no commentary:
+{{
+  "blurb": "...",
+  "speed": 0,
+  "attack": 0,
+  "defence": 0,
+  "hp": 0,
+  "stamina_regen": 0
+}}
+"""
+
+STAT_PROMPT_PLANT = """\
+You are the game designer of WildEx. Create a card for the plant below using
+real botany — not guesswork.
+
+── PLANT DATA ────────────────────────────────────────────────────────────
+Common name    : {common_name}
+Scientific name: {scientific_name}
+Category       : {iconic_taxon}
+Conservation   : {conservation_status}
+iNat sightings : {observations_count}
+GBIF rarity    : {rarity_tier}
+{invasive_line}
+── TASKS ─────────────────────────────────────────────────────────────────
+
+1. BLURB — 2-3 sentences about this plant in exciting field-guide style.
+   Name it in the first sentence. Highlight distinctive features.
+
+2. STATS — Five integers 1–100. For plants the stats are reinterpreted:
+   SPEED       = Growth rate (97 Bamboo · 70 Kudzu · 30 Oak · 5 Bristlecone Pine)
+   ATTACK      = Toxicity/Hazard (95 Manchineel · 70 Stinging Nettle · 10 Dandelion)
+   DEFENCE     = Drought/stress resilience (95 Cactus · 75 Olive · 15 Lettuce)
+   HP          = Lifespan potential (99 Sequoia · 80 Oak · 40 Sunflower · 5 Annual grass)
+   STAMINA_REGEN = Seed dispersal reach (95 Dandelion · 80 Coconut · 10 Truffles)
+
+── OUTPUT FORMAT ─────────────────────────────────────────────────────────
+Respond with ONLY this JSON — no markdown, no commentary:
+{{
+  "blurb": "...",
+  "speed": 0,
+  "attack": 0,
+  "defence": 0,
+  "hp": 0,
+  "stamina_regen": 0
+}}
+"""
+
+STAT_PROMPT_TERRAIN = """\
+You are the game designer of WildEx. Create a card for the terrain feature below.
+
+── TERRAIN DATA ──────────────────────────────────────────────────────────
+Name           : {common_name}
+Type           : {sub_category}
+Rarity         : {rarity_tier}
+
+── TASKS ─────────────────────────────────────────────────────────────────
+
+1. BLURB — 2-3 sentences describing this terrain in dramatic naturalist style.
+   Name it in the first sentence. Highlight its geological or ecological significance.
+
+2. STATS — Five integers 1–100. For terrain the stats represent:
+   SPEED         = Rate of change / erosion speed (95 Lava flow · 60 River · 2 Granite)
+   ATTACK        = Hazard level (95 Active volcano · 70 Quicksand · 5 Meadow)
+   DEFENCE       = Hardness / durability (98 Granite · 80 Sandstone · 20 Clay)
+   HP            = Age / geological timescale (99 Precambrian shield · 50 Limestone · 5 Sand dune)
+   STAMINA_REGEN = Ecosystem recovery speed (90 Wetland · 60 Forest · 10 Desert)
+
+── OUTPUT FORMAT ─────────────────────────────────────────────────────────
+Respond with ONLY this JSON — no markdown, no commentary:
 {{
   "blurb": "...",
   "speed": 0,
@@ -125,13 +184,39 @@ class WildCard:
 
 
 def _build_prompt(species: SpeciesResult, gbif: SpeciesData | None) -> str:
+    if species.category == "terrain":
+        return STAT_PROMPT_TERRAIN.format(
+            common_name  = species.common_name,
+            sub_category = species.sub_category or "terrain",
+            rarity_tier  = "unknown",
+        )
+    if species.category == "plant":
+        rarity_tier   = gbif.rarity_tier if gbif else "unknown"
+        invasive_line = (
+            "INVASIVE in capture region — mention in blurb if space allows."
+            if gbif and gbif.invasive_at_location else ""
+        )
+        obs_str = f"{species.observations_count:,}" if species.observations_count else "unknown"
+        return STAT_PROMPT_PLANT.format(
+            common_name         = species.inat_common_name or species.common_name,
+            scientific_name     = species.scientific_name,
+            iconic_taxon        = species.iconic_taxon or "Plantae",
+            conservation_status = species.conservation_status or "not listed",
+            observations_count  = obs_str,
+            rarity_tier         = rarity_tier,
+            invasive_line       = invasive_line,
+        )
+    return _build_animal_prompt(species, gbif)
+
+
+def _build_animal_prompt(species: SpeciesResult, gbif: SpeciesData | None) -> str:
     # Use iNat name as the authoritative species name; keep Gemini's name
     # as a breed/variety hint when the two differ (e.g. "Domestic Dog" vs
     # "Australian Kelpie" — we want Kelpie-specific stats, not generic dog stats).
     inat_name   = species.inat_common_name
     gemini_name = species.common_name
     if inat_name and gemini_name and inat_name.lower() != gemini_name.lower():
-        display_name  = gemini_name          # breed is more specific for stats
+        display_name  = gemini_name
         variety_line  = f"Breed/variety  : {gemini_name} (species: {inat_name})"
     else:
         display_name  = inat_name or gemini_name
@@ -144,7 +229,7 @@ def _build_prompt(species: SpeciesResult, gbif: SpeciesData | None) -> str:
     )
     obs_str = f"{species.observations_count:,}" if species.observations_count else "unknown"
 
-    return STAT_PROMPT.format(
+    return STAT_PROMPT_ANIMAL.format(
         common_name          = display_name,
         scientific_name      = species.scientific_name,
         rank                 = species.rank,
