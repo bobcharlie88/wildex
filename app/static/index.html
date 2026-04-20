@@ -96,6 +96,20 @@
     #gps-dot { width: 7px; height: 7px; border-radius: 50%;
       background: var(--muted); flex-shrink: 0; transition: background 0.4s; }
     #gps-dot.acquired { background: var(--accent); }
+    #sync-status {
+      display: none;
+      width: 100%;
+      max-width: 340px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(21,33,48,0.92);
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.4;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    #sync-status.visible { display: block; }
 
     .btn {
       width: 100%; max-width: 340px; padding: 15px; border: none;
@@ -226,6 +240,7 @@
         <div id="gps-dot"></div>
         <span id="gps-text">Acquiring GPS...</span>
       </div>
+      <div id="sync-status"></div>
 
       <label class="btn btn-primary" id="open-label" for="camera-input">Take Photo</label>
       <input type="file" id="camera-input" accept="image/*" capture="environment"
@@ -258,6 +273,167 @@
   <script>
     const $ = id => document.getElementById(id);
     const screens = ['capture-screen','loading-screen','result-screen'].map($);
+    const QUEUE_DB_NAME = 'wildex-offline';
+    const QUEUE_STORE = 'capture_queue';
+    let syncInFlight = false;
+
+    fetch('/auth/me', { credentials: 'same-origin' }).then(resp => {
+      if (resp.status === 401) location.href = '/login';
+    }).catch(() => {});
+
+    function openQueueDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(QUEUE_DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(QUEUE_STORE)) {
+            db.createObjectStore(QUEUE_STORE, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('IndexedDB unavailable'));
+      });
+    }
+
+    async function queueTx(mode, handler) {
+      const db = await openQueueDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(QUEUE_STORE, mode);
+        const store = tx.objectStore(QUEUE_STORE);
+        let result;
+        try {
+          result = handler(store, tx);
+        } catch (err) {
+          db.close();
+          reject(err);
+          return;
+        }
+        tx.oncomplete = () => {
+          db.close();
+          resolve(result);
+        };
+        tx.onerror = () => {
+          db.close();
+          reject(tx.error || new Error('Queue transaction failed'));
+        };
+      });
+    }
+
+    async function enqueueCapture(file, coords) {
+      await queueTx('readwrite', store => {
+        store.add({
+          created_at: Date.now(),
+          file,
+          lat: coords?.lat ?? null,
+          lon: coords?.lon ?? null,
+        });
+      });
+      await refreshQueueStatus();
+    }
+
+    async function listQueuedCaptures() {
+      const db = await openQueueDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(QUEUE_STORE, 'readonly');
+        const req = tx.objectStore(QUEUE_STORE).getAll();
+        req.onsuccess = () => {
+          db.close();
+          resolve((req.result || []).sort((a, b) => a.id - b.id));
+        };
+        req.onerror = () => {
+          db.close();
+          reject(req.error || new Error('Could not read queue'));
+        };
+      });
+    }
+
+    async function deleteQueuedCapture(id) {
+      await queueTx('readwrite', store => store.delete(id));
+    }
+
+    async function queuedCount() {
+      const db = await openQueueDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(QUEUE_STORE, 'readonly');
+        const req = tx.objectStore(QUEUE_STORE).count();
+        req.onsuccess = () => {
+          db.close();
+          resolve(req.result || 0);
+        };
+        req.onerror = () => {
+          db.close();
+          reject(req.error || new Error('Could not count queue'));
+        };
+      });
+    }
+
+    async function refreshQueueStatus(message = '') {
+      try {
+        const count = await queuedCount();
+        if (!count && !message) {
+          $('sync-status').classList.remove('visible');
+          $('sync-status').textContent = '';
+          return;
+        }
+        const parts = [];
+        if (message) parts.push(message);
+        if (count) parts.push(`${count} capture${count === 1 ? '' : 's'} queued for upload`);
+        $('sync-status').textContent = parts.join(' • ');
+        $('sync-status').classList.add('visible');
+      } catch (_) {
+        $('sync-status').classList.remove('visible');
+      }
+    }
+
+    async function uploadQueuedCapture(entry) {
+      const file = entry.file instanceof File
+        ? entry.file
+        : new File([entry.file], entry.file?.name || 'offline-capture.jpg', { type: entry.file?.type || 'application/octet-stream' });
+      const form = new FormData();
+      form.append('file', file, file.name || 'offline-capture');
+      if (entry.lat != null && entry.lon != null) {
+        form.append('lat', entry.lat);
+        form.append('lon', entry.lon);
+      }
+      const resp = await fetch('/capture', {
+        method: 'POST',
+        body: form,
+        credentials: 'same-origin',
+      });
+      if (resp.status === 401) {
+        location.href = '/login';
+        throw new Error('Authentication required');
+      }
+      if (!resp.ok) {
+        throw new Error(`Queued upload failed (${resp.status})`);
+      }
+      return resp.json();
+    }
+
+    async function processQueuedCaptures() {
+      if (syncInFlight || !navigator.onLine) {
+        await refreshQueueStatus(navigator.onLine ? '' : 'Offline mode active');
+        return;
+      }
+      syncInFlight = true;
+      try {
+        const queue = await listQueuedCaptures();
+        if (!queue.length) {
+          await refreshQueueStatus('');
+          return;
+        }
+        await refreshQueueStatus('Connection restored • syncing queued captures');
+        for (const entry of queue) {
+          await uploadQueuedCapture(entry);
+          await deleteQueuedCapture(entry.id);
+          await refreshQueueStatus('Queued capture uploaded');
+        }
+      } catch (err) {
+        await refreshQueueStatus(navigator.onLine ? 'Sync paused until upload succeeds' : 'Offline mode active');
+      } finally {
+        syncInFlight = false;
+      }
+    }
 
     function show(id) {
       screens.forEach(s => s.classList.remove('active'));
@@ -313,6 +489,29 @@
       $('capture-btn').classList.remove('visible');
     }
 
+    function renderQueuedCapture(file, coords) {
+      const fallbackPhoto = file ? URL.createObjectURL(file) : '';
+      $('result-photo').onerror = null;
+      $('result-photo').src = fallbackPhoto;
+      const locationBits = [];
+      if (coords?.lat != null && coords?.lon != null) {
+        locationBits.push(detailRow('Queued at', `${coords.lat.toFixed(4)}, ${coords.lon.toFixed(4)}`));
+      }
+      locationBits.push(detailRow('Status', 'Stored offline and will upload automatically'));
+      $('result-body').innerHTML = `
+        <div class="save-banner unsaved">&#9888; Capture queued offline &mdash; it will upload when reception returns</div>
+        <div class="name-block">
+          <div class="common-name">Capture queued</div>
+          <div class="sci-name">WildEx will finish identification after sync</div>
+        </div>
+        <div class="blurb">This photo or video is saved on this device. Leave WildEx installed and signed in, then reopen the app or regain reception to let the queue sync.</div>
+        <div class="detail-card">${locationBits.join('')}</div>
+        <button class="btn btn-secondary" onclick="resetCapture()">Capture Another</button>
+        <a class="btn btn-secondary" href="/" style="text-align:center;text-decoration:none;display:block;padding:15px">Back Home</a>
+      `;
+      show('result-screen');
+    }
+
     // ── File selection ──────────────────────────────────────────────
     let capturedFile = null;
 
@@ -341,6 +540,7 @@
       if (!capturedFile) return;
 
       const isVideo = capturedFile.type.startsWith('video/');
+      const queuedCoords = gpsCoords ? { ...gpsCoords } : null;
 
       // Reset steps
       ['s0','s1','s2','s3','s4','s5'].forEach(id => $(id).className = 'step');
@@ -371,14 +571,26 @@
 
       const form = new FormData();
       form.append('file', capturedFile);
-      if (gpsCoords) {
-        form.append('lat', gpsCoords.lat);
-        form.append('lon', gpsCoords.lon);
+      if (queuedCoords) {
+        form.append('lat', queuedCoords.lat);
+        form.append('lon', queuedCoords.lon);
+      }
+
+      if (!navigator.onLine) {
+        timers.forEach(clearTimeout);
+        await enqueueCapture(capturedFile, queuedCoords);
+        renderQueuedCapture(capturedFile, queuedCoords);
+        return;
       }
 
       try {
-        const resp = await fetch('/capture', { method: 'POST', body: form });
+        const resp = await fetch('/capture', { method: 'POST', body: form, credentials: 'same-origin' });
         timers.forEach(clearTimeout);
+
+        if (resp.status === 401) {
+          location.href = '/login';
+          return;
+        }
 
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({ detail: `Server error ${resp.status}` }));
@@ -393,14 +605,24 @@
 
       } catch (e) {
         timers.forEach(clearTimeout);
-        showError('Could not reach server. Check your connection.');
+        try {
+          await enqueueCapture(capturedFile, queuedCoords);
+          renderQueuedCapture(capturedFile, queuedCoords);
+        } catch (_) {
+          showError('Could not reach server. Check your connection.');
+        }
       }
     });
 
     // ── Render card ─────────────────────────────────────────────────
     function renderCard(resp) {
       const c = resp.card;
-      $('result-photo').src = URL.createObjectURL(capturedFile);
+      const fallbackPhoto = capturedFile ? URL.createObjectURL(capturedFile) : '';
+      $('result-photo').onerror = () => {
+        $('result-photo').onerror = null;
+        $('result-photo').src = fallbackPhoto;
+      };
+      $('result-photo').src = c.image_url || fallbackPhoto;
 
       const banner = resp.saved
         ? `<div class="save-banner saved">&#10003; Saved to WildDex &mdash; card #${resp.card_id}</div>`
@@ -506,6 +728,12 @@
         .replace(/&/g,'&amp;').replace(/</g,'&lt;')
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
+
+    window.addEventListener('online', () => processQueuedCaptures());
+    window.addEventListener('focus', () => processQueuedCaptures());
+    window.setInterval(() => { processQueuedCaptures().catch(() => {}); }, 15000);
+    refreshQueueStatus(navigator.onLine ? '' : 'Offline mode active').catch(() => {});
+    processQueuedCaptures().catch(() => {});
   </script>
 </body>
 </html>

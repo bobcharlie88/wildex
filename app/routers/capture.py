@@ -4,14 +4,15 @@ import tempfile
 import time
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from app.auth import require_user
 from app.database import SessionLocal, db_available
-from app.models import Card
+from app.models import Card, User
 from app.pipeline.card_generator import generate_card
 from app.pipeline.frame_extractor import extract_best_frame, save_frame
 from app.pipeline.species_data import get_species_data
-from app.pipeline.species_id import identify_species
+from app.pipeline.species_id import TemporaryIdentificationError, identify_species, is_temporary_identification_error
 from app.utils.storage import upload_capture_asset
 
 router = APIRouter()
@@ -21,18 +22,10 @@ IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/hei
 VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm", "video/3gpp", "video/x-m4v"}
 ALLOWED_TYPES = IMAGE_TYPES | VIDEO_TYPES
 IDENTIFY_RETRY_DELAYS = (1.0, 2.0)
-TEMPORARY_ID_MARKERS = (
-    "503",
-    "unavailable",
-    "high demand",
-    "resource_exhausted",
-    "overloaded",
-)
 
 
 def _is_temporary_identification_failure(exc: Exception) -> bool:
-    text = str(exc).lower()
-    return any(marker in text for marker in TEMPORARY_ID_MARKERS)
+    return isinstance(exc, TemporaryIdentificationError) or is_temporary_identification_error(exc)
 
 
 def _identify_with_retry(image_path: str):
@@ -86,6 +79,7 @@ async def capture(
     file: UploadFile = File(...),
     lat: float | None = Form(None),
     lon: float | None = Form(None),
+    current_user: User = Depends(require_user),
 ):
     """
     Full pipeline: species ID -> GBIF data -> card generation -> DB save.
@@ -164,6 +158,7 @@ async def capture(
                     db = SessionLocal()
                     try:
                         row = Card(
+                            owner_id=current_user.id,
                             species_name="Pending identification",
                             scientific_name="Unknown",
                             rank="unknown",
@@ -225,6 +220,7 @@ async def capture(
             db = SessionLocal()
             try:
                 row = Card(
+                    owner_id=current_user.id,
                     species_name=card.common_name,
                     scientific_name=card.scientific_name,
                     rank=card.rank,
@@ -321,6 +317,8 @@ async def identify(file: UploadFile = File(...)):
         except EnvironmentError as exc:
             raise HTTPException(503, str(exc))
         except Exception as exc:
+            if _is_temporary_identification_failure(exc):
+                raise HTTPException(503, f"Identification temporarily unavailable: {exc}")
             raise HTTPException(500, f"Identification failed: {exc}")
 
         return {

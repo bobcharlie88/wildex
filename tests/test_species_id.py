@@ -16,10 +16,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import httpx
 from app.pipeline.species_id import (
+    TemporaryIdentificationError,
     identify_species,
     identify_with_gemini,
     enrich_with_inat,
     _parse_gemini_json,
+    is_temporary_identification_error,
     SpeciesResult,
     CONFIDENCE_THRESHOLD,
 )
@@ -58,6 +60,19 @@ MOCK_INAT_RESPONSE = {
             "iconic_taxon_name": "Mammalia",
             "conservation_status": {"status_name": "vulnerable"},
             "observations_count": 187432,
+        }
+    ],
+}
+
+MOCK_INAT_PLANT_RESPONSE = {
+    "total_results": 1,
+    "results": [
+        {
+            "id": 56789,
+            "name": "Chenopodium album",
+            "preferred_common_name": "Lamb's quarters",
+            "iconic_taxon_name": "Plantae",
+            "observations_count": 42000,
         }
     ],
 }
@@ -167,6 +182,35 @@ def test_inat_enrichment_with_mocked_response():
     print("  PASS")
 
 
+def test_plant_enrichment_replaces_generic_name():
+    result = SpeciesResult(
+        scientific_name="Chenopodium",
+        common_name="Plant",
+        confidence=0.61,
+        rank="genus",
+        provisional=True,
+        reasoning="Broad leaves with mealy new growth on disturbed ground.",
+        subject_visible=True,
+        category="plant",
+        sub_category="other",
+    )
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = MOCK_INAT_PLANT_RESPONSE
+    mock_resp.raise_for_status.return_value = None
+
+    with patch("httpx.get", return_value=mock_resp):
+        enrich_with_inat(result)
+
+    assert result.inat_validated is True
+    assert result.common_name == "Lamb's quarters"
+    assert result.scientific_name == "Chenopodium album"
+    assert result.iconic_taxon == "Plantae"
+    assert result.sub_category == "other"
+    print("  Generic plant label replaced with iNat plant taxon")
+    print("  PASS")
+
+
 def test_no_gemini_key_raises():
     with patch("app.pipeline.species_id.GEMINI_API_KEY", "your_placeholder"):
         try:
@@ -176,6 +220,69 @@ def test_no_gemini_key_raises():
             assert "aistudio.google.com" in str(e)
             print(f"  EnvironmentError raised with key URL hint")
             print("  PASS")
+
+
+def test_temporary_error_detection():
+    exc = RuntimeError("503 UNAVAILABLE: model experiencing high demand, try again later")
+    assert is_temporary_identification_error(exc) is True
+    print("  Temporary provider outage correctly detected from error text")
+    print("  PASS")
+
+
+def test_all_temporary_provider_failures_raise_temporary_error():
+    temporary = RuntimeError("503 UNAVAILABLE: model experiencing high demand")
+    with patch("app.pipeline.species_id.identify_with_gemini", side_effect=temporary):
+        with patch("app.pipeline.species_id.identify_with_inat_cv", side_effect=temporary):
+            with patch("app.pipeline.species_id.identify_with_google_vision", side_effect=temporary):
+                try:
+                    identify_species("/fake/image.jpg")
+                    print("  FAIL — should have raised TemporaryIdentificationError")
+                except TemporaryIdentificationError as exc:
+                    assert "All identification providers failed" in str(exc)
+                    print("  All-temporary outage escalated as TemporaryIdentificationError")
+                    print("  PASS")
+
+
+def test_temporary_plus_skipped_providers_still_raise_temporary_error():
+    temporary = RuntimeError("503 UNAVAILABLE: model experiencing high demand")
+    skipped = EnvironmentError("GOOGLE_VISION_API_KEY not set.")
+    with patch("app.pipeline.species_id.identify_with_gemini", side_effect=temporary):
+        with patch("app.pipeline.species_id.identify_with_inat_cv", side_effect=temporary):
+            with patch("app.pipeline.species_id.identify_with_google_vision", side_effect=skipped):
+                with patch("app.pipeline.species_id.identify_with_google_web", side_effect=skipped):
+                    try:
+                        identify_species("/fake/image.jpg")
+                        print("  FAIL â€” should have raised TemporaryIdentificationError")
+                    except TemporaryIdentificationError as exc:
+                        assert "All identification providers failed" in str(exc)
+                        print("  Temporary failures plus skipped providers still degrade gracefully")
+                        print("  PASS")
+
+
+def test_fourth_provider_runs_after_google_vision():
+    temporary = RuntimeError("503 UNAVAILABLE: model experiencing high demand")
+    web_result = SpeciesResult(
+        scientific_name="Taraxacum officinale",
+        common_name="Dandelion",
+        confidence=0.52,
+        rank="species",
+        provisional=True,
+        reasoning="Fallback via web entities.",
+        subject_visible=True,
+        category="plant",
+        sub_category="flower",
+    )
+    with patch("app.pipeline.species_id.identify_with_gemini", side_effect=temporary):
+        with patch("app.pipeline.species_id.identify_with_inat_cv", side_effect=temporary):
+            with patch("app.pipeline.species_id.identify_with_google_vision", side_effect=RuntimeError("Google Vision returned no labels")):
+                with patch("app.pipeline.species_id.identify_with_google_web", return_value=web_result):
+                    with patch("app.pipeline.species_id.enrich_with_inat", side_effect=lambda result: result):
+                        result = identify_species("/fake/image.jpg")
+
+    assert result.common_name == "Dandelion"
+    assert result.category == "plant"
+    print("  Fourth provider runs after Google Vision and returns a usable result")
+    print("  PASS")
 
 
 # ---------------------------------------------------------------------------
@@ -292,8 +399,23 @@ if __name__ == "__main__":
     print("\n[test_inat_enrichment_with_mocked_response]")
     test_inat_enrichment_with_mocked_response()
 
+    print("\n[test_plant_enrichment_replaces_generic_name]")
+    test_plant_enrichment_replaces_generic_name()
+
     print("\n[test_no_gemini_key_raises]")
     test_no_gemini_key_raises()
+
+    print("\n[test_temporary_error_detection]")
+    test_temporary_error_detection()
+
+    print("\n[test_all_temporary_provider_failures_raise_temporary_error]")
+    test_all_temporary_provider_failures_raise_temporary_error()
+
+    print("\n[test_temporary_plus_skipped_providers_still_raise_temporary_error]")
+    test_temporary_plus_skipped_providers_still_raise_temporary_error()
+
+    print("\n[test_fourth_provider_runs_after_google_vision]")
+    test_fourth_provider_runs_after_google_vision()
 
     if live:
         print("\n=== LIVE TESTS ===")

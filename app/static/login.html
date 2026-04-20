@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>WildEx Login</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #081018;
+      --surface: #101b27;
+      --surface2: #172636;
+      --accent: #22c55e;
+      --text: #ecf6ef;
+      --muted: #88a19d;
+      --danger: #f87171;
+      --radius: 16px;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: radial-gradient(circle at top, #142638 0%, #081018 60%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 22px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 380px;
+      background: rgba(16, 27, 39, 0.94);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 24px;
+      padding: 28px 22px 24px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.32);
+    }
+
+    h1 {
+      color: var(--accent);
+      font-size: 2rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    p {
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 22px;
+    }
+
+    .toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: var(--surface2);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 18px;
+    }
+
+    .toggle button {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+    .toggle button.active {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--surface2);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 14px 15px;
+      font-size: 1rem;
+    }
+
+    button[type="submit"] {
+      border: none;
+      background: var(--accent);
+      color: #081209;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-weight: 800;
+      font-size: 1rem;
+    }
+
+    .note {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    .error {
+      display: none;
+      margin-top: 14px;
+      color: var(--danger);
+      background: rgba(248, 113, 113, 0.08);
+      border: 1px solid rgba(248, 113, 113, 0.18);
+      padding: 12px 14px;
+      border-radius: 14px;
+      line-height: 1.45;
+    }
+    .error.visible { display: block; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>WildEx</h1>
+    <p id="subtitle">Sign in to keep your captures and WildDex tied to your own account.</p>
+
+    <div class="toggle">
+      <button id="mode-login" class="active" type="button">Sign In</button>
+      <button id="mode-register" type="button">Create Account</button>
+    </div>
+
+    <form id="auth-form">
+      <input id="email" type="email" autocomplete="email" placeholder="Email address" required>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Password" minlength="8" required>
+      <button type="submit" id="submit-btn">Sign In</button>
+    </form>
+
+    <div class="error" id="error-box"></div>
+    <div class="note">Passwords must be at least 8 characters. Session stays on this device unless you sign out.</div>
+  </main>
+
+  <script>
+    let mode = 'login';
+    const subtitle = document.getElementById('subtitle');
+    const submitBtn = document.getElementById('submit-btn');
+    const errorBox = document.getElementById('error-box');
+
+    async function boot() {
+      const me = await fetch('/auth/me', { credentials: 'same-origin' }).catch(() => null);
+      if (me && me.ok) location.href = '/';
+    }
+
+    function setMode(nextMode) {
+      mode = nextMode;
+      document.getElementById('mode-login').classList.toggle('active', nextMode === 'login');
+      document.getElementById('mode-register').classList.toggle('active', nextMode === 'register');
+      submitBtn.textContent = nextMode === 'login' ? 'Sign In' : 'Create Account';
+      subtitle.textContent = nextMode === 'login'
+        ? 'Sign in to keep your captures and WildDex tied to your own account.'
+        : 'Create a separate account so each user gets their own WildDex and capture history.';
+      errorBox.classList.remove('visible');
+      errorBox.textContent = '';
+    }
+
+    document.getElementById('mode-login').addEventListener('click', () => setMode('login'));
+    document.getElementById('mode-register').addEventListener('click', () => setMode('register'));
+
+    document.getElementById('auth-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorBox.classList.remove('visible');
+      errorBox.textContent = '';
+
+      const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
+      const payload = {
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      }).catch(() => null);
+
+      if (!response) {
+        errorBox.textContent = 'Could not reach the server.';
+        errorBox.classList.add('visible');
+        return;
+      }
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: 'Request failed' }));
+        errorBox.textContent = err.detail || 'Request failed';
+        errorBox.classList.add('visible');
+        return;
+      }
+
+      location.href = '/';
+    });
+
+    boot();
+  </script>
+</body>
+</html>

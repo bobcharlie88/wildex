@@ -3,12 +3,14 @@ import os
 import socket
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 
+from app.auth import get_current_user
+from app.routers.auth import router as auth_router
 from app.routers.capture import router as capture_router
 from app.routers.cards import router as cards_router
 from app.routers.wildex import router as wildex_router
@@ -16,6 +18,7 @@ from app.routers.wildex import router as wildex_router
 log = logging.getLogger("wildex")
 
 app = FastAPI(title="WildEx API", version="0.1.0")
+app.include_router(auth_router)
 app.include_router(capture_router)
 app.include_router(cards_router)
 app.include_router(wildex_router)
@@ -37,6 +40,7 @@ def startup():
             with engine.connect() as conn:
                 from sqlalchemy import text
                 for col, typedef in [
+                    ("owner_id",     "INTEGER"),
                     ("category",     "VARCHAR(50)"),
                     ("sub_category", "VARCHAR(100)"),
                     ("image_url",    "VARCHAR(1000)"),
@@ -61,7 +65,9 @@ def root():
 
 
 @app.get("/capture")
-def capture_page():
+def capture_page(request: Request):
+    if get_current_user(request) is None:
+        return RedirectResponse("/login", status_code=303)
     return FileResponse("app/static/index.html")
 
 

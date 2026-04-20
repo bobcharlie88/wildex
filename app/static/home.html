@@ -10,124 +10,329 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #080f14;
-      --surface:  #0e1a24;
+      --bg: #080f14;
+      --surface: #0e1a24;
       --surface2: #152130;
-      --accent:   #22c55e;
-      --accent2:  #16a34a;
-      --warn:     #f59e0b;
-      --text:     #e8f0e9;
-      --muted:    #5a7a62;
-      --radius:   16px;
+      --accent: #22c55e;
+      --accent2: #16a34a;
+      --text: #e8f0e9;
+      --muted: #86a09c;
+      --danger: #ef4444;
+      --radius: 16px;
     }
 
     html, body {
-      height: 100%; background: var(--bg); color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      overflow: hidden;
-    }
-
-    .page {
       height: 100%;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 32px 28px 48px;
-      gap: 0;
+      background: radial-gradient(circle at top, #112231 0%, #080f14 58%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    /* ── Hero ────────────────────────────────────────────────── */
-    .hero { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 52px; }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
 
+    .shell {
+      width: 100%;
+      max-width: 380px;
+      background: rgba(14, 26, 36, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 24px;
+      padding: 28px 22px 24px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+    }
+
+    .hero { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
     .wordmark {
-      font-size: 2.8rem; font-weight: 800; letter-spacing: 0.12em;
-      text-transform: uppercase; color: var(--accent);
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
       line-height: 1;
     }
+    .tagline { color: var(--muted); line-height: 1.5; font-size: 0.95rem; }
 
-    .tagline {
-      font-size: 0.9rem; color: var(--muted); text-align: center; line-height: 1.5;
+    .status {
+      display: none;
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.18);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      line-height: 1.4;
     }
+    .status.visible { display: block; }
+    .status small { display: block; color: var(--muted); margin-top: 4px; }
 
-    .badge-count {
-      margin-top: 4px;
-      font-size: 0.78rem; color: var(--muted);
-      background: var(--surface); padding: 4px 14px;
-      border-radius: 20px;
+    .count-badge {
+      display: none;
+      margin-bottom: 18px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 0.9rem;
     }
-    .badge-count span { color: var(--accent); font-weight: 700; }
+    .count-badge.visible { display: block; }
+    .count-badge strong { color: var(--accent); }
+    .count-badge.queue strong { color: #fbbf24; }
 
-    /* ── Nav buttons ─────────────────────────────────────────── */
-    .nav { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 340px; }
-
+    .nav { display: flex; flex-direction: column; gap: 12px; }
     .nav-btn {
-      display: flex; align-items: center; gap: 16px;
-      padding: 18px 22px; border: none; border-radius: var(--radius);
-      font-size: 1.05rem; font-weight: 700; cursor: pointer;
-      text-decoration: none; color: inherit;
-      transition: transform 0.12s, opacity 0.12s;
-      -webkit-tap-highlight-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      border-radius: var(--radius);
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: transform 0.12s ease, opacity 0.12s ease;
     }
-    .nav-btn:active { transform: scale(0.97); opacity: 0.88; }
+    .nav-btn:active { transform: scale(0.98); opacity: 0.92; }
+    .nav-btn.primary { background: var(--accent); color: #04120a; border: none; }
+    .nav-btn.surface { background: var(--surface); }
+    .nav-btn.warn { background: rgba(239, 68, 68, 0.08); color: #fecaca; }
+    .nav-icon { font-size: 1.4rem; }
+    .nav-copy { display: flex; flex-direction: column; gap: 2px; }
+    .nav-copy strong { font-size: 1rem; }
+    .nav-copy span { font-size: 0.8rem; color: inherit; opacity: 0.72; }
 
-    .nav-btn-primary { background: var(--accent); color: #000; }
-    .nav-btn-surface { background: var(--surface); color: var(--text);
-      border: 1px solid rgba(255,255,255,0.07); }
+    .auth-actions {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .auth-actions.visible { display: flex; }
 
-    .nav-icon { font-size: 1.5rem; flex-shrink: 0; }
-    .nav-text { display: flex; flex-direction: column; gap: 1px; }
-    .nav-label { font-size: 1rem; font-weight: 700; }
-    .nav-sub   { font-size: 0.75rem; font-weight: 400; opacity: 0.7; }
-
-    /* ── Footer ──────────────────────────────────────────────── */
     .footer {
-      position: fixed; bottom: 24px;
-      font-size: 0.7rem; color: var(--muted); opacity: 0.5;
+      margin-top: 18px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.75rem;
+      opacity: 0.65;
     }
   </style>
 </head>
 <body>
-
-  <div class="page">
+  <main class="shell">
     <div class="hero">
       <div class="wordmark">WildEx</div>
-      <div class="tagline">Go outside. Find a creature.<br>Film it. Add it to your WildDex.</div>
-      <div class="badge-count" id="count-badge" style="display:none">
-        <span id="card-count">0</span> cards captured
-      </div>
+      <div class="tagline">Go outside. Find a creature. Capture it. Keep your own WildDex separate from everyone else.</div>
     </div>
 
-    <div class="nav">
-      <a class="nav-btn nav-btn-primary" href="/capture">
-        <span class="nav-icon">📷</span>
-        <div class="nav-text">
-          <span class="nav-label">Take Photo or Video</span>
-          <span class="nav-sub">Capture your next card</span>
-        </div>
-      </a>
+    <div class="status" id="account-status"></div>
+    <div class="count-badge" id="count-badge"><strong id="card-count">0</strong> cards captured</div>
+    <div class="count-badge queue" id="queue-badge"><strong id="queue-count">0</strong> captures waiting for reception</div>
 
-      <a class="nav-btn nav-btn-surface" href="/wildex">
-        <span class="nav-icon">📖</span>
-        <div class="nav-text">
-          <span class="nav-label">My WildDex</span>
-          <span class="nav-sub">Browse your collection</span>
-        </div>
+    <div class="nav" id="signed-in-nav" style="display:none">
+      <a class="nav-btn primary" href="/capture">
+        <div class="nav-icon">📷</div>
+        <div class="nav-copy"><strong>Capture</strong><span>Take a photo or video</span></div>
+      </a>
+      <a class="nav-btn surface" href="/wildex">
+        <div class="nav-icon">📖</div>
+        <div class="nav-copy"><strong>My WildDex</strong><span>Browse only your collection</span></div>
+      </a>
+      <a class="nav-btn warn" href="#" id="logout-link">
+        <div class="nav-icon">↩</div>
+        <div class="nav-copy"><strong>Sign Out</strong><span>End this session on this device</span></div>
       </a>
     </div>
-  </div>
 
-  <div class="footer">WildEx &mdash; Phase 1 MVP</div>
+    <div class="auth-actions visible" id="signed-out-nav">
+      <a class="nav-btn primary" href="/login">
+        <div class="nav-icon">🔐</div>
+        <div class="nav-copy"><strong>Sign In</strong><span>Open your WildDex account</span></div>
+      </a>
+      <a class="nav-btn surface" href="/login">
+        <div class="nav-icon">🌱</div>
+        <div class="nav-copy"><strong>Create Account</strong><span>Keep captures separate per user</span></div>
+      </a>
+    </div>
+
+    <div class="footer">WildEx MVP</div>
+  </main>
 
   <script>
-    // Show card count if DB is available
-    fetch('/cards')
-      .then(r => r.ok ? r.json() : [])
-      .then(cards => {
-        if (cards.length > 0) {
-          document.getElementById('card-count').textContent = cards.length;
-          document.getElementById('count-badge').style.display = '';
+    const signedInNav = document.getElementById('signed-in-nav');
+    const signedOutNav = document.getElementById('signed-out-nav');
+    const accountStatus = document.getElementById('account-status');
+    const countBadge = document.getElementById('count-badge');
+    const queueBadge = document.getElementById('queue-badge');
+    const QUEUE_DB_NAME = 'wildex-offline';
+    const QUEUE_STORE = 'capture_queue';
+
+    function openQueueDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(QUEUE_DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(QUEUE_STORE)) {
+            db.createObjectStore(QUEUE_STORE, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('IndexedDB unavailable'));
+      });
+    }
+
+    async function queuedCount() {
+      const db = await openQueueDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(QUEUE_STORE, 'readonly');
+        const req = tx.objectStore(QUEUE_STORE).count();
+        req.onsuccess = () => {
+          db.close();
+          resolve(req.result || 0);
+        };
+        req.onerror = () => {
+          db.close();
+          reject(req.error || new Error('Could not count queue'));
+        };
+      });
+    }
+
+    async function listQueuedCaptures() {
+      const db = await openQueueDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(QUEUE_STORE, 'readonly');
+        const req = tx.objectStore(QUEUE_STORE).getAll();
+        req.onsuccess = () => {
+          db.close();
+          resolve((req.result || []).sort((a, b) => a.id - b.id));
+        };
+        req.onerror = () => {
+          db.close();
+          reject(req.error || new Error('Could not read queue'));
+        };
+      });
+    }
+
+    async function deleteQueuedCapture(id) {
+      const db = await openQueueDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(QUEUE_STORE, 'readwrite');
+        tx.objectStore(QUEUE_STORE).delete(id);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          db.close();
+          reject(tx.error || new Error('Could not delete queue item'));
+        };
+      });
+    }
+
+    async function refreshQueueBadge() {
+      const pending = await queuedCount().catch(() => 0);
+      document.getElementById('queue-count').textContent = pending;
+      queueBadge.classList.toggle('visible', pending > 0);
+      return pending;
+    }
+
+    async function uploadQueuedCapture(entry) {
+      const file = entry.file instanceof File
+        ? entry.file
+        : new File([entry.file], entry.file?.name || 'offline-capture.jpg', { type: entry.file?.type || 'application/octet-stream' });
+      const form = new FormData();
+      form.append('file', file, file.name || 'offline-capture');
+      if (entry.lat != null && entry.lon != null) {
+        form.append('lat', entry.lat);
+        form.append('lon', entry.lon);
+      }
+      const resp = await fetch('/capture', {
+        method: 'POST',
+        body: form,
+        credentials: 'same-origin',
+      });
+      if (resp.status === 401) {
+        location.href = '/login';
+        throw new Error('Authentication required');
+      }
+      if (!resp.ok) {
+        throw new Error(`Queued upload failed (${resp.status})`);
+      }
+      return resp.json();
+    }
+
+    let syncInFlight = false;
+    async function processQueuedCaptures() {
+      if (syncInFlight || !navigator.onLine) {
+        await refreshQueueBadge();
+        return;
+      }
+      syncInFlight = true;
+      try {
+        const queue = await listQueuedCaptures();
+        for (const entry of queue) {
+          await uploadQueuedCapture(entry);
+          await deleteQueuedCapture(entry.id);
         }
-      })
-      .catch(() => {});
+      } catch (_) {
+      } finally {
+        syncInFlight = false;
+        await refreshQueueBadge();
+      }
+    }
+
+    function setSignedIn(user) {
+      accountStatus.classList.add('visible');
+      accountStatus.innerHTML = `Signed in as <strong>${escapeHtml(user.email)}</strong><small>Your captures and WildDex are now user-specific.</small>`;
+      signedInNav.style.display = '';
+      signedOutNav.classList.remove('visible');
+    }
+
+    function setSignedOut() {
+      signedInNav.style.display = 'none';
+      signedOutNav.classList.add('visible');
+      accountStatus.classList.remove('visible');
+      countBadge.classList.remove('visible');
+      queueBadge.classList.remove('visible');
+    }
+
+    async function loadSession() {
+      const me = await fetch('/auth/me', { credentials: 'same-origin' });
+      if (!me.ok) {
+        setSignedOut();
+        return;
+      }
+      const user = await me.json();
+      setSignedIn(user);
+
+      const cards = await fetch('/cards', { credentials: 'same-origin' });
+      if (!cards.ok) return;
+      const rows = await cards.json();
+      document.getElementById('card-count').textContent = rows.length;
+      countBadge.classList.add('visible');
+      await refreshQueueBadge();
+    }
+
+    document.getElementById('logout-link').addEventListener('click', async (event) => {
+      event.preventDefault();
+      await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+      location.href = '/login';
+    });
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    window.addEventListener('online', () => processQueuedCaptures());
+    window.addEventListener('focus', () => processQueuedCaptures());
+    window.setInterval(() => { processQueuedCaptures().catch(() => {}); }, 15000);
+
+    loadSession().then(() => processQueuedCaptures()).catch(() => setSignedOut());
   </script>
 </body>
 </html>

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc
 
+from app.auth import require_user
 from app.database import SessionLocal, db_available
-from app.models import Card
+from app.models import Card, User
 
 router = APIRouter()
 
@@ -49,24 +50,24 @@ def _card_dict(c: Card) -> dict:
 
 
 @router.get("/cards")
-def list_cards():
+def list_cards(current_user: User = Depends(require_user)):
     if not db_available():
         return []
     db = SessionLocal()
     try:
-        rows = db.query(Card).order_by(desc(Card.captured_at)).all()
+        rows = db.query(Card).filter(Card.owner_id == current_user.id).order_by(desc(Card.captured_at)).all()
         return [_card_dict(r) for r in rows]
     finally:
         db.close()
 
 
 @router.get("/cards/{card_id}")
-def get_card(card_id: int):
+def get_card(card_id: int, current_user: User = Depends(require_user)):
     if not db_available():
         raise HTTPException(503, "Database unavailable")
     db = SessionLocal()
     try:
-        row = db.query(Card).filter(Card.id == card_id).first()
+        row = db.query(Card).filter(Card.id == card_id, Card.owner_id == current_user.id).first()
         if not row:
             raise HTTPException(404, "Card not found")
         return _card_dict(row)

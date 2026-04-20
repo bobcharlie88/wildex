@@ -31,6 +31,27 @@ INAT_TAXA_URL = "https://api.inaturalist.org/v1/taxa"
 INAT_CV_URL = "https://api.inaturalist.org/v1/computervision/score_image"
 GOOGLE_VISION_URL = "https://vision.googleapis.com/v1/images:annotate"
 CONFIDENCE_THRESHOLD = 0.70
+TEMPORARY_ERROR_MARKERS = (
+    "429",
+    "500",
+    "502",
+    "503",
+    "504",
+    "deadline exceeded",
+    "high demand",
+    "internal error",
+    "over capacity",
+    "overloaded",
+    "quota exceeded",
+    "rate limit",
+    "resource_exhausted",
+    "resource exhausted",
+    "service unavailable",
+    "temporarily unavailable",
+    "timeout",
+    "try again later",
+    "unavailable",
+)
 
 SPECIES_ID_PROMPT = """You are a field naturalist and geologist with global expertise in animals, \
 plants, fungi, and terrain.
@@ -67,6 +88,10 @@ like "Granite outcrop" or "Sandstone formation"
   - terrain -> one of: rock, soil, water, landscape
 - subject_visible: false if nothing identifiable is in the image
 - Do not assume geographic region - identify from visual features only
+- For plants, reason explicitly from visible botany: leaf arrangement, leaf margin, venation, stem form, \
+surface texture, growth habit, flowers/fruit/seed pods if present
+- For plants, do not guess a species from weak evidence; prefer genus or family over an invented species name
+- Avoid generic labels like "plant", "weed", or "green shrub" unless that is genuinely all that is visible
 """
 
 GOOGLE_LIVING_TERMS = {
@@ -109,6 +134,21 @@ GOOGLE_TERRAIN_TERMS = {
     "wetland",
     "forest",
     "sky",
+}
+
+GENERIC_PLANT_NAMES = {
+    "flora",
+    "flower",
+    "grass",
+    "green plant",
+    "herb",
+    "leaf",
+    "plant",
+    "seedling",
+    "shrub",
+    "tree",
+    "vegetation",
+    "weed",
 }
 
 
@@ -172,6 +212,15 @@ class SpeciesResult:
         self.conservation_status = conservation_status
         self.observations_count = observations_count
         self.inat_validated = inat_validated
+
+
+class TemporaryIdentificationError(RuntimeError):
+    """Raised when identification providers fail for transient reasons."""
+
+
+def is_temporary_identification_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(marker in text for marker in TEMPORARY_ERROR_MARKERS)
 
 
 def _parse_gemini_json(text: str) -> dict:
@@ -283,6 +332,28 @@ def _classify_google_terms(terms: list[str]) -> tuple[str, str]:
     return "animal", "other"
 
 
+def _looks_like_generic_plant_name(name: str) -> bool:
+    text = (name or "").strip().lower()
+    return not text or text in GENERIC_PLANT_NAMES
+
+
+def _plant_sub_category_from_terms(*terms: str) -> str:
+    joined = " ".join((term or "").lower() for term in terms)
+    if any(word in joined for word in ("tree", "oak", "eucalyptus", "pine", "acacia", "willow", "birch", "elm")):
+        return "tree"
+    if any(word in joined for word in ("flower", "orchid", "lily", "rose", "daisy", "blossom", "petal")):
+        return "flower"
+    if any(word in joined for word in ("grass", "reed", "sedge", "bamboo", "turf")):
+        return "grass"
+    if any(word in joined for word in ("cactus", "succulent", "agave", "aloe")):
+        return "cactus"
+    if any(word in joined for word in ("waterlily", "water lily", "pondweed", "duckweed", "kelp", "mangrove", "aquatic")):
+        return "aquatic_plant"
+    if any(word in joined for word in ("shrub", "bush", "heath", "scrub")):
+        return "shrub"
+    return "other"
+
+
 def _inat_headers() -> dict[str, str]:
     headers = {"Accept": "application/json"}
     if INATURALIST_API_KEY:
@@ -312,7 +383,7 @@ def identify_with_gemini(image_path: str) -> SpeciesResult:
     )
 
     data = _parse_gemini_json(response.text)
-    return _build_result(
+    result = _build_result(
         scientific_name=data.get("scientific_name", "Unknown"),
         common_name=data.get("common_name", ""),
         confidence=data.get("confidence", 0.0),
@@ -322,6 +393,12 @@ def identify_with_gemini(image_path: str) -> SpeciesResult:
         category=_normalize_category(data.get("category", "animal")),
         sub_category=data.get("sub_category", ""),
     )
+    if result.category == "plant":
+        if not result.sub_category or result.sub_category == "other":
+            result.sub_category = _plant_sub_category_from_terms(result.common_name, result.scientific_name, result.reasoning)
+        if _looks_like_generic_plant_name(result.common_name):
+            result.provisional = True
+    return result
 
 
 def identify_with_inat_cv(image_path: str) -> SpeciesResult:
@@ -377,6 +454,10 @@ def identify_with_inat_cv(image_path: str) -> SpeciesResult:
     result.inat_common_name = common_name
     result.iconic_taxon = iconic
     result.inat_validated = bool(result.taxon_id)
+    if result.category == "plant":
+        result.sub_category = _plant_sub_category_from_terms(common_name, scientific_name)
+        if _looks_like_generic_plant_name(result.common_name):
+            result.provisional = True
     return result
 
 
@@ -450,9 +531,19 @@ def identify_with_google_vision(image_path: str) -> SpeciesResult:
             sub_category=sub_category,
         )
 
+    if category == "plant":
+        preferred = next(
+            (
+                term
+                for term, _ in scored_terms
+                if term and not _looks_like_generic_plant_name(term)
+            ),
+            preferred,
+        )
+
     # Use the most specific visible term as a taxa search hint, then let iNat
     # enrichment refine it if possible.
-    return _build_result(
+    result = _build_result(
         scientific_name=preferred,
         common_name=preferred.title(),
         confidence=min(confidence, 0.65),
@@ -462,48 +553,177 @@ def identify_with_google_vision(image_path: str) -> SpeciesResult:
         category=category,
         sub_category=sub_category,
     )
+    if result.category == "plant":
+        result.sub_category = _plant_sub_category_from_terms(preferred, " ".join(terms))
+        if _looks_like_generic_plant_name(preferred):
+            result.provisional = True
+    return result
 
 
-def enrich_with_inat(result: SpeciesResult) -> SpeciesResult:
-    query = result.scientific_name or result.common_name
-    if not query or query == "Unknown":
-        return result
+def identify_with_google_web(image_path: str) -> SpeciesResult:
+    if not GOOGLE_VISION_API_KEY or GOOGLE_VISION_API_KEY.startswith("your_"):
+        raise EnvironmentError("GOOGLE_VISION_API_KEY not set.")
 
-    response = httpx.get(
-        INAT_TAXA_URL,
-        headers=_inat_headers(),
-        params={"q": query, "rank": result.rank, "per_page": 1},
-        timeout=15.0,
+    image_b64 = base64.b64encode(Path(image_path).read_bytes()).decode("ascii")
+    payload = {
+        "requests": [
+            {
+                "image": {"content": image_b64},
+                "features": [
+                    {"type": "WEB_DETECTION", "maxResults": 10},
+                ],
+            }
+        ]
+    }
+    response = httpx.post(
+        GOOGLE_VISION_URL,
+        params={"key": GOOGLE_VISION_API_KEY},
+        json=payload,
+        timeout=30.0,
     )
     response.raise_for_status()
     data = response.json()
+    result = (data.get("responses") or [{}])[0]
+    if result.get("error"):
+        raise ValueError(result["error"].get("message", "Google Vision web detection request failed"))
 
-    results = data.get("results", [])
-    if not results:
-        response = httpx.get(
-            INAT_TAXA_URL,
-            headers=_inat_headers(),
-            params={"q": query, "per_page": 1},
-            timeout=15.0,
+    web = result.get("webDetection") or {}
+    entities = web.get("webEntities") or []
+    scored_terms = [
+        (entity.get("description", ""), float(entity.get("score", 0.0)))
+        for entity in entities
+        if entity.get("description")
+    ]
+    if not scored_terms:
+        raise ValueError("Google Vision web detection returned no entities")
+
+    terms = [term for term, _ in scored_terms]
+    category, sub_category = _classify_google_terms(terms)
+    preferred = next(
+        (
+            term
+            for term, _ in scored_terms
+            if term and (
+                len(term.split()) > 1
+                or term.lower() in GOOGLE_LIVING_TERMS
+                or term.lower() in GOOGLE_TERRAIN_TERMS
+            )
+        ),
+        scored_terms[0][0],
+    )
+    confidence = max(score for _, score in scored_terms)
+
+    if category == "terrain":
+        return _build_result(
+            scientific_name=preferred.title(),
+            common_name=preferred.title(),
+            confidence=min(confidence, 0.55),
+            rank="formation",
+            reasoning="Fallback via Google Vision web entities.",
+            subject_visible=True,
+            category=category,
+            sub_category=sub_category,
         )
-        response.raise_for_status()
-        results = response.json().get("results", [])
 
-    if not results:
+    if category == "plant":
+        preferred = next(
+            (
+                term
+                for term, _ in scored_terms
+                if term and not _looks_like_generic_plant_name(term)
+            ),
+            preferred,
+        )
+
+    result = _build_result(
+        scientific_name=preferred,
+        common_name=preferred.title(),
+        confidence=min(confidence, 0.58),
+        rank="species" if len(preferred.split()) > 1 else "class",
+        reasoning="Fallback via Google Vision web entities.",
+        subject_visible=True,
+        category=category,
+        sub_category=sub_category,
+    )
+    if result.category == "plant":
+        result.sub_category = _plant_sub_category_from_terms(preferred, " ".join(terms))
+        if _looks_like_generic_plant_name(preferred):
+            result.provisional = True
+    return result
+
+
+def _inat_taxa_lookup(query: str, *, rank: str | None = None, iconic_taxa: str | None = None) -> dict | None:
+    params = {"q": query, "per_page": 5}
+    if rank:
+        params["rank"] = rank
+    if iconic_taxa:
+        params["iconic_taxa"] = iconic_taxa
+    response = httpx.get(
+        INAT_TAXA_URL,
+        headers=_inat_headers(),
+        params=params,
+        timeout=15.0,
+    )
+    response.raise_for_status()
+    results = response.json().get("results", [])
+    if iconic_taxa:
+        results = [row for row in results if (row.get("iconic_taxon_name") or "").lower() == iconic_taxa.lower()]
+    return results[0] if results else None
+
+
+def enrich_with_inat(result: SpeciesResult) -> SpeciesResult:
+    queries: list[str] = []
+    preferred_iconic = _CATEGORY_ICONIC.get(result.category)
+
+    for value in (result.scientific_name, result.common_name):
+        text = (value or "").strip()
+        if not text or text == "Unknown":
+            continue
+        if result.category == "plant" and _looks_like_generic_plant_name(text):
+            continue
+        if text not in queries:
+            queries.append(text)
+
+    if not queries:
         return result
 
-    taxon = results[0]
+    taxon = None
+    for query in queries:
+        taxon = _inat_taxa_lookup(query, rank=result.rank, iconic_taxa=preferred_iconic)
+        if taxon:
+            break
+        taxon = _inat_taxa_lookup(query, iconic_taxa=preferred_iconic)
+        if taxon:
+            break
+        if preferred_iconic:
+            continue
+        taxon = _inat_taxa_lookup(query, rank=result.rank)
+        if taxon:
+            break
+        taxon = _inat_taxa_lookup(query)
+        if taxon:
+            break
+
+    if not taxon:
+        return result
+
     cs = taxon.get("conservation_status") or {}
     result.taxon_id = taxon.get("id")
     result.scientific_name = taxon.get("name", result.scientific_name)
     result.inat_common_name = taxon.get("preferred_common_name", "")
-    if result.inat_common_name and not result.common_name:
+    if result.inat_common_name and (not result.common_name or _looks_like_generic_plant_name(result.common_name)):
         result.common_name = result.inat_common_name
     result.wikipedia_summary = taxon.get("wikipedia_summary", "")
     result.iconic_taxon = taxon.get("iconic_taxon_name", "")
     result.conservation_status = cs.get("status_name", "")
     result.observations_count = taxon.get("observations_count", 0)
     result.inat_validated = True
+    if result.category == "plant":
+        result.sub_category = _plant_sub_category_from_terms(
+            result.inat_common_name,
+            result.common_name,
+            result.scientific_name,
+        )
     return result
 
 
@@ -517,11 +737,15 @@ _CATEGORY_ICONIC = {
 
 def identify_species(image_path: str) -> SpeciesResult:
     provider_errors: list[str] = []
+    skipped_providers: list[str] = []
+    temporary_failures: list[str] = []
+    hard_failures: list[str] = []
 
     for provider_name, provider in (
         ("gemini", identify_with_gemini),
         ("inaturalist_cv", identify_with_inat_cv),
         ("google_vision", identify_with_google_vision),
+        ("google_web", identify_with_google_web),
     ):
         try:
             result = provider(image_path)
@@ -529,12 +753,20 @@ def identify_species(image_path: str) -> SpeciesResult:
             break
         except EnvironmentError as exc:
             provider_errors.append(f"{provider_name}: {exc}")
+            skipped_providers.append(provider_name)
             log.warning("Species identification provider skipped: %s", provider_errors[-1])
         except Exception as exc:
             provider_errors.append(f"{provider_name}: {exc}")
+            if is_temporary_identification_error(exc):
+                temporary_failures.append(provider_name)
+            else:
+                hard_failures.append(provider_name)
             log.warning("Species identification provider failed: %s", provider_errors[-1])
     else:
-        raise RuntimeError("All identification providers failed: " + " | ".join(provider_errors))
+        message = "All identification providers failed: " + " | ".join(provider_errors)
+        if temporary_failures and not hard_failures:
+            raise TemporaryIdentificationError(message)
+        raise RuntimeError(message)
 
     if result.category == "terrain":
         result.iconic_taxon = "Terrain"
@@ -548,5 +780,15 @@ def identify_species(image_path: str) -> SpeciesResult:
 
         if not result.iconic_taxon and result.category in _CATEGORY_ICONIC:
             result.iconic_taxon = _CATEGORY_ICONIC[result.category] or ""
+        if result.category == "plant":
+            if not result.sub_category or result.sub_category == "other":
+                result.sub_category = _plant_sub_category_from_terms(
+                    result.inat_common_name,
+                    result.common_name,
+                    result.scientific_name,
+                    result.reasoning,
+                )
+            if _looks_like_generic_plant_name(result.common_name) and not result.inat_validated:
+                result.provisional = True
 
     return result
