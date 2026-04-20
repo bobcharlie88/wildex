@@ -74,6 +74,7 @@ class Card(Base):
 
     gbif_key: Mapped[int | None] = mapped_column(Integer)
     rarity_tier: Mapped[str | None] = mapped_column(String(50))
+    rarity_display: Mapped[str | None] = mapped_column(String(50))
     invasive_at_location: Mapped[bool] = mapped_column(Boolean, default=False)
 
     blurb: Mapped[str | None] = mapped_column(Text)
@@ -82,6 +83,15 @@ class Card(Base):
     defence: Mapped[int | None] = mapped_column(Integer)
     hp: Mapped[int | None] = mapped_column(Integer)
     stamina_regen: Mapped[int | None] = mapped_column(Integer)
+    threat_level: Mapped[str | None] = mapped_column(String(32))
+    aggression: Mapped[str | None] = mapped_column(String(32))
+    biome: Mapped[str | None] = mapped_column(String(120))
+    biome_bonus: Mapped[str | None] = mapped_column(String(255))
+    strength_name: Mapped[str | None] = mapped_column(String(120))
+    strength_effect: Mapped[str | None] = mapped_column(String(255))
+    weakness_name: Mapped[str | None] = mapped_column(String(120))
+    weakness_effect: Mapped[str | None] = mapped_column(String(255))
+    sound_url: Mapped[str | None] = mapped_column(String(1000))
 
     captured_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     latitude: Mapped[float | None] = mapped_column(Float)

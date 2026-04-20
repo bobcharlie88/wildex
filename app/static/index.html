@@ -1305,6 +1305,9 @@
     }
 
     function renderStyledCard(resp) {
+      // Legacy entrypoint retained only for compatibility.
+      // Shared renderer below is the maintained path.
+      return renderRenderedCard(resp);
       const c = resp.card;
       const fallbackPhoto = capturedFile ? URL.createObjectURL(capturedFile) : '';
       const displayPhoto = c.image_url || fallbackPhoto;

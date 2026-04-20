@@ -12,7 +12,7 @@ from app.models import Card, User, UserDexDiscovery
 from app.pipeline.card_generator import generate_card
 from app.pipeline.species_data import get_species_data
 from app.pipeline.species_id import TemporaryIdentificationError, identify_species, is_temporary_identification_error
-from app.services.card_render import build_render_card
+from app.services.card_render import apply_render_fields, build_render_card
 from app.services.dex import DISCOVERY_CAPTURED, DISCOVERY_SEEN, sync_card_to_dex
 
 router = APIRouter()
@@ -42,7 +42,7 @@ def _card_dict(c: Card) -> dict:
         "confidence":           round(c.confidence, 4) if c.confidence else None,
         "provisional":          c.provisional,
         "rarity_tier":          c.rarity_tier,
-        "rarity_display":       RARITY_DISPLAY.get(c.rarity_tier or "", "Unknown"),
+        "rarity_display":       c.rarity_display or RARITY_DISPLAY.get(c.rarity_tier or "", "Unknown"),
         "invasive_at_location": c.invasive_at_location,
         "iconic_taxon":         c.iconic_taxon,
         "conservation_status":  c.conservation_status,
@@ -59,6 +59,15 @@ def _card_dict(c: Card) -> dict:
             "hp":            c.hp,
             "stamina_regen": c.stamina_regen,
         },
+        "threat_level":     c.threat_level,
+        "aggression":       c.aggression,
+        "biome":            c.biome,
+        "biome_bonus":      c.biome_bonus,
+        "strength_name":    c.strength_name,
+        "strength_effect":  c.strength_effect,
+        "weakness_name":    c.weakness_name,
+        "weakness_effect":  c.weakness_effect,
+        "sound_url":        c.sound_url,
         "captured_at":     c.captured_at.isoformat() if c.captured_at else None,
         "latitude":        c.latitude,
         "longitude":       c.longitude,
@@ -237,6 +246,30 @@ def reidentify_card(card_id: int, current_user: User = Depends(require_user)):
             row.hp = card.stats.hp
             row.stamina_regen = card.stats.stamina_regen
             row.capture_country = gbif.query_country if gbif else row.capture_country
+            row.rarity_display = card.rarity_display
+            apply_render_fields(row, build_render_card({
+                "species_name": card.common_name,
+                "scientific_name": card.scientific_name,
+                "rank": card.rank,
+                "confidence": card.confidence,
+                "provisional": card.provisional,
+                "rarity_tier": card.rarity_tier,
+                "rarity_display": card.rarity_display,
+                "iconic_taxon": card.iconic_taxon,
+                "conservation_status": card.conservation_status,
+                "observations_count": card.observations_count,
+                "blurb": card.blurb,
+                "stats": {
+                    "speed": card.stats.speed,
+                    "attack": card.stats.attack,
+                    "defence": card.stats.defence,
+                    "hp": card.stats.hp,
+                },
+                "category": species.category,
+                "sub_category": species.sub_category,
+                "capture_country": gbif.query_country if gbif else row.capture_country,
+                "image_url": row.image_url,
+            }))
             sync_card_to_dex(db, row)
             row.discovery_state = DISCOVERY_CAPTURED
             db.commit()

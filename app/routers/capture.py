@@ -13,7 +13,7 @@ from app.pipeline.card_generator import generate_card
 from app.pipeline.frame_extractor import extract_best_frame, save_frame
 from app.pipeline.species_data import get_species_data
 from app.pipeline.species_id import TemporaryIdentificationError, identify_species, is_temporary_identification_error
-from app.services.card_render import build_render_card
+from app.services.card_render import apply_render_fields, build_render_card
 from app.services.dex import DISCOVERY_CAPTURED, sync_card_to_dex
 from app.utils.storage import upload_capture_asset
 
@@ -253,6 +253,30 @@ async def capture(
                     capture_country=gbif.query_country if gbif else None,
                     image_url=image_url,
                 )
+                render_data = build_render_card({
+                    "species_name": card.common_name,
+                    "scientific_name": card.scientific_name,
+                    "rank": card.rank,
+                    "confidence": card.confidence,
+                    "provisional": card.provisional,
+                    "rarity_tier": card.rarity_tier,
+                    "rarity_display": card.rarity_display,
+                    "iconic_taxon": card.iconic_taxon,
+                    "conservation_status": card.conservation_status,
+                    "observations_count": card.observations_count,
+                    "blurb": card.blurb,
+                    "stats": {
+                        "speed": card.stats.speed,
+                        "attack": card.stats.attack,
+                        "defence": card.stats.defence,
+                        "hp": card.stats.hp,
+                    },
+                    "category": species.category,
+                    "sub_category": species.sub_category,
+                    "capture_country": gbif.query_country if gbif else None,
+                    "image_url": image_url,
+                })
+                apply_render_fields(row, render_data)
                 db.add(row)
                 db.flush()
                 sync_card_to_dex(db, row)

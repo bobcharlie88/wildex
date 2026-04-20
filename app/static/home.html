@@ -176,11 +176,14 @@
     }
     .map-wrap { padding: 14px 14px 18px; }
     .map-card {
-      border-radius: 18px;
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, #102130, #0a151e);
+      border-radius: 24px;
+      border: 1px solid rgba(81, 64, 38, 0.28);
+      background:
+        radial-gradient(circle at 50% 44%, rgba(255,245,217,.72), rgba(223,196,147,.88) 52%, rgba(145,108,62,.95) 100%),
+        linear-gradient(180deg, #d9bb82, #a67e47);
       overflow: hidden;
-      padding: 10px;
+      padding: 12px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 16px 32px rgba(0,0,0,.22);
     }
     .map-legend {
       display: flex;
@@ -199,19 +202,67 @@
       vertical-align: middle;
     }
     svg.world-map { width: 100%; height: auto; display: block; }
-    .map-region {
-      fill: var(--locked);
-      stroke: rgba(255,255,255,.14);
-      stroke-width: 1.5;
-      cursor: default;
-      transition: fill .15s ease, opacity .15s ease, transform .15s ease;
-      transform-origin: center;
-      opacity: .56;
+    .map-frame { fill: rgba(117, 82, 44, .9); }
+    .map-sea {
+      fill: url(#seaWash);
+      stroke: rgba(92, 66, 32, .58);
+      stroke-width: 4;
     }
-    .map-region.unlocked { fill: #3f9360; opacity: .96; cursor: pointer; }
-    .map-region.active { fill: #f1c36b; opacity: 1; }
+    .map-parchment {
+      fill: url(#paperTone);
+      opacity: .94;
+    }
+    .map-grid, .map-route {
+      fill: none;
+      stroke: rgba(109, 78, 43, .18);
+      stroke-width: 1.6;
+    }
+    .map-route { stroke-dasharray: 7 8; opacity: .7; }
+    .map-compass {
+      fill: rgba(121, 84, 44, .12);
+      stroke: rgba(111, 79, 43, .42);
+      stroke-width: 1.8;
+    }
+    .map-continent {
+      fill: rgba(168, 135, 87, .4);
+      stroke: rgba(103, 73, 39, .32);
+      stroke-width: 2;
+    }
+    .map-region {
+      fill: rgba(88, 92, 96, .3);
+      stroke: rgba(74, 53, 31, .62);
+      stroke-width: 2.4;
+      cursor: default;
+      transition: fill .15s ease, opacity .15s ease, transform .15s ease, filter .15s ease;
+      transform-origin: center;
+      opacity: .64;
+    }
+    .map-region.unlocked {
+      fill: rgba(92, 137, 95, .78);
+      opacity: .96;
+      cursor: pointer;
+      filter: drop-shadow(0 0 12px rgba(48,92,50,.22));
+    }
+    .map-region.active {
+      fill: rgba(221, 170, 81, .9);
+      opacity: 1;
+      filter: drop-shadow(0 0 16px rgba(190,136,42,.3));
+    }
     .map-region:hover.unlocked { transform: translateY(-1px); }
-    .map-label { fill: rgba(237,245,239,.85); font-size: 10px; pointer-events: none; }
+    .map-hit {
+      fill: transparent;
+      stroke: transparent;
+      stroke-width: 18;
+      pointer-events: all;
+      cursor: pointer;
+    }
+    .map-label {
+      fill: rgba(91, 61, 28, .82);
+      font-size: 14px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
     .region-strip {
       display: flex;
       gap: 8px;
@@ -517,20 +568,68 @@
         </div>
         <div class="map-wrap">
           <div class="map-card">
-            <svg class="world-map" viewBox="0 0 1000 520" role="img" aria-label="WildEx world map">
-              <rect x="0" y="0" width="1000" height="520" fill="#0f2130"></rect>
-              <path class="map-region" data-region="NA" d="M128 118 L248 76 L335 107 L355 157 L314 196 L268 218 L249 266 L201 288 L155 251 L138 198 L100 173 Z"></path>
-              <path class="map-region" data-region="SA" d="M283 284 L327 304 L352 349 L334 414 L298 475 L263 436 L256 372 Z"></path>
-              <path class="map-region" data-region="EU" d="M451 116 L522 101 L579 118 L585 151 L536 166 L487 154 L454 138 Z"></path>
-              <path class="map-region" data-region="AF" d="M480 184 L562 193 L603 265 L577 377 L522 432 L467 351 L455 260 Z"></path>
-              <path class="map-region" data-region="AS" d="M585 122 L714 109 L832 158 L865 230 L804 286 L718 274 L650 241 L602 198 Z"></path>
-              <path class="map-region" data-region="AU" d="M774 338 L859 353 L903 390 L886 444 L816 467 L747 448 L726 398 Z"></path>
-              <text class="map-label" x="184" y="170">North America</text>
-              <text class="map-label" x="278" y="370">South America</text>
-              <text class="map-label" x="488" y="134">Europe</text>
-              <text class="map-label" x="505" y="286">Africa</text>
-              <text class="map-label" x="689" y="184">Asia</text>
-              <text class="map-label" x="792" y="408">Australia</text>
+            <svg class="world-map" viewBox="0 0 1000 620" role="img" aria-label="WildEx world map">
+              <defs>
+                <radialGradient id="paperTone" cx="50%" cy="45%" r="60%">
+                  <stop offset="0%" stop-color="#f6e7c4"></stop>
+                  <stop offset="58%" stop-color="#e2c891"></stop>
+                  <stop offset="100%" stop-color="#c39b63"></stop>
+                </radialGradient>
+                <linearGradient id="seaWash" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#efe1bd"></stop>
+                  <stop offset="100%" stop-color="#d9bc82"></stop>
+                </linearGradient>
+              </defs>
+              <rect class="map-frame" x="8" y="8" width="984" height="604" rx="42"></rect>
+              <ellipse class="map-sea" cx="500" cy="310" rx="438" ry="238"></ellipse>
+              <ellipse class="map-parchment" cx="500" cy="310" rx="422" ry="222"></ellipse>
+              <path class="map-grid" d="M130 310 H870 M188 238 C320 260,680 260,812 238 M188 382 C320 360,680 360,812 382"></path>
+              <path class="map-grid" d="M500 96 V524 M360 112 C384 204,384 416,360 508 M640 112 C616 204,616 416,640 508"></path>
+              <path class="map-route" d="M184 270 C292 184, 438 172, 552 222 S752 338, 824 288"></path>
+              <g class="map-compass" transform="translate(114 134)">
+                <circle cx="0" cy="0" r="42"></circle>
+                <path d="M0 -34 L7 -7 L0 34 L-7 -7 Z"></path>
+                <path d="M34 0 L7 7 L-34 0 L7 -7 Z"></path>
+                <text x="0" y="-52" text-anchor="middle" font-size="18" fill="rgba(91,61,28,.82)">N</text>
+              </g>
+              <path class="map-continent" d="M156 182 C190 146,252 128,312 146 C348 156,376 182,390 218 C375 252,350 270,324 282 C310 302,288 322,262 330 C214 330,174 298,152 260 C138 232,138 206,156 182 Z"></path>
+              <path class="map-continent" d="M302 340 C330 352,352 378,360 412 C350 452,328 490,306 522 C286 538,262 520,254 488 C252 450,264 392,302 340 Z"></path>
+              <path class="map-continent" d="M480 176 C504 164,540 166,570 176 C588 186,598 206,588 220 C562 232,526 234,494 226 C478 214,472 194,480 176 Z"></path>
+              <path class="map-continent" d="M502 242 C532 232,566 238,592 258 C618 304,612 368,582 430 C554 456,520 442,502 394 C488 336,482 282,502 242 Z"></path>
+              <path class="map-continent" d="M604 170 C662 150,752 150,826 182 C860 210,866 252,836 288 C786 310,714 308,656 294 C622 278,596 236,604 170 Z"></path>
+              <path class="map-continent" d="M762 384 C794 372,840 376,876 400 C896 422,894 454,862 474 C820 486,774 474,744 448 C736 420,744 396,762 384 Z"></path>
+
+              <g data-region="NA">
+                <path class="map-region" data-region="NA" d="M164 188 C198 154,256 138,310 154 C342 164,366 188,378 218 C366 246,340 266,314 278 C298 298,280 314,254 320 C214 318,180 290,160 256 C150 230,150 206,164 188 Z"></path>
+                <path class="map-hit" data-region="NA" d="M164 188 C198 154,256 138,310 154 C342 164,366 188,378 218 C366 246,340 266,314 278 C298 298,280 314,254 320 C214 318,180 290,160 256 C150 230,150 206,164 188 Z"></path>
+              </g>
+              <g data-region="SA">
+                <path class="map-region" data-region="SA" d="M304 346 C330 358,348 382,354 410 C348 444,330 480,310 510 C292 526,272 512,266 482 C264 446,274 390,304 346 Z"></path>
+                <path class="map-hit" data-region="SA" d="M304 346 C330 358,348 382,354 410 C348 444,330 480,310 510 C292 526,272 512,266 482 C264 446,274 390,304 346 Z"></path>
+              </g>
+              <g data-region="EU">
+                <path class="map-region" data-region="EU" d="M482 180 C506 170,538 170,566 178 C582 186,588 204,580 216 C554 226,522 228,494 220 C482 208,476 194,482 180 Z"></path>
+                <path class="map-hit" data-region="EU" d="M482 180 C506 170,538 170,566 178 C582 186,588 204,580 216 C554 226,522 228,494 220 C482 208,476 194,482 180 Z"></path>
+              </g>
+              <g data-region="AF">
+                <path class="map-region" data-region="AF" d="M508 244 C536 238,562 244,582 262 C604 302,600 360,576 420 C554 442,526 432,508 388 C494 334,492 286,508 244 Z"></path>
+                <path class="map-hit" data-region="AF" d="M508 244 C536 238,562 244,582 262 C604 302,600 360,576 420 C554 442,526 432,508 388 C494 334,492 286,508 244 Z"></path>
+              </g>
+              <g data-region="AS">
+                <path class="map-region" data-region="AS" d="M610 176 C666 158,750 158,820 186 C850 212,854 248,828 278 C778 300,712 298,658 284 C626 270,604 230,610 176 Z"></path>
+                <path class="map-hit" data-region="AS" d="M610 176 C666 158,750 158,820 186 C850 212,854 248,828 278 C778 300,712 298,658 284 C626 270,604 230,610 176 Z"></path>
+              </g>
+              <g data-region="AU">
+                <path class="map-region" data-region="AU" d="M766 388 C794 380,836 382,868 402 C884 420,882 448,854 464 C816 474,776 464,752 442 C744 420,748 398,766 388 Z"></path>
+                <path class="map-hit" data-region="AU" d="M766 388 C794 380,836 382,868 402 C884 420,882 448,854 464 C816 474,776 464,752 442 C744 420,748 398,766 388 Z"></path>
+              </g>
+
+              <text class="map-label" x="228" y="214">North America</text>
+              <text class="map-label" x="274" y="440">South America</text>
+              <text class="map-label" x="512" y="170">Europe</text>
+              <text class="map-label" x="530" y="336">Africa</text>
+              <text class="map-label" x="720" y="220">Asia</text>
+              <text class="map-label" x="800" y="432">Australia</text>
             </svg>
           </div>
           <div class="map-legend">
@@ -645,46 +744,20 @@
       });
     }
 
+    function taxonomy(entry) {
+      return entry.taxonomy || { kingdom_root: 'Other', major_category: 'Other', family: entry.group_code || 'Group' };
+    }
+
     function kingdomRoot(entry) {
-      const category = String(entry.category || entry.card?.category || '').toLowerCase();
-      const sub = String(entry.sub_category || entry.card?.sub_category || '').toLowerCase();
-      if (category === 'plant') return 'Plants';
-      if (category === 'fungi') return 'Fungi';
-      if (category === 'terrain') return 'Terrain';
-      if (sub === 'reptile') return 'Animals';
-      if (sub === 'mammal') return 'Animals';
-      if (sub === 'bird') return 'Animals';
-      if (sub === 'fish' || sub === 'marine') return 'Animals';
-      if (sub === 'insect' || sub === 'arachnid') return 'Insects';
-      if (sub === 'amphibian') return 'Animals';
-      return category === 'animal' ? 'Animals' : 'Other';
+      return taxonomy(entry).kingdom_root;
     }
 
     function categoryLabel(entry) {
-      const category = String(entry.category || entry.card?.category || '').toLowerCase();
-      const sub = String(entry.sub_category || entry.card?.sub_category || '').toLowerCase();
-      if (sub === 'reptile') return 'Reptiles';
-      if (sub === 'mammal') return 'Mammals';
-      if (sub === 'bird') return 'Birds';
-      if (sub === 'fish' || sub === 'marine') return 'Fish / Marine';
-      if (sub === 'insect' || sub === 'arachnid') return 'Insects';
-      if (sub === 'amphibian') return 'Amphibians';
-      if (category === 'plant') return 'Plants';
-      if (category === 'fungi') return 'Fungi';
-      if (category === 'terrain') return 'Terrain';
-      return 'Other';
+      return taxonomy(entry).major_category;
     }
 
     function familyLabel(entry) {
-      const map = {
-        DRG: 'Dragons', GEK: 'Geckos', SKN: 'Skinks', SNK: 'Snakes', TRT: 'Turtles', CRO: 'Crocs',
-        MAR: 'Marsupials', BAT: 'Bats', SEA: 'Marine Mammals', ROD: 'Rodents', MAM: 'Mammals',
-        RAP: 'Raptors', PAR: 'Parrots', BRD: 'Birds',
-        EST: 'Estuary Fish', REF: 'Reef Fish', SHK: 'Sharks / Rays', FSH: 'Fish',
-        MED: 'Medicinal', TRE: 'Trees', GRS: 'Grasses', AQP: 'Aquatic', SHB: 'Shrubs', BOT: 'Botanical',
-        LEP: 'Butterflies / Moths', BET: 'Beetles', ODO: 'Dragonflies', INS: 'Insects', FRG: 'Frogs',
-      };
-      return map[entry.group_code] || entry.group_code || 'Group';
+      return taxonomy(entry).family;
     }
 
     function activeEntries() {
@@ -728,6 +801,11 @@
     function renderMap() {
       const regions = new Set(unlockedRegions());
       document.querySelectorAll('.map-region').forEach(node => {
+        const code = node.dataset.region;
+        node.classList.toggle('unlocked', regions.has(code));
+        node.classList.toggle('active', code === state.selectedRegion);
+      });
+      document.querySelectorAll('.map-hit').forEach(node => {
         const code = node.dataset.region;
         node.classList.toggle('unlocked', regions.has(code));
         node.classList.toggle('active', code === state.selectedRegion);
@@ -809,230 +887,15 @@
       }).join('') || '<div class="hint">No Dex entries in this path yet.</div>';
     }
 
-    function regionMapSvg(entry, data) {
-      const mode = data.range_mode;
-      const activeRegions = new Set(data.range_regions || []);
-      const markerSvg = (data.local_markers || []).map(marker =>
-        `<circle cx="${marker.x}" cy="${marker.y}" r="3.8" fill="#8c5c33" stroke="#f7ecd2" stroke-width="1.2"></circle>`
-      ).join('');
-      if (mode === 'region' && activeRegions.has('AU')) {
-        return `
-          <svg viewBox="0 0 140 100" aria-label="Australia range map">
-            <rect width="140" height="100" rx="10" fill="#ead8b8"></rect>
-            <path d="M34 50 L63 37 L96 43 L110 56 L101 76 L72 83 L42 74 L28 61 Z" fill="#a27d55" stroke="#6c4f34" stroke-width="2"></path>
-            ${markerSvg || '<circle cx="79" cy="60" r="4" fill="#7b4d2d" stroke="#f8eed8" stroke-width="1.2"></circle>'}
-          </svg>`;
-      }
-      if (mode === 'ocean') {
-        return `
-          <svg viewBox="0 0 180 110" aria-label="Ocean range map">
-            <rect width="180" height="110" rx="12" fill="#d9e6ea"></rect>
-            <path d="M8 18 H172 V102 H8 Z" fill="#92c2cf"></path>
-            <path d="M12 22 L44 18 L62 36 L54 54 L18 56 Z" fill="#9f8865"></path>
-            <path d="M122 24 L168 30 L162 56 L136 62 L112 44 Z" fill="#9f8865"></path>
-            <path d="M54 70 L86 74 L98 95 L60 98 Z" fill="#9f8865"></path>
-            <path d="M105 68 L138 70 L150 92 L112 96 Z" fill="#9f8865"></path>
-            <path d="M18 70 C34 58, 58 58, 76 70 S118 82, 140 68 S162 58, 170 70" fill="none" stroke="#2f6f7f" stroke-width="12" stroke-linecap="round"></path>
-          </svg>`;
-      }
-      return `
-        <svg viewBox="0 0 180 110" aria-label="World range map">
-          <rect width="180" height="110" rx="12" fill="#d9e6ea"></rect>
-          <path d="M18 28 L42 18 L61 26 L66 43 L51 53 L32 59 L20 47 Z" fill="${activeRegions.has('NA') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
-          <path d="M53 60 L66 64 L73 82 L63 98 L51 89 L49 73 Z" fill="${activeRegions.has('SA') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
-          <path d="M82 24 L99 20 L114 26 L112 38 L90 36 Z" fill="${activeRegions.has('EU') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
-          <path d="M88 44 L110 46 L119 72 L104 96 L85 80 L82 56 Z" fill="${activeRegions.has('AF') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
-          <path d="M114 26 L148 24 L166 42 L158 62 L129 59 L118 48 Z" fill="${activeRegions.has('AS') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
-          <path d="M138 72 L162 76 L168 91 L146 98 L130 88 Z" fill="${activeRegions.has('AU') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
-          ${markerSvg}
-        </svg>`;
-    }
-
-    function buildRenderData(entry) {
-      const card = entry.card || {};
-      const name = card.species_name || entry.name || entry.scientific_name || 'Unknown';
-      const scientific = card.scientific_name || entry.scientific_name || 'Unknown';
-      const kingdom = categoryLabel(entry);
-      const iconMap = {
-        Reptiles: 'Dragon', Mammals: 'Paw', Birds: 'Wing', 'Fish / Marine': 'Fish', Insects: 'Insect', Plants: 'Leaf', Fungi: 'Spore', Terrain: 'Stone'
-      };
-      const strengthMap = {
-        Reptiles: ['Desert', '+20% defence in arid zones'],
-        Mammals: ['Open Ground', '+20% movement in open terrain'],
-        Birds: ['High Wind', '+20% scouting in elevated zones'],
-        'Fish / Marine': ['Current', '+20% speed in open water'],
-        Insects: ['Camouflage', '+20% evasion in cover'],
-        Plants: ['Rooted Soil', '+20% resilience in native ground'],
-      };
-      const weaknessMap = {
-        Reptiles: ['Cold Rain', 'Reduced mobility and warmth in wet conditions'],
-        Mammals: ['Heat Stress', 'Reduced stamina during severe heat'],
-        Birds: ['Dense Brush', 'Reduced maneuvering in enclosed canopy'],
-        'Fish / Marine': ['Shallow Heat', 'Reduced endurance in warm shallow water'],
-        Insects: ['Cold Snap', 'Reduced activity in low temperatures'],
-        Plants: ['Transplant Shock', 'Reduced vitality outside stable habitat'],
-      };
-      const rangeMode = card.sub_category === 'marine' || card.sub_category === 'fish' ? 'ocean' : (entry.region === 'AU' ? 'region' : 'world');
-      const rangeRegions = rangeMode === 'region' ? [entry.region] : [entry.region];
-      const icons = iconMap[kingdom] || 'WildEx';
-      return {
-        species_name: name,
-        scientific_name: scientific,
-        dex_id: entry.dex_id,
-        card_number: entry.dex_id.split('-').pop(),
-        rarity: card.rarity_display || 'Common',
-        threat_level: (card.attack || 0) >= 70 ? 'High' : (card.attack || 0) >= 40 ? 'Medium' : 'Low',
-        aggression: (card.attack || 0) >= 78 ? 'High' : (card.attack || 0) >= 45 ? 'Medium' : 'Low',
-        length_text: kingdom === 'Reptiles' ? '8-10 inches (20-25 cm)' : kingdom === 'Mammals' ? 'Field size varies by species' : 'Field size varies by species',
-        habitat_text: card.capture_country === 'AU' ? 'Native habitat within Australia' : 'Habitat matched to local range',
-        diet_text: kingdom === 'Plants' ? 'Photosynthesis and nutrient uptake' : kingdom === 'Fish / Marine' ? 'Marine prey and forage' : 'Diet varies by species',
-        info_text: card.blurb || 'WildEx field record.',
-        fact_text: card.conservation_status ? `Conservation status: ${card.conservation_status}` : `Observed ${Number(card.observations_count || 0).toLocaleString()} times on iNaturalist.`,
-        image_url: card.image_url || '',
-        hp: card.stats?.hp ?? 0,
-        atk: card.stats?.attack ?? 0,
-        def: card.stats?.defence ?? 0,
-        spd: card.stats?.speed ?? 0,
-        type_label: kingdom.replace(' / Marine',''),
-        biome: kingdom === 'Reptiles' ? 'Rocky Desert' : kingdom === 'Mammals' ? 'Open Woodland' : kingdom === 'Birds' ? 'Sky / Cliff' : kingdom === 'Fish / Marine' ? 'Ocean Current' : kingdom === 'Insects' ? 'Brushland' : 'Botanical Habitat',
-        biome_bonus: strengthMap[kingdom]?.[1] || '+20% field advantage in native terrain',
-        strength_name: strengthMap[kingdom]?.[0] || 'Native Habitat',
-        strength_effect: strengthMap[kingdom]?.[1] || '+20% field advantage in native terrain',
-        weakness_name: weaknessMap[kingdom]?.[0] || 'Range Shift',
-        weakness_effect: weaknessMap[kingdom]?.[1] || 'Reduced performance outside native terrain',
-        abilities: card.provisional ? ['Pending Identification'] : ['Field Adaptation', 'Territory Sense'],
-        environment_triggers: [
-          `Gains advantage in ${(kingdom === 'Fish / Marine' ? 'marine' : 'native').toLowerCase()} terrain`,
-          `Vulnerable to ${(weaknessMap[kingdom]?.[0] || 'range shift').toLowerCase()} conditions`,
-        ],
-        range_mode: rangeMode,
-        range_regions: rangeRegions,
-        local_markers: entry.region === 'AU' ? [{ region: 'AU', x: 79, y: 60 }] : [],
-        theme_class: kingdom === 'Reptiles' ? 'theme-reptile' : kingdom === 'Mammals' ? 'theme-mammal' : kingdom === 'Birds' ? 'theme-bird' : kingdom === 'Fish / Marine' ? 'theme-fish' : kingdom === 'Insects' ? 'theme-insect' : 'theme-plant',
-        banner_icon: icons,
-        rank: card.rank || 'species',
-        sound_url: card.sound_url || '',
-      };
-    }
-
-    function cardFrontHtml(data) {
-      return `
-        <section class="card-face ${data.theme_class}">
-          <div class="face-inner">
-            <div class="card-banner">
-              <div class="level-badge">${escapeHtml(data.card_number)}</div>
-              <div class="banner-title">WildEx</div>
-              <div class="icon-badge">${escapeHtml(data.banner_icon)}</div>
-            </div>
-            <div class="species-block">
-              <h3>${escapeHtml(data.species_name)}</h3>
-              <p>${escapeHtml(data.scientific_name)}</p>
-            </div>
-            <div class="front-main">
-              <div class="info-panel">
-                <div class="info-row"><div class="label">Common Name</div><div class="value">${escapeHtml(data.species_name)}</div></div>
-                <div class="info-row"><div class="label">Scientific Name</div><div class="value"><em>${escapeHtml(data.scientific_name)}</em></div></div>
-                <div class="info-row"><div class="label">Length</div><div class="value">${escapeHtml(data.length_text)}</div></div>
-                <div class="info-row"><div class="label">Habitat</div><div class="value">${escapeHtml(data.habitat_text)}</div></div>
-                <div class="info-row"><div class="label">Diet</div><div class="value">${escapeHtml(data.diet_text)}</div></div>
-              </div>
-              <div class="photo-panel">${data.image_url ? `<img src="${escapeHtml(data.image_url)}" alt="">` : ''}</div>
-            </div>
-            <div class="section-tag">Info</div>
-            <div class="lore-box">${escapeHtml(data.info_text)}</div>
-            <div class="fact-box"><strong>Fact</strong>${escapeHtml(data.fact_text)}</div>
-          </div>
-        </section>`;
-    }
-
-    function cardBackHtml(data, entry) {
-      return `
-        <section class="card-face back ${data.theme_class}">
-          <div class="face-inner" style="grid-template-rows:auto auto auto 1fr auto auto">
-            <div class="card-banner">
-              <div class="level-badge">${escapeHtml(data.card_number)}</div>
-              <div class="banner-title">${escapeHtml(data.dex_id)}</div>
-              <div class="icon-badge">${escapeHtml(data.banner_icon)}</div>
-            </div>
-            <div class="species-block">
-              <h3>${escapeHtml(data.species_name)}</h3>
-              <p>${escapeHtml(data.scientific_name)}</p>
-            </div>
-            <div class="back-grid">
-              <div class="back-col">
-                <div class="back-box">
-                  <h4>Status</h4>
-                  <div class="status-grid">
-                    <div><span>Rarity</span><strong>${escapeHtml(data.rarity)}</strong></div>
-                    <div><span>Threat</span><strong>${escapeHtml(data.threat_level)}</strong></div>
-                    <div><span>Aggression</span><strong>${escapeHtml(data.aggression)}</strong></div>
-                  </div>
-                </div>
-              </div>
-              <div class="back-col">
-                <div class="back-box map-panel">
-                  ${regionMapSvg(entry, data)}
-                </div>
-              </div>
-            </div>
-            <div class="back-grid">
-              <div class="back-col">
-                <div class="strip-box">
-                  <h4>Strength</h4>
-                  <div class="title">${escapeHtml(data.strength_name)}</div>
-                  <div class="effect">${escapeHtml(data.strength_effect)}</div>
-                </div>
-                <div class="strip-box">
-                  <h4>Weakness</h4>
-                  <div class="title">${escapeHtml(data.weakness_name)}</div>
-                  <div class="effect">${escapeHtml(data.weakness_effect)}</div>
-                </div>
-                <div class="lower-box">
-                  <h4>Stats</h4>
-                  <div class="stat-grid">
-                    <div><span>HP</span><strong>${data.hp}</strong></div>
-                    <div><span>ATK</span><strong>${data.atk}</strong></div>
-                    <div><span>DEF</span><strong>${data.def}</strong></div>
-                    <div><span>SPD</span><strong>${data.spd}</strong></div>
-                  </div>
-                </div>
-              </div>
-              <div class="back-col">
-                <div class="lower-box">
-                  <h4>Type</h4>
-                  <div class="type-grid">
-                    <div><span>Type</span><strong>${escapeHtml(data.type_label)}</strong></div>
-                    <div><span>Biome</span><strong>${escapeHtml(data.biome)}</strong></div>
-                    <div><span>Biome Bonus</span><strong>${escapeHtml(data.biome_bonus)}</strong></div>
-                  </div>
-                </div>
-                <div class="lower-box">
-                  <h4>Abilities</h4>
-                  <ul>${data.abilities.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
-                </div>
-                <div class="environment-box">
-                  <h4>Environment Triggers</h4>
-                  <ul>${data.environment_triggers.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
-                </div>
-              </div>
-            </div>
-            <div class="call-box ${data.sound_url ? '' : 'hidden'}">
-              <button class="btn btn-secondary" type="button" id="play-call-btn">Play Call</button>
-            </div>
-            <div class="bottom-bar">
-              <span>Rarity: ${escapeHtml(data.rarity)}</span>
-              <span>Threat Level: ${escapeHtml(data.threat_level)}</span>
-              <span>Aggression: ${escapeHtml(data.aggression)}</span>
-            </div>
-          </div>
-        </section>`;
-    }
+    // Legacy inline renderer helpers removed.
+    // Shared renderer in /static/card_renderer.js is the single maintained path.
 
     function openEntry(entryId) {
       const entry = state.entries.find(item => item.id === entryId);
       if (!entry || !entry.card || entry.discovery_state !== 'CAPTURED') return;
       state.activeEntry = entry;
-      const data = entry.card.render_card || buildRenderData(entry);
+      const data = entry.card.render_card;
+      if (!data) return;
       document.getElementById('modal-title').textContent = data.species_name;
       document.getElementById('modal-subtitle').textContent = `${entry.dex_id} · ${familyLabel(entry)}`;
       WildExCardRenderer.buildCard(document.getElementById('detail-card-host'), data);
@@ -1110,7 +973,7 @@
     }
 
     document.addEventListener('click', (event) => {
-      const regionNode = event.target.closest('.map-region,.region-pill');
+      const regionNode = event.target.closest('.map-region,.map-hit,.region-pill');
       if (regionNode) {
         const region = regionNode.dataset.region;
         if (unlockedRegions().includes(region)) {

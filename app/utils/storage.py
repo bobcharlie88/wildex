@@ -4,8 +4,17 @@ import mimetypes
 from pathlib import Path
 from uuid import uuid4
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+try:
+    import boto3
+    from botocore.exceptions import BotoCoreError, ClientError
+except ImportError:  # Local/dev environments may use local upload fallback only.
+    boto3 = None
+
+    class BotoCoreError(Exception):
+        pass
+
+    class ClientError(Exception):
+        pass
 
 from app.config import (
     R2_ACCESS_KEY_ID,
@@ -32,6 +41,8 @@ def r2_enabled() -> bool:
 def _r2_client():
     if not r2_enabled():
         raise RuntimeError("Cloudflare R2 is not fully configured")
+    if boto3 is None:
+        raise RuntimeError("boto3 is not installed")
     endpoint = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
     return boto3.client(
         "s3",

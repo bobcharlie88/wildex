@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Card, DexEntry, UserDexDiscovery
+from app.services.card_render import apply_render_fields, build_render_card
 
 DISCOVERY_UNKNOWN = "UNKNOWN"
 DISCOVERY_SEEN = "SEEN"
@@ -535,15 +536,30 @@ def backfill_user_cards(db: Session, user_id: int) -> None:
         db.query(Card)
         .filter(
             Card.owner_id == user_id,
-            Card.dex_entry_id.is_(None),
         )
         .order_by(Card.captured_at.asc(), Card.id.asc())
         .all()
     )
     changed = False
     for row in rows:
-        sync_card_to_dex(db, row)
-        changed = True
+        if row.dex_entry_id is None:
+            sync_card_to_dex(db, row)
+            changed = True
+        if any(
+            value is None
+            for value in (
+                row.rarity_display,
+                row.threat_level,
+                row.aggression,
+                row.biome,
+                row.biome_bonus,
+                row.strength_name,
+                row.strength_effect,
+                row.weakness_name,
+                row.weakness_effect,
+            )
+        ):
+            apply_render_fields(row, build_render_card(row))
+            changed = True
     if changed:
         db.commit()
-

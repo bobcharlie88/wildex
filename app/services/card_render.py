@@ -133,6 +133,15 @@ def _rarity(source) -> str:
     return RARITY_VALUES.get(str(_value(source, "rarity_tier") or "").strip().lower(), "Common")
 
 
+def _stored_or(default, source, key):
+    value = _value(source, key)
+    if value is None:
+        return default
+    if isinstance(value, str) and not value.strip():
+        return default
+    return value
+
+
 def _threat_level(attack: int, hp: int) -> str:
     score = attack * 0.65 + hp * 0.35
     if score >= 82:
@@ -249,6 +258,14 @@ def build_render_card(source) -> dict:
     rarity = _rarity(source)
     capture_country = _value(source, "capture_country")
     range_mode, range_regions, local_markers = _range_mode(species_name, kingdom_key, capture_country)
+    threat_level = _stored_or(_threat_level(attack, hp), source, "threat_level")
+    aggression = _stored_or(_aggression(attack, speed), source, "aggression")
+    biome = _stored_or(theme["biome"], source, "biome")
+    biome_bonus = _stored_or(theme["biome_bonus"], source, "biome_bonus")
+    strength_name = _stored_or(theme["strength_name"], source, "strength_name")
+    strength_effect = _stored_or(theme["strength_effect"], source, "strength_effect")
+    weakness_name = _stored_or(theme["weakness_name"], source, "weakness_name")
+    weakness_effect = _stored_or(theme["weakness_effect"], source, "weakness_effect")
     return {
         "species_name": species_name,
         "scientific_name": scientific_name,
@@ -258,8 +275,8 @@ def build_render_card(source) -> dict:
         "dex_id": _value(source, "dex_id"),
         "card_number": (str(_value(source, "dex_id") or "").split("-")[-1] or str(_value(source, "id") or "")),
         "rarity": rarity,
-        "threat_level": _threat_level(attack, hp),
-        "aggression": _aggression(attack, speed),
+        "threat_level": threat_level,
+        "aggression": aggression,
         "length_text": _length_text(species_name, kingdom_key),
         "habitat_text": _habitat_text(species_name, kingdom_key, capture_country),
         "diet_text": _diet_text(species_name, kingdom_key),
@@ -276,16 +293,16 @@ def build_render_card(source) -> dict:
         "def": defence,
         "spd": speed,
         "type_label": theme["type_label"],
-        "biome": theme["biome"],
-        "biome_bonus": theme["biome_bonus"],
-        "strength_name": theme["strength_name"],
-        "strength_effect": theme["strength_effect"],
-        "weakness_name": theme["weakness_name"],
-        "weakness_effect": theme["weakness_effect"],
+        "biome": biome,
+        "biome_bonus": biome_bonus,
+        "strength_name": strength_name,
+        "strength_effect": strength_effect,
+        "weakness_name": weakness_name,
+        "weakness_effect": weakness_effect,
         "abilities": _abilities(species_name, kingdom_key),
         "environment_triggers": [
-            f"Gains advantage in {theme['biome'].lower()} terrain",
-            f"Vulnerable to {theme['weakness_name'].lower()} conditions",
+            f"Gains advantage in {str(biome).lower()} terrain",
+            f"Vulnerable to {str(weakness_name).lower()} conditions",
         ],
         "range_mode": range_mode,
         "range_regions": range_regions,
@@ -300,3 +317,17 @@ def build_render_card(source) -> dict:
         "provisional": _value(source, "provisional"),
         "rank": _value(source, "rank"),
     }
+
+
+def apply_render_fields(target, render_data: dict) -> None:
+    target.rarity_display = render_data.get("rarity")
+    target.threat_level = render_data.get("threat_level")
+    target.aggression = render_data.get("aggression")
+    target.biome = render_data.get("biome")
+    target.biome_bonus = render_data.get("biome_bonus")
+    target.strength_name = render_data.get("strength_name")
+    target.strength_effect = render_data.get("strength_effect")
+    target.weakness_name = render_data.get("weakness_name")
+    target.weakness_effect = render_data.get("weakness_effect")
+    if getattr(target, "sound_url", None) is None:
+        target.sound_url = render_data.get("sound_url")

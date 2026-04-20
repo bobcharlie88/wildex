@@ -17,6 +17,7 @@ from app.services.dex import (
     resolve_or_create_dex_entry,
     set_discovery_state,
 )
+from app.services.taxonomy import REGION_LABELS, taxonomy_for_entry
 
 router = APIRouter()
 
@@ -46,7 +47,7 @@ def _card_dict(c: Card) -> dict:
         "confidence": round(c.confidence, 4) if c.confidence else None,
         "provisional": c.provisional,
         "rarity_tier": c.rarity_tier,
-        "rarity_display": RARITY_DISPLAY.get(c.rarity_tier or "", "Unknown"),
+        "rarity_display": c.rarity_display or RARITY_DISPLAY.get(c.rarity_tier or "", "Unknown"),
         "invasive_at_location": c.invasive_at_location,
         "iconic_taxon": c.iconic_taxon,
         "conservation_status": c.conservation_status,
@@ -63,6 +64,15 @@ def _card_dict(c: Card) -> dict:
             "hp": c.hp,
             "stamina_regen": c.stamina_regen,
         },
+        "threat_level": c.threat_level,
+        "aggression": c.aggression,
+        "biome": c.biome,
+        "biome_bonus": c.biome_bonus,
+        "strength_name": c.strength_name,
+        "strength_effect": c.strength_effect,
+        "weakness_name": c.weakness_name,
+        "weakness_effect": c.weakness_effect,
+        "sound_url": c.sound_url,
         "captured_at": c.captured_at.isoformat() if c.captured_at else None,
         "latitude": c.latitude,
         "longitude": c.longitude,
@@ -142,6 +152,7 @@ def list_wilddex_entries(current_user: User = Depends(require_user)):
                     "id": entry.id,
                     "dex_id": entry.dex_id,
                     "region": entry.region,
+                    "region_label": REGION_LABELS.get(entry.region, entry.region),
                     "kingdom": entry.kingdom,
                     "group_code": entry.group_code,
                     "number": entry.number,
@@ -150,6 +161,12 @@ def list_wilddex_entries(current_user: User = Depends(require_user)):
                     "scientific_name": entry.scientific_name if state == DISCOVERY_CAPTURED else None,
                     "category": entry.category,
                     "sub_category": entry.sub_category,
+                    "taxonomy": taxonomy_for_entry(
+                        category=entry.category,
+                        sub_category=entry.sub_category,
+                        group_code=entry.group_code,
+                        kingdom=entry.kingdom,
+                    ),
                     "evolution_chain_id": entry.evolution_chain_id,
                     "evolution_stage": entry.evolution_stage,
                     "evolution_length": entry.evolution_length,
