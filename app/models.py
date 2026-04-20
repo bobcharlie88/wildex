@@ -15,7 +15,10 @@ class User(Base):
     favorite_card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    cards: Mapped[list["Card"]] = relationship(back_populates="owner")
+    cards: Mapped[list["Card"]] = relationship(
+        back_populates="owner",
+        foreign_keys="Card.owner_id",
+    )
     dex_discoveries: Mapped[list["UserDexDiscovery"]] = relationship(back_populates="user")
 
 
@@ -94,7 +97,10 @@ class Card(Base):
     evolution_chain_id: Mapped[str | None] = mapped_column(String(255))
     evolution_stage: Mapped[int | None] = mapped_column(Integer)
 
-    owner: Mapped[User | None] = relationship(back_populates="cards")
+    owner: Mapped[User | None] = relationship(
+        back_populates="cards",
+        foreign_keys=[owner_id],
+    )
     dex_entry: Mapped[DexEntry | None] = relationship(back_populates="cards")
 
 
