@@ -159,6 +159,9 @@
     justify-content: center;
     font-size: 40px;
   }
+  .card-thumb.landscape {
+    aspect-ratio: 4 / 3;
+  }
   .card-thumb img {
     width: 100%;
     height: 100%;
@@ -297,15 +300,13 @@
 
   #modal-photo {
     width: 100%;
-    max-height: 260px;
-    object-fit: cover;
+    max-height: none;
+    object-fit: initial;
     margin-top: 12px;
-    background: var(--surface2);
-    min-height: 120px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 80px;
+    background: transparent;
+    min-height: 0;
+    display: block;
+    font-size: inherit;
   }
   #modal-photo img {
     width: 100%;
@@ -386,9 +387,253 @@
     color: #071107;
     border-color: var(--accent);
   }
+  .action-btn.danger {
+    background: rgba(127, 29, 29, 0.92);
+    color: #fee2e2;
+    border-color: rgba(239, 68, 68, 0.45);
+  }
   .action-btn:disabled {
     opacity: 0.6;
     cursor: wait;
+  }
+  .flip-card {
+    perspective: 1400px;
+    margin: 12px 16px 0;
+  }
+  .flip-card-inner {
+    position: relative;
+    min-height: 610px;
+    transform-style: preserve-3d;
+    transition: transform .7s ease;
+  }
+  .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+  .card-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.08);
+    box-shadow: 0 20px 54px rgba(0,0,0,.38);
+    display: flex;
+    flex-direction: column;
+  }
+  .card-face.back { transform: rotateY(180deg); }
+  .card-front-photo {
+    min-height: 260px;
+    position: relative;
+    background: rgba(255,255,255,.04);
+  }
+  .card-front-photo.landscape {
+    min-height: 210px;
+  }
+  .card-front-photo img {
+    width: 100%;
+    height: 100%;
+    min-height: 260px;
+    object-fit: cover;
+    display: block;
+  }
+  .card-front-photo.landscape img {
+    min-height: 210px;
+  }
+  .card-front-overlay {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,.06), transparent 38%, rgba(0,0,0,.7)),
+      radial-gradient(circle at top right, rgba(255,255,255,.14), transparent 30%);
+    pointer-events: none;
+  }
+  .card-ribbon {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(10,15,10,.72);
+    border: 1px solid rgba(255,255,255,.1);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .card-ribbon-icon { font-size: 15px; }
+  .card-front-title {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-end;
+  }
+  .score-chip {
+    min-width: 78px;
+    padding: 10px 12px;
+    border-radius: 16px;
+    text-align: center;
+    background: rgba(10,15,10,.78);
+    border: 1px solid rgba(255,255,255,.1);
+  }
+  .score-chip strong { display: block; font-size: 16px; }
+  .score-chip span {
+    display: block;
+    margin-top: 3px;
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+  .card-face-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    flex: 1;
+  }
+  .card-face-body::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,.05), transparent 36%),
+      linear-gradient(180deg, transparent, rgba(255,255,255,.03));
+    pointer-events: none;
+  }
+  .card-face-body > * { position: relative; z-index: 1; }
+  .card-meta-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .card-title-kicker {
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: rgba(232,245,233,.72);
+  }
+  .card-rank-pill {
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.08);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .modal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .modal-badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    background: rgba(255,255,255,.08);
+  }
+  .modal-badge.warn { background: rgba(245,158,11,.16); color: #ffd28c; }
+  .modal-badge.alert { background: rgba(239,68,68,.16); color: #ffb2b2; }
+  .modal-badge.good { background: rgba(34,197,94,.14); color: #b7f3c8; }
+  .stat-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .stat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .stat-name {
+    width: 36px;
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text3);
+    flex-shrink: 0;
+  }
+  .stat-track {
+    flex: 1;
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255,255,255,.08);
+  }
+  .stat-fill {
+    height: 100%;
+    border-radius: 999px;
+  }
+  .stat-number {
+    width: 24px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .card-back-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .card-back-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    font-size: 24px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.1);
+  }
+  .card-back-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .meta-chip {
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .meta-chip .label {
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+  .meta-chip .value {
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .theme-reptile { background: linear-gradient(160deg, rgba(104,36,18,.98), rgba(43,17,11,.98)); }
+  .theme-mammal { background: linear-gradient(160deg, rgba(51,63,35,.98), rgba(21,27,19,.98)); }
+  .theme-bird { background: linear-gradient(160deg, rgba(24,62,92,.98), rgba(15,28,44,.98)); }
+  .theme-fish { background: linear-gradient(160deg, rgba(7,74,99,.98), rgba(5,28,44,.98)); }
+  .theme-plant { background: linear-gradient(160deg, rgba(97,83,47,.98), rgba(51,44,24,.98)); }
+  .theme-fungi { background: linear-gradient(160deg, rgba(76,40,54,.98), rgba(32,18,28,.98)); }
+  .theme-terrain { background: linear-gradient(160deg, rgba(65,60,52,.98), rgba(26,24,23,.98)); }
+  .theme-pending { background: linear-gradient(160deg, rgba(35,35,49,.98), rgba(14,14,24,.98)); }
+  @media (max-width: 420px) {
+    .flip-card-inner { min-height: 580px; }
+    .card-back-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -507,6 +752,84 @@ let activeKingdom = 'all';
 let activeSub = 'all';
 let activeModalCardId = null;
 
+function normalizeKingdom(c) {
+  const category = (c.category || '').toLowerCase();
+  const sub = (c.sub_category || '').toLowerCase();
+  const iconic = (c.iconic_taxon || '').toLowerCase();
+  if ((c.species_name || '').toLowerCase() === 'pending identification') return 'pending';
+  if (category === 'plant' || iconic === 'plantae') return 'plant';
+  if (category === 'fungi' || iconic === 'fungi') return 'fungi';
+  if (category === 'terrain' || iconic === 'terrain') return 'terrain';
+  if (sub === 'reptile' || iconic === 'reptilia') return 'reptile';
+  if (sub === 'bird' || iconic === 'aves') return 'bird';
+  if (sub === 'fish' || sub === 'marine' || iconic === 'actinopterygii') return 'fish';
+  if (category === 'animal' || iconic === 'mammalia') return 'mammal';
+  return 'mammal';
+}
+
+function biomeTheme(c, kingdom) {
+  const location = c.capture_country || ((c.latitude != null && c.longitude != null) ? `${Number(c.latitude).toFixed(2)}, ${Number(c.longitude).toFixed(2)}` : 'Unknown range');
+  const map = {
+    reptile: { label: 'Rocky Escarpment', icon: '🐉', frame: 'theme-reptile', habitat: 'Arid / rocky biome', location },
+    mammal: { label: 'Woodland Run', icon: '🐾', frame: 'theme-mammal', habitat: 'Earth / grassland biome', location },
+    bird: { label: 'Canopy Draft', icon: '🪶', frame: 'theme-bird', habitat: 'Sky / cliff biome', location },
+    fish: { label: 'Estuary Current', icon: '🌊', frame: 'theme-fish', habitat: 'Ocean / reef biome', location },
+    plant: { label: 'Herbarium Plate', icon: '🌿', frame: 'theme-plant', habitat: 'Botanical archive', location },
+    fungi: { label: 'Forest Floor', icon: '🍄', frame: 'theme-fungi', habitat: 'Shade / decay biome', location },
+    terrain: { label: 'Geostrata', icon: '🪨', frame: 'theme-terrain', habitat: 'Landform record', location },
+    pending: { label: 'Field Archive', icon: '⏳', frame: 'theme-pending', habitat: 'Awaiting classification', location },
+  };
+  return map[kingdom] || map.mammal;
+}
+
+function modalStatRows(stats) {
+  const colors = { speed:'#38bdf8', attack:'#f87171', defence:'#a78bfa', hp:'#34d399', stamina_regen:'#fb923c' };
+  const labels = { speed:'SPD', attack:'ATK', defence:'DEF', hp:'HP', stamina_regen:'STM' };
+  return Object.entries(stats || {}).map(([k, v]) => `
+    <div class="stat-row">
+      <div class="stat-name">${labels[k]}</div>
+      <div class="stat-track"><div class="stat-fill" style="width:${v}%;background:${colors[k]}"></div></div>
+      <div class="stat-number">${v}</div>
+    </div>`).join('');
+}
+
+function metaChip(label, value) {
+  return `<div class="meta-chip"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+}
+
+function applyOrientationClass(container, width, height) {
+  if (!container || !width || !height) return;
+  container.classList.remove('landscape', 'portrait', 'square');
+  const ratio = width / height;
+  if (ratio > 1.18) container.classList.add('landscape');
+  else if (ratio < 0.85) container.classList.add('portrait');
+  else container.classList.add('square');
+}
+
+function setThumbOrientation(img) {
+  if (!img) return;
+  applyOrientationClass(img.closest('.card-thumb'), img.naturalWidth, img.naturalHeight);
+}
+
+function bindModalOrientation() {
+  const img = document.getElementById('modal-card-photo');
+  if (!img) return;
+  const container = img.closest('.card-front-photo');
+  const apply = () => applyOrientationClass(container, img.naturalWidth, img.naturalHeight);
+  img.onload = apply;
+  img.onerror = () => applyOrientationClass(container, 1, 1);
+  if (img.complete) apply();
+}
+
+function flipModalCard() {
+  const card = document.getElementById('modal-flip-card');
+  if (card) card.classList.toggle('flipped');
+}
+
+function printModalCard() {
+  window.print();
+}
+
 async function loadCards() {
   try {
     const res = await fetch('/cards', { credentials: 'same-origin' });
@@ -583,7 +906,7 @@ function renderGrid() {
       ? `<img src="${c.image_url}" alt="" loading="lazy" onerror="this.parentNode.classList.add('no-img');this.parentNode.innerHTML='${safeEmoji}'">`
       : '';
 
-    return `<div class="card-tile" onclick="openModal(${c.id})">
+    return `<div class="card-tile" onclick="openStyledModal(${c.id})">
       <div class="card-thumb${thumb ? '' : ' no-img'}">${thumb || emoji}</div>
       <div class="card-info">
         <div class="card-name">${c.species_name || c.scientific_name}</div>
@@ -678,10 +1001,108 @@ function openModal(id) {
   document.body.style.overflow = 'hidden';
 }
 
+function openStyledModal(id) {
+  const c = allCards.find(x => x.id === id);
+  if (!c) return;
+  activeModalCardId = id;
+
+  const emoji = TAXON_EMOJI[c.sub_category] || TAXON_EMOJI[c.iconic_taxon] || '🌍';
+  const kingdom = normalizeKingdom(c);
+  const theme = biomeTheme(c, kingdom);
+  const pct = c.confidence ? Math.round(c.confidence * 100) : 0;
+  const rarity = c.rarity_display || 'Unknown';
+  const date = c.captured_at ? new Date(c.captured_at).toLocaleDateString() : '—';
+  const location = (c.latitude != null && c.longitude != null)
+    ? `${Number(c.latitude).toFixed(4)}, ${Number(c.longitude).toFixed(4)}`
+    : (c.capture_country || '—');
+
+  document.getElementById('modal-name').textContent = c.species_name || c.scientific_name;
+  document.querySelector('.modal-body').style.display = 'none';
+  document.getElementById('modal-photo').innerHTML = `
+    <div class="flip-card ${theme.frame}" id="modal-flip-card">
+      <div class="flip-card-inner">
+        <section class="card-face front">
+          <div class="card-front-photo">
+            ${c.image_url ? `<img src="${c.image_url}" alt="" onerror="this.parentNode.innerHTML='<div style=&quot;height:100%;display:grid;place-items:center;font-size:88px&quot;>${emoji}</div>'">` : `<div style="height:100%;display:grid;place-items:center;font-size:88px">${emoji}</div>`}
+            <div class="card-front-overlay"></div>
+            <div class="card-ribbon"><span class="card-ribbon-icon">${theme.icon}</span><span>${theme.label}</span></div>
+            <div class="card-front-title">
+              <div>
+                <div class="modal-title" style="font-size:28px">${c.species_name || c.scientific_name}</div>
+                <div class="modal-sci" style="margin:4px 0 0;color:rgba(232,245,233,.76)">${c.scientific_name || ''}</div>
+              </div>
+              <div class="score-chip"><strong>${pct}%</strong><span>${c.provisional ? 'uncertain' : 'verified'}</span></div>
+            </div>
+          </div>
+          <div class="card-face-body">
+            <div class="card-meta-row">
+              <div class="card-title-kicker">${theme.habitat}</div>
+              <div class="card-rank-pill">${(c.rank || 'unknown').replace(/_/g, ' ')}</div>
+            </div>
+            <div class="modal-badges">
+              <span class="modal-badge good">${rarity}</span>
+              ${c.provisional ? '<span class="modal-badge warn">Provisional</span>' : ''}
+              ${c.invasive_at_location ? '<span class="modal-badge alert">Invasive</span>' : ''}
+              ${c.iconic_taxon ? `<span class="modal-badge">${c.iconic_taxon}</span>` : ''}
+            </div>
+            <div class="modal-blurb">${c.blurb || ''}</div>
+            <div class="stat-stack">${modalStatRows(c.stats || {})}</div>
+          </div>
+        </section>
+        <section class="card-face back">
+          <div class="card-face-body">
+            <div class="card-back-top">
+              <div>
+                <div class="card-title-kicker">WildEx Collector Back</div>
+                <div class="modal-title" style="font-size:26px">${c.species_name || c.scientific_name}</div>
+                <div class="modal-sci" style="margin-top:4px">${c.scientific_name || ''}</div>
+              </div>
+              <div class="card-back-icon">${theme.icon}</div>
+            </div>
+            <div class="card-back-grid">
+              ${metaChip('Biome Theme', theme.habitat)}
+              ${metaChip('Capture Zone', theme.location)}
+              ${metaChip('Captured', date)}
+              ${metaChip('Location', location)}
+              ${metaChip('Rarity', rarity)}
+              ${metaChip('Confidence', `${pct}%`)}
+              ${c.conservation_status ? metaChip('Conservation', c.conservation_status) : ''}
+              ${c.observations_count ? metaChip('Sightings', `${Number(c.observations_count).toLocaleString()} iNat`) : ''}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>`;
+
+  const actions = document.getElementById('modal-actions');
+  const reidButton = (c.species_name || '') === 'Pending identification'
+    ? `<button class="action-btn primary" id="reid-btn" onclick="reidentifyActiveCard()">Re-ID Now</button>`
+    : '';
+  actions.innerHTML = `
+    <button class="action-btn" onclick="flipModalCard()">Flip Card</button>
+    <button class="action-btn" onclick="printModalCard()">Print / Save PDF</button>
+    ${reidButton}
+    <button class="action-btn danger" onclick="releaseActiveCard()">Release</button>
+  `;
+
+  document.getElementById('modal-sci').textContent = '';
+  document.getElementById('modal-blurb').textContent = '';
+  document.getElementById('s-spd').textContent = '—';
+  document.getElementById('s-atk').textContent = '—';
+  document.getElementById('s-def').textContent = '—';
+  document.getElementById('s-hp').textContent = '—';
+  document.getElementById('s-sta').textContent = '—';
+  document.getElementById('modal-meta').innerHTML = '';
+
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
   document.body.style.overflow = '';
   activeModalCardId = null;
+  document.querySelector('.modal-body').style.display = '';
 }
 
 async function reidentifyActiveCard() {
@@ -714,6 +1135,35 @@ async function reidentifyActiveCard() {
       btn.textContent = 'Re-ID Now';
     }
     alert(err.message || 'Re-identification failed');
+  }
+}
+
+async function releaseActiveCard() {
+  if (!activeModalCardId) return;
+  const c = allCards.find(card => card.id === activeModalCardId);
+  const name = c?.species_name || c?.scientific_name || 'this card';
+  if (!confirm(`Release ${name}? This will delete the card from your WildDex.`)) return;
+
+  try {
+    const res = await fetch(`/cards/${activeModalCardId}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    if (res.status === 401) {
+      location.href = '/login';
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || `Release failed (${res.status})`);
+    }
+    allCards = allCards.filter(card => card.id !== activeModalCardId);
+    document.getElementById('total-count').textContent =
+      allCards.length + (allCards.length === 1 ? ' card' : ' cards');
+    closeModal();
+    renderGrid();
+  } catch (err) {
+    alert(err.message || 'Release failed');
   }
 }
 

@@ -16,6 +16,7 @@ from app.config import (
 )
 
 log = logging.getLogger("wildex.storage")
+LOCAL_UPLOADS_DIR = Path("uploads")
 
 
 def r2_enabled() -> bool:
@@ -43,6 +44,26 @@ def _r2_client():
 
 def _public_url(key: str) -> str:
     return f"{R2_PUBLIC_BASE_URL.rstrip('/')}/{key}"
+
+
+def _local_url(filename: str) -> str:
+    return f"/uploads/{filename}"
+
+
+def _write_local_bytes(data: bytes, suffix: str | None = None) -> str:
+    ext = (suffix or ".bin").lower()
+    if not ext.startswith("."):
+        ext = f".{ext}"
+    LOCAL_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid4().hex}{ext}"
+    path = LOCAL_UPLOADS_DIR / filename
+    path.write_bytes(data)
+    return _local_url(filename)
+
+
+def _write_local_file(image_path: str) -> str:
+    path = Path(image_path)
+    return _write_local_bytes(path.read_bytes(), suffix=path.suffix or ".bin")
 
 
 def upload_bytes(data: bytes, content_type: str | None, suffix: str | None = None) -> str:
@@ -81,4 +102,13 @@ def upload_capture_asset(
         )
     except (BotoCoreError, ClientError, RuntimeError, OSError) as exc:
         log.exception("R2 upload failed: %s", exc)
-        return None
+        try:
+            if extracted_frame_path:
+                local_url = _write_local_file(extracted_frame_path)
+            else:
+                local_url = _write_local_bytes(original_bytes, suffix=original_suffix)
+            log.warning("Fell back to local upload storage: %s", local_url)
+            return local_url
+        except OSError as local_exc:
+            log.exception("Local upload fallback failed: %s", local_exc)
+            return None

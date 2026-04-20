@@ -1,5 +1,6 @@
 import os
 import tempfile
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +14,14 @@ from app.pipeline.species_data import get_species_data
 from app.pipeline.species_id import TemporaryIdentificationError, identify_species, is_temporary_identification_error
 
 router = APIRouter()
+UPLOADS_DIR = Path("uploads")
+
+
+def _is_local_upload_path(path: str) -> bool:
+    try:
+        return Path(path).resolve().is_relative_to(UPLOADS_DIR.resolve())
+    except Exception:
+        return False
 
 RARITY_DISPLAY = {
     "common":    "Common",
@@ -82,6 +91,22 @@ def get_card(card_id: int, current_user: User = Depends(require_user)):
         db.close()
 
 
+@router.delete("/cards/{card_id}")
+def delete_card(card_id: int, current_user: User = Depends(require_user)):
+    if not db_available():
+        raise HTTPException(503, "Database unavailable")
+    db = SessionLocal()
+    try:
+        row = db.query(Card).filter(Card.id == card_id, Card.owner_id == current_user.id).first()
+        if not row:
+            raise HTTPException(404, "Card not found")
+        db.delete(row)
+        db.commit()
+        return {"deleted": True, "card_id": card_id}
+    finally:
+        db.close()
+
+
 @router.post("/cards/{card_id}/reidentify")
 def reidentify_card(card_id: int, current_user: User = Depends(require_user)):
     if not db_available():
@@ -99,13 +124,19 @@ def reidentify_card(card_id: int, current_user: User = Depends(require_user)):
 
     tmp_path = None
     try:
-        response = httpx.get(row.image_url, timeout=30.0, follow_redirects=True)
-        response.raise_for_status()
-        content_type = response.headers.get("content-type", "").lower()
-        suffix = ".png" if "png" in content_type else ".webp" if "webp" in content_type else ".jpg"
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(response.content)
-            tmp_path = tmp.name
+        if row.image_url.startswith("/uploads/"):
+            local_path = UPLOADS_DIR / Path(row.image_url).name
+            if not local_path.exists():
+                raise HTTPException(404, "Saved image file is missing")
+            tmp_path = str(local_path)
+        else:
+            response = httpx.get(row.image_url, timeout=30.0, follow_redirects=True)
+            response.raise_for_status()
+            content_type = response.headers.get("content-type", "").lower()
+            suffix = ".png" if "png" in content_type else ".webp" if "webp" in content_type else ".jpg"
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(response.content)
+                tmp_path = tmp.name
 
         try:
             species = identify_species(tmp_path, lat=row.latitude, lon=row.longitude)
@@ -165,5 +196,5 @@ def reidentify_card(card_id: int, current_user: User = Depends(require_user)):
     except httpx.HTTPError as exc:
         raise HTTPException(502, f"Could not fetch saved image for re-identification: {exc}")
     finally:
-        if tmp_path and os.path.exists(tmp_path):
+        if tmp_path and os.path.exists(tmp_path) and not _is_local_upload_path(tmp_path):
             os.unlink(tmp_path)
