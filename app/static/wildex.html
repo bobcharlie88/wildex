@@ -547,8 +547,8 @@ function renderGrid() {
     const invasiveBadge = c.invasive_at_location
       ? `<span class="badge badge-invasive">Invasive</span>` : '';
     const safeEmoji = emoji.replace(/'/g, '');
-    const thumb = c.photo_url
-      ? `<img src="${c.photo_url}" alt="" loading="lazy" onerror="this.parentNode.classList.add('no-img');this.parentNode.innerHTML='${safeEmoji}'">`
+    const thumb = c.image_url
+      ? `<img src="${c.image_url}" alt="" loading="lazy" onerror="this.parentNode.classList.add('no-img');this.parentNode.innerHTML='${safeEmoji}'">`
       : '';
 
     return `<div class="card-tile" onclick="openModal(${c.id})">
@@ -603,8 +603,8 @@ function openModal(id) {
   document.getElementById('modal-blurb').textContent = c.blurb || '';
 
   const photo = document.getElementById('modal-photo');
-  if (c.photo_url) {
-    photo.innerHTML = `<img src="${c.photo_url}" alt="" onerror="this.parentNode.textContent='${emoji}'">`;
+  if (c.image_url) {
+    photo.innerHTML = `<img src="${c.image_url}" alt="" onerror="this.parentNode.textContent='${emoji}'">`;
   } else {
     photo.textContent = emoji;
   }

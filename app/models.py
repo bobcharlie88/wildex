@@ -46,3 +46,4 @@ class Card(Base):
     latitude:        Mapped[float | None] = mapped_column(Float)
     longitude:       Mapped[float | None] = mapped_column(Float)
     capture_country: Mapped[str | None]  = mapped_column(String(10))
+    image_url:       Mapped[str | None]  = mapped_column(String(1000))

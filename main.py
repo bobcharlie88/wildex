@@ -39,6 +39,7 @@ def startup():
                 for col, typedef in [
                     ("category",     "VARCHAR(50)"),
                     ("sub_category", "VARCHAR(100)"),
+                    ("image_url",    "VARCHAR(1000)"),
                 ]:
                     try:
                         conn.execute(text(f"ALTER TABLE cards ADD COLUMN IF NOT EXISTS {col} {typedef}"))

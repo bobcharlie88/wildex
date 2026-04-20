@@ -44,7 +44,7 @@ def _card_dict(c: Card) -> dict:
         "latitude":        c.latitude,
         "longitude":       c.longitude,
         "capture_country": c.capture_country,
-        "photo_url":       f"/uploads/{c.id}.jpg",
+        "image_url":       c.image_url,
     }
 
 
