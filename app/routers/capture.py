@@ -1,6 +1,7 @@
 import logging
 import os
 import tempfile
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -19,6 +20,65 @@ log = logging.getLogger("wildex.capture")
 IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
 VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm", "video/3gpp", "video/x-m4v"}
 ALLOWED_TYPES = IMAGE_TYPES | VIDEO_TYPES
+IDENTIFY_RETRY_DELAYS = (1.0, 2.0)
+TEMPORARY_ID_MARKERS = (
+    "503",
+    "unavailable",
+    "high demand",
+    "resource_exhausted",
+    "overloaded",
+)
+
+
+def _is_temporary_identification_failure(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(marker in text for marker in TEMPORARY_ID_MARKERS)
+
+
+def _identify_with_retry(image_path: str):
+    last_exc = None
+    for idx in range(len(IDENTIFY_RETRY_DELAYS) + 1):
+        try:
+            return identify_species(image_path)
+        except EnvironmentError:
+            raise
+        except Exception as exc:
+            last_exc = exc
+            if not _is_temporary_identification_failure(exc) or idx >= len(IDENTIFY_RETRY_DELAYS):
+                raise
+            delay = IDENTIFY_RETRY_DELAYS[idx]
+            log.warning("Temporary species identification failure; retrying in %.1fs: %s", delay, exc)
+            time.sleep(delay)
+    raise last_exc
+
+
+def _pending_card_payload(image_url: str | None, lat: float | None, lon: float | None, message: str) -> dict:
+    return {
+        "species_name": "Pending identification",
+        "scientific_name": "Unknown",
+        "rank": "unknown",
+        "confidence": 0.0,
+        "provisional": True,
+        "rarity_tier": None,
+        "rarity_display": None,
+        "invasive_at_location": False,
+        "iconic_taxon": "Pending",
+        "conservation_status": None,
+        "observations_count": 0,
+        "taxon_id": None,
+        "blurb": message,
+        "stats": {
+            "speed": 0,
+            "attack": 0,
+            "defence": 0,
+            "hp": 0,
+            "stamina_regen": 0,
+        },
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "latitude": lat,
+        "longitude": lon,
+        "image_url": image_url,
+    }
 
 
 @router.post("/capture")
@@ -76,11 +136,71 @@ async def capture(
         else:
             identify_path = tmp_path
 
+        image_url = upload_capture_asset(
+            original_bytes=content,
+            original_content_type=file.content_type,
+            original_suffix=suffix,
+            extracted_frame_path=frame_path if is_video else None,
+        )
+        if not image_url:
+            log.error("Capture image upload failed; continuing without persistent image")
+
         try:
-            species = identify_species(identify_path)
+            species = _identify_with_retry(identify_path)
         except EnvironmentError as exc:
             raise HTTPException(503, str(exc))
         except Exception as exc:
+            if _is_temporary_identification_failure(exc):
+                log.warning("Species identification unavailable; saving pending capture instead: %s", exc)
+                pending_message = (
+                    "Photo saved. Identification is pending because the identification service "
+                    "is temporarily unavailable."
+                )
+                saved = False
+                card_id = None
+                db_error = None
+
+                if db_available():
+                    db = SessionLocal()
+                    try:
+                        row = Card(
+                            species_name="Pending identification",
+                            scientific_name="Unknown",
+                            rank="unknown",
+                            confidence=0.0,
+                            provisional=True,
+                            iconic_taxon="Pending",
+                            observations_count=0,
+                            blurb=pending_message,
+                            speed=0,
+                            attack=0,
+                            defence=0,
+                            hp=0,
+                            stamina_regen=0,
+                            captured_at=datetime.now(timezone.utc),
+                            latitude=lat,
+                            longitude=lon,
+                            image_url=image_url,
+                        )
+                        db.add(row)
+                        db.commit()
+                        db.refresh(row)
+                        card_id = row.id
+                        saved = True
+                    except Exception as db_exc:
+                        db.rollback()
+                        db_error = str(db_exc)
+                    finally:
+                        db.close()
+                else:
+                    db_error = "Database not configured - update DATABASE_URL in .env"
+
+                return {
+                    "saved": saved,
+                    "card_id": card_id,
+                    "db_error": db_error,
+                    "card": _pending_card_payload(image_url, lat, lon, pending_message),
+                }
             raise HTTPException(500, f"Species identification failed: {exc}")
 
         gbif = None
@@ -96,15 +216,6 @@ async def capture(
             raise HTTPException(503, str(exc))
         except Exception as exc:
             raise HTTPException(500, f"Card generation failed: {exc}")
-
-        image_url = upload_capture_asset(
-            original_bytes=content,
-            original_content_type=file.content_type,
-            original_suffix=suffix,
-            extracted_frame_path=frame_path if is_video else None,
-        )
-        if not image_url:
-            log.error("Capture image upload failed; continuing without persistent image")
 
         saved = False
         card_id = None
