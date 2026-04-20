@@ -364,6 +364,32 @@
     padding-top: 12px;
   }
   .modal-meta span { color: var(--text2); }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin: 0 16px 16px;
+  }
+  .action-btn {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .action-btn.primary {
+    background: var(--accent);
+    color: #071107;
+    border-color: var(--accent);
+  }
+  .action-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
 </style>
 </head>
 <body>
@@ -443,6 +469,7 @@
       <div class="modal-title" id="modal-name"></div>
     </div>
     <div id="modal-photo"></div>
+    <div class="modal-actions" id="modal-actions"></div>
     <div class="modal-body">
       <div class="modal-sci" id="modal-sci"></div>
       <div class="modal-blurb" id="modal-blurb"></div>
@@ -478,6 +505,7 @@ const RARITY_CLASS = {
 let allCards = [];
 let activeKingdom = 'all';
 let activeSub = 'all';
+let activeModalCardId = null;
 
 async function loadCards() {
   try {
@@ -599,6 +627,7 @@ document.querySelectorAll('.sub-tabs').forEach(panel => {
 function openModal(id) {
   const c = allCards.find(x => x.id === id);
   if (!c) return;
+  activeModalCardId = id;
 
   const emoji = TAXON_EMOJI[c.sub_category] || TAXON_EMOJI[c.iconic_taxon] || '🌍';
 
@@ -611,6 +640,13 @@ function openModal(id) {
     photo.innerHTML = `<img src="${c.image_url}" alt="" onerror="this.parentNode.textContent='${emoji}'">`;
   } else {
     photo.textContent = emoji;
+  }
+
+  const actions = document.getElementById('modal-actions');
+  if ((c.species_name || '') === 'Pending identification') {
+    actions.innerHTML = `<button class="action-btn primary" id="reid-btn" onclick="reidentifyActiveCard()">Re-ID Now</button>`;
+  } else {
+    actions.innerHTML = '';
   }
 
   const stats = c.stats || {};
@@ -645,6 +681,40 @@ function openModal(id) {
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
   document.body.style.overflow = '';
+  activeModalCardId = null;
+}
+
+async function reidentifyActiveCard() {
+  if (!activeModalCardId) return;
+  const btn = document.getElementById('reid-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Re-identifying...';
+  }
+  try {
+    const res = await fetch(`/cards/${activeModalCardId}/reidentify`, {
+      method: 'POST',
+      credentials: 'same-origin',
+    });
+    if (res.status === 401) {
+      location.href = '/login';
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || `Re-ID failed (${res.status})`);
+    }
+    const idx = allCards.findIndex(card => card.id === activeModalCardId);
+    if (idx >= 0) allCards[idx] = data;
+    renderGrid();
+    openModal(activeModalCardId);
+  } catch (err) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Re-ID Now';
+    }
+    alert(err.message || 'Re-identification failed');
+  }
 }
 
 document.getElementById('modal-overlay').addEventListener('click', e => {
