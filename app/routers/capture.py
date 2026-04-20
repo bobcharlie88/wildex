@@ -13,6 +13,8 @@ from app.pipeline.card_generator import generate_card
 from app.pipeline.frame_extractor import extract_best_frame, save_frame
 from app.pipeline.species_data import get_species_data
 from app.pipeline.species_id import TemporaryIdentificationError, identify_species, is_temporary_identification_error
+from app.services.card_render import build_render_card
+from app.services.dex import DISCOVERY_CAPTURED, sync_card_to_dex
 from app.utils.storage import upload_capture_asset
 
 router = APIRouter()
@@ -46,7 +48,7 @@ def _identify_with_retry(image_path: str, lat: float | None = None, lon: float |
 
 
 def _pending_card_payload(image_url: str | None, lat: float | None, lon: float | None, message: str) -> dict:
-    return {
+    payload = {
         "species_name": "Pending identification",
         "scientific_name": "Unknown",
         "rank": "unknown",
@@ -72,6 +74,8 @@ def _pending_card_payload(image_url: str | None, lat: float | None, lon: float |
         "longitude": lon,
         "image_url": image_url,
     }
+    payload["render_card"] = build_render_card(payload)
+    return payload
 
 
 @router.post("/capture")
@@ -215,6 +219,7 @@ async def capture(
 
         saved = False
         card_id = None
+        dex_id = None
         db_error = None
 
         if db_available():
@@ -249,9 +254,13 @@ async def capture(
                     image_url=image_url,
                 )
                 db.add(row)
+                db.flush()
+                sync_card_to_dex(db, row)
+                row.discovery_state = DISCOVERY_CAPTURED
                 db.commit()
                 db.refresh(row)
                 card_id = row.id
+                dex_id = row.dex_id
                 saved = True
             except Exception as exc:
                 db.rollback()
@@ -261,11 +270,8 @@ async def capture(
         else:
             db_error = "Database not configured - update DATABASE_URL in .env"
 
-        return {
-            "saved": saved,
-            "card_id": card_id,
-            "db_error": db_error,
-            "card": {
+        card_payload = {
+                "dex_id": dex_id,
                 "species_name": card.common_name,
                 "scientific_name": card.scientific_name,
                 "rank": card.rank,
@@ -289,8 +295,17 @@ async def capture(
                 "captured_at": datetime.now(timezone.utc).isoformat(),
                 "latitude": lat,
                 "longitude": lon,
+                "capture_country": gbif.query_country if gbif else None,
+                "category": species.category,
+                "sub_category": species.sub_category,
                 "image_url": image_url,
-            },
+            }
+        card_payload["render_card"] = build_render_card(card_payload)
+        return {
+            "saved": saved,
+            "card_id": card_id,
+            "db_error": db_error,
+            "card": card_payload,
         }
     finally:
         os.unlink(tmp_path)

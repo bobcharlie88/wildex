@@ -13,6 +13,7 @@ from app.auth import get_current_user
 from app.routers.auth import router as auth_router
 from app.routers.capture import router as capture_router
 from app.routers.cards import router as cards_router
+from app.routers.dex import router as dex_router
 from app.routers.wildex import router as wildex_router
 
 log = logging.getLogger("wildex")
@@ -21,6 +22,7 @@ app = FastAPI(title="WildEx API", version="0.1.0")
 app.include_router(auth_router)
 app.include_router(capture_router)
 app.include_router(cards_router)
+app.include_router(dex_router)
 app.include_router(wildex_router)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -44,12 +46,25 @@ def startup():
                     ("category",     "VARCHAR(50)"),
                     ("sub_category", "VARCHAR(100)"),
                     ("image_url",    "VARCHAR(1000)"),
+                    ("dex_entry_id", "INTEGER"),
+                    ("dex_id",       "VARCHAR(32)"),
+                    ("discovery_state", "VARCHAR(20)"),
+                    ("region",       "VARCHAR(8)"),
+                    ("kingdom",      "VARCHAR(32)"),
+                    ("group_code",   "VARCHAR(32)"),
+                    ("evolution_chain_id", "VARCHAR(255)"),
+                    ("evolution_stage", "INTEGER"),
                 ]:
                     try:
                         conn.execute(text(f"ALTER TABLE cards ADD COLUMN IF NOT EXISTS {col} {typedef}"))
                         conn.commit()
                     except Exception:
                         conn.rollback()
+                try:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS favorite_card_id INTEGER"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
         except Exception as e:
             log.warning(f"Could not create tables: {e}")
     else:

@@ -38,7 +38,7 @@ def auth_me(request: Request):
     user = get_current_user(request)
     if user is None:
         raise HTTPException(401, "Not signed in")
-    return {"id": user.id, "email": user.email}
+    return {"id": user.id, "email": user.email, "favorite_card_id": user.favorite_card_id}
 
 
 @router.post("/auth/register")

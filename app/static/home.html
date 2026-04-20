@@ -2,171 +2,624 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>WildEx</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>WildEx Hub</title>
+  <link rel="stylesheet" href="/static/card_renderer.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #080f14;
-      --surface: #0e1a24;
-      --surface2: #152130;
-      --accent: #22c55e;
-      --accent2: #16a34a;
-      --text: #e8f0e9;
-      --muted: #86a09c;
-      --danger: #ef4444;
-      --radius: 16px;
+      --bg: #071015;
+      --surface: #0d1821;
+      --surface2: #162431;
+      --surface3: #1d3040;
+      --line: rgba(255,255,255,.08);
+      --text: #edf5ef;
+      --muted: #93aaa4;
+      --accent: #28c36b;
+      --accent2: #f1c36b;
+      --danger: #ef6666;
+      --locked: #344654;
+      --radius: 18px;
+      --shadow: 0 18px 60px rgba(0,0,0,.28);
     }
-
     html, body {
-      height: 100%;
-      background: radial-gradient(circle at top, #112231 0%, #080f14 58%);
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(40,195,107,.08), transparent 34%),
+        linear-gradient(180deg, #0a141b 0%, #071015 60%, #050c11 100%);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-
-    body {
+    body { padding: 18px 14px 34px; }
+    .app {
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+    .panel {
+      background: rgba(13,24,33,.9);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .topline {
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 24px;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 6px 2px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .02em;
     }
-
-    .shell {
-      width: 100%;
-      max-width: 380px;
-      background: rgba(14, 26, 36, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 24px;
-      padding: 28px 22px 24px;
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+    .topline strong { color: var(--text); }
+    .hero {
+      position: relative;
+      min-height: 220px;
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      background:
+        linear-gradient(135deg, rgba(22,36,49,.92), rgba(8,17,24,.84)),
+        linear-gradient(180deg, rgba(40,195,107,.12), transparent 55%);
     }
-
-    .hero { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: var(--hero-image, none) center/cover no-repeat;
+      opacity: .18;
+      filter: saturate(1.1) contrast(1.02);
+      pointer-events: none;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(7,16,21,.22), rgba(7,16,21,.78));
+      pointer-events: none;
+    }
+    .hero > * { position: relative; z-index: 1; }
+    .hero-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    }
     .wordmark {
-      font-size: 2.2rem;
-      font-weight: 800;
-      letter-spacing: 0.12em;
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: .18em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: #dff6e5;
       line-height: 1;
     }
-    .tagline { color: var(--muted); line-height: 1.5; font-size: 0.95rem; }
-
-    .status {
-      display: none;
-      background: rgba(34, 197, 94, 0.08);
-      border: 1px solid rgba(34, 197, 94, 0.18);
-      color: var(--text);
-      border-radius: 14px;
-      padding: 12px 14px;
-      margin-bottom: 18px;
-      line-height: 1.4;
+    .tagline {
+      margin-top: 8px;
+      max-width: 560px;
+      color: #c2d4cb;
+      line-height: 1.45;
+      font-size: 14px;
     }
-    .status.visible { display: block; }
-    .status small { display: block; color: var(--muted); margin-top: 4px; }
-
-    .count-badge {
-      display: none;
-      margin-bottom: 18px;
-      padding: 10px 14px;
-      border-radius: 14px;
-      background: var(--surface2);
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-    .count-badge.visible { display: block; }
-    .count-badge strong { color: var(--accent); }
-    .count-badge.queue strong { color: #fbbf24; }
-
-    .nav { display: flex; flex-direction: column; gap: 12px; }
-    .nav-btn {
+    .status-pills, .action-row, .stats-row, .chip-row, .family-row {
       display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 16px 18px;
-      border-radius: var(--radius);
-      text-decoration: none;
-      color: inherit;
-      border: 1px solid rgba(255,255,255,0.06);
-      transition: transform 0.12s ease, opacity 0.12s ease;
+      flex-wrap: wrap;
+      gap: 10px;
     }
-    .nav-btn:active { transform: scale(0.98); opacity: 0.92; }
-    .nav-btn.primary { background: var(--accent); color: #04120a; border: none; }
-    .nav-btn.surface { background: var(--surface); }
-    .nav-btn.warn { background: rgba(239, 68, 68, 0.08); color: #fecaca; }
-    .nav-icon { font-size: 1.4rem; }
-    .nav-copy { display: flex; flex-direction: column; gap: 2px; }
-    .nav-copy strong { font-size: 1rem; }
-    .nav-copy span { font-size: 0.8rem; color: inherit; opacity: 0.72; }
-
-    .auth-actions {
-      display: none;
-      flex-direction: column;
+    .pill, .chip {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+    .pill strong { color: var(--accent); }
+    .btn {
+      appearance: none;
+      border: none;
+      border-radius: 16px;
+      padding: 14px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: transform .12s ease, opacity .12s ease, background .12s ease;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: var(--accent); color: #06110b; }
+    .btn-secondary { background: rgba(255,255,255,.06); color: var(--text); border: 1px solid var(--line); }
+    .btn-danger { background: rgba(239,102,102,.1); color: #ffd1d1; border: 1px solid rgba(239,102,102,.25); }
+    .btn.small { padding: 9px 12px; border-radius: 12px; font-size: 12px; }
+    .stat-card {
+      min-width: 110px;
+      padding: 12px 13px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--line);
+    }
+    .stat-card strong {
+      display: block;
+      font-size: 19px;
+      color: var(--accent2);
+      margin-bottom: 4px;
+    }
+    .stat-card span { color: var(--muted); font-size: 12px; }
+    .layout {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1.05fr .95fr;
+      align-items: start;
+    }
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 16px 0;
+    }
+    .panel-head h2 {
+      font-size: 16px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .panel-head p {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .map-wrap { padding: 14px 14px 18px; }
+    .map-card {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #102130, #0a151e);
+      overflow: hidden;
+      padding: 10px;
+    }
+    .map-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px 2px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    svg.world-map { width: 100%; height: auto; display: block; }
+    .map-region {
+      fill: var(--locked);
+      stroke: rgba(255,255,255,.14);
+      stroke-width: 1.5;
+      cursor: default;
+      transition: fill .15s ease, opacity .15s ease, transform .15s ease;
+      transform-origin: center;
+      opacity: .56;
+    }
+    .map-region.unlocked { fill: #3f9360; opacity: .96; cursor: pointer; }
+    .map-region.active { fill: #f1c36b; opacity: 1; }
+    .map-region:hover.unlocked { transform: translateY(-1px); }
+    .map-label { fill: rgba(237,245,239,.85); font-size: 10px; pointer-events: none; }
+    .region-strip {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 0 14px 14px;
+      scrollbar-width: none;
+    }
+    .region-strip::-webkit-scrollbar { display: none; }
+    .region-pill {
+      white-space: nowrap;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 10px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .region-pill.unlocked { color: var(--text); }
+    .region-pill.active { background: rgba(241,195,107,.12); color: #ffe5ae; border-color: rgba(241,195,107,.38); }
+    .explorer {
+      padding: 14px;
+      display: grid;
       gap: 12px;
     }
-    .auth-actions.visible { display: flex; }
-
-    .footer {
-      margin-top: 18px;
-      text-align: center;
+    .selector-group {
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.035);
+    }
+    .selector-group h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
       color: var(--muted);
-      font-size: 0.75rem;
-      opacity: 0.65;
+      margin-bottom: 10px;
+    }
+    .chip, .family-chip {
+      cursor: pointer;
+      background: rgba(255,255,255,.05);
+    }
+    .chip.active, .family-chip.active {
+      background: rgba(40,195,107,.13);
+      border-color: rgba(40,195,107,.28);
+      color: #d8f5df;
+    }
+    .entry-list {
+      display: grid;
+      gap: 8px;
+    }
+    .entry-row {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.035);
+      border-radius: 16px;
+      padding: 12px 13px;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .entry-row.locked { cursor: default; opacity: .78; }
+    .entry-row.evolution { border-left: 4px solid rgba(241,195,107,.5); }
+    .entry-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 7px;
+      align-items: center;
+    }
+    .entry-id {
+      color: var(--accent2);
+      font-size: 11px;
+      letter-spacing: .08em;
+      font-weight: 700;
+    }
+    .entry-state {
+      font-size: 11px;
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+    }
+    .entry-state.seen { color: #d2e5f1; }
+    .entry-state.captured { color: #dff7e6; background: rgba(40,195,107,.12); }
+    .entry-name { font-weight: 700; margin-bottom: 4px; }
+    .entry-meta { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    #card-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.74);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 100;
+    }
+    #card-modal.open { display: flex; }
+    .modal-shell {
+      width: min(100%, 920px);
+      max-height: 94vh;
+      overflow: auto;
+      background: #091118;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 14px;
+    }
+    .modal-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .card-stage {
+      display: grid;
+      gap: 12px;
+      justify-items: center;
+    }
+    .flip-card {
+      width: min(100%, 380px);
+      aspect-ratio: 63 / 88;
+      perspective: 1600px;
+    }
+    .flip-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform .45s ease;
+      transform-style: preserve-3d;
+    }
+    .flip-card.flipped .flip-inner { transform: rotateY(180deg); }
+    .card-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 22px;
+      overflow: hidden;
+      backface-visibility: hidden;
+      color: #291c12;
+      border: 4px solid #5f4330;
+      background:
+        radial-gradient(circle at top, rgba(255,255,255,.25), transparent 30%),
+        linear-gradient(180deg, #d7c4a0 0%, #c6b08a 48%, #b69871 100%);
+      box-shadow: inset 0 0 0 2px rgba(57,33,18,.22);
+    }
+    .card-face.back { transform: rotateY(180deg); }
+    .theme-reptile { border-color: #69412c; }
+    .theme-mammal { border-color: #655034; }
+    .theme-fish { border-color: #355a69; }
+    .theme-bird { border-color: #5f6878; }
+    .theme-insect { border-color: #66582e; }
+    .theme-plant { border-color: #3f6440; }
+    .face-inner { padding: 12px; height: 100%; display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 8px; }
+    .card-banner {
+      display: grid;
+      grid-template-columns: 56px 1fr 74px;
+      align-items: center;
+      gap: 8px;
+    }
+    .level-badge, .icon-badge {
+      height: 48px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      color: #f7f0df;
+      background: linear-gradient(180deg, #274e36, #163223);
+      border: 2px solid rgba(255,255,255,.22);
+    }
+    .icon-badge { background: linear-gradient(180deg, #56402c, #39291d); font-size: 12px; }
+    .banner-title {
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: linear-gradient(180deg, #83583f, #5a3d2d);
+      color: #f6ecd8;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+    .species-block { text-align: center; }
+    .species-block h3 { font-size: 19px; letter-spacing: .02em; }
+    .species-block p { font-style: italic; opacity: .9; margin-top: 2px; }
+    .front-main {
+      display: grid;
+      grid-template-columns: 1fr 1.05fr;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .info-panel, .photo-panel, .back-box, .strip-box, .lower-box, .environment-box, .call-box, .bottom-bar {
+      border: 2px solid rgba(66,40,20,.35);
+      background: rgba(248,239,219,.5);
+      border-radius: 14px;
+    }
+    .info-panel { padding: 10px; display: grid; gap: 8px; }
+    .info-row .label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #5d432f; }
+    .info-row .value { font-size: 13px; line-height: 1.28; }
+    .photo-panel { overflow: hidden; position: relative; }
+    .photo-panel img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .section-tag {
+      align-self: start;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #836145, #61432f);
+      color: #f7eedb;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+    .lore-box, .fact-box { border-radius: 14px; padding: 10px 12px; background: rgba(248,239,219,.56); border: 2px solid rgba(66,40,20,.35); }
+    .lore-box { font-size: 13px; line-height: 1.42; }
+    .fact-box strong { display: block; margin-bottom: 4px; text-transform: uppercase; font-size: 11px; letter-spacing: .08em; color: #5d432f; }
+    .back-grid {
+      display: grid;
+      grid-template-columns: .88fr 1.12fr;
+      gap: 10px;
+      align-items: start;
+    }
+    .back-col { display: grid; gap: 8px; }
+    .back-box, .strip-box, .lower-box, .environment-box, .call-box, .bottom-bar { padding: 9px 10px; }
+    .back-box h4, .strip-box h4, .lower-box h4, .environment-box h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #5d432f; margin-bottom: 4px; }
+    .status-grid { display: grid; gap: 4px; font-size: 13px; }
+    .status-grid div { display: flex; justify-content: space-between; gap: 8px; }
+    .map-panel { min-height: 122px; display: grid; place-items: center; }
+    .map-panel svg { width: 100%; height: auto; }
+    .strip-box .title { font-weight: 800; margin-bottom: 2px; }
+    .strip-box .effect { font-size: 12px; line-height: 1.35; }
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-weight: 800; }
+    .stat-grid div, .type-grid div { display: flex; justify-content: space-between; gap: 10px; }
+    .type-grid { display: grid; gap: 6px; font-size: 13px; }
+    .lower-box ul, .environment-box ul { padding-left: 16px; display: grid; gap: 4px; font-size: 12px; line-height: 1.35; }
+    .call-box button { width: 100%; }
+    .bottom-bar { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+    .hidden { display: none !important; }
+    @media (max-width: 920px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      body { padding: 12px 10px 28px; }
+      .hero { min-height: 0; }
+      .hero-head { flex-direction: column; }
+      .wordmark { font-size: 28px; }
+      .front-main, .back-grid { grid-template-columns: 1fr; }
+      .bottom-bar { flex-direction: column; }
     }
   </style>
 </head>
 <body>
-  <main class="shell">
-    <div class="hero">
-      <div class="wordmark">WildEx</div>
-      <div class="tagline">Go outside. Find a creature. Capture it. Keep your own WildDex separate from everyone else.</div>
+  <main class="app">
+    <div class="topline">
+      <div id="signin-line">Checking session…</div>
+      <div id="mini-status">WildEx Hub</div>
     </div>
 
-    <div class="status" id="account-status"></div>
-    <div class="count-badge" id="count-badge"><strong id="card-count">0</strong> cards captured</div>
-    <div class="count-badge queue" id="queue-badge"><strong id="queue-count">0</strong> captures waiting for reception</div>
+    <section class="panel hero" id="hero-panel">
+      <div class="hero-head">
+        <div>
+          <div class="wordmark">WildEx</div>
+          <p class="tagline">Capture stays the main action. The map, unlocked regions, and nested index are now the heart of discovery.</p>
+        </div>
+        <div class="status-pills">
+          <div class="pill"><strong id="captures-count">0</strong> captures</div>
+          <div class="pill"><strong id="regions-count">0</strong> regions unlocked</div>
+          <div class="pill"><strong id="queue-count">0</strong> queued offline</div>
+        </div>
+      </div>
+      <div class="action-row">
+        <a class="btn btn-primary" href="/capture">Capture</a>
+        <button class="btn btn-secondary" id="open-first-unlocked" type="button">Open Index</button>
+        <button class="btn btn-danger" id="logout-link" type="button">Sign Out</button>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><strong id="captured-total">0</strong><span>Captured entries</span></div>
+        <div class="stat-card"><strong id="seen-total">0</strong><span>Seen entries</span></div>
+        <div class="stat-card"><strong id="unknown-total">0</strong><span>Unknown slots</span></div>
+      </div>
+    </section>
 
-    <div class="nav" id="signed-in-nav" style="display:none">
-      <a class="nav-btn primary" href="/capture">
-        <div class="nav-icon">📷</div>
-        <div class="nav-copy"><strong>Capture</strong><span>Take a photo or video</span></div>
-      </a>
-      <a class="nav-btn surface" href="/wildex">
-        <div class="nav-icon">📖</div>
-        <div class="nav-copy"><strong>My WildDex</strong><span>Browse only your collection</span></div>
-      </a>
-      <a class="nav-btn warn" href="#" id="logout-link">
-        <div class="nav-icon">↩</div>
-        <div class="nav-copy"><strong>Sign Out</strong><span>End this session on this device</span></div>
-      </a>
-    </div>
+    <section class="layout">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>World Map</h2>
+            <p>Unlocked regions highlight. Tap a live region to open its Dex branches.</p>
+          </div>
+          <div class="pill">Favorite card background: <strong id="favorite-status">Default</strong></div>
+        </div>
+        <div class="map-wrap">
+          <div class="map-card">
+            <svg class="world-map" viewBox="0 0 1000 520" role="img" aria-label="WildEx world map">
+              <rect x="0" y="0" width="1000" height="520" fill="#0f2130"></rect>
+              <path class="map-region" data-region="NA" d="M128 118 L248 76 L335 107 L355 157 L314 196 L268 218 L249 266 L201 288 L155 251 L138 198 L100 173 Z"></path>
+              <path class="map-region" data-region="SA" d="M283 284 L327 304 L352 349 L334 414 L298 475 L263 436 L256 372 Z"></path>
+              <path class="map-region" data-region="EU" d="M451 116 L522 101 L579 118 L585 151 L536 166 L487 154 L454 138 Z"></path>
+              <path class="map-region" data-region="AF" d="M480 184 L562 193 L603 265 L577 377 L522 432 L467 351 L455 260 Z"></path>
+              <path class="map-region" data-region="AS" d="M585 122 L714 109 L832 158 L865 230 L804 286 L718 274 L650 241 L602 198 Z"></path>
+              <path class="map-region" data-region="AU" d="M774 338 L859 353 L903 390 L886 444 L816 467 L747 448 L726 398 Z"></path>
+              <text class="map-label" x="184" y="170">North America</text>
+              <text class="map-label" x="278" y="370">South America</text>
+              <text class="map-label" x="488" y="134">Europe</text>
+              <text class="map-label" x="505" y="286">Africa</text>
+              <text class="map-label" x="689" y="184">Asia</text>
+              <text class="map-label" x="792" y="408">Australia</text>
+            </svg>
+          </div>
+          <div class="map-legend">
+            <span><span class="legend-dot" style="background:#3f9360"></span>Unlocked</span>
+            <span><span class="legend-dot" style="background:#f1c36b"></span>Active region</span>
+            <span><span class="legend-dot" style="background:#344654"></span>Locked</span>
+          </div>
+        </div>
+        <div class="region-strip" id="region-strip"></div>
+      </section>
 
-    <div class="auth-actions visible" id="signed-out-nav">
-      <a class="nav-btn primary" href="/login">
-        <div class="nav-icon">🔐</div>
-        <div class="nav-copy"><strong>Sign In</strong><span>Open your WildDex account</span></div>
-      </a>
-      <a class="nav-btn surface" href="/login">
-        <div class="nav-icon">🌱</div>
-        <div class="nav-copy"><strong>Create Account</strong><span>Keep captures separate per user</span></div>
-      </a>
-    </div>
-
-    <div class="footer">WildEx MVP</div>
+      <section class="panel" id="index-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Regional Index</h2>
+            <p>Kingdom → category → family → numbered entries</p>
+          </div>
+        </div>
+        <div class="explorer">
+          <div class="selector-group">
+            <h3>Kingdom</h3>
+            <div class="chip-row" id="kingdom-row"></div>
+          </div>
+          <div class="selector-group">
+            <h3>Category</h3>
+            <div class="chip-row" id="category-row"></div>
+          </div>
+          <div class="selector-group">
+            <h3>Family / Subgroup</h3>
+            <div class="family-row" id="family-row"></div>
+          </div>
+          <div class="selector-group">
+            <h3>Entries</h3>
+            <div class="entry-list" id="entry-list"></div>
+            <p class="hint hidden" id="entry-hint">Unlock a region on the map to view its Dex branches.</p>
+          </div>
+        </div>
+      </section>
+    </section>
   </main>
 
+  <div id="card-modal">
+    <div class="modal-shell">
+      <div class="modal-toolbar">
+        <div>
+          <strong id="modal-title">Card</strong>
+          <div class="hint" id="modal-subtitle"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary small" type="button" id="flip-btn">Flip</button>
+          <button class="btn btn-secondary small" type="button" id="print-btn">Print</button>
+          <button class="btn btn-secondary small" type="button" id="download-front-btn">Front PNG</button>
+          <button class="btn btn-secondary small" type="button" id="download-back-btn">Back PNG</button>
+          <button class="btn btn-secondary small" type="button" id="download-both-btn">Both PNG</button>
+          <button class="btn btn-secondary small hidden" type="button" id="play-call-btn">Play Call</button>
+          <button class="btn btn-secondary small" type="button" id="favorite-btn">Set Favorite</button>
+          <button class="btn btn-secondary small hidden" type="button" id="reid-btn">Re-ID</button>
+          <button class="btn btn-danger small" type="button" id="release-btn">Release</button>
+          <button class="btn btn-secondary small" type="button" id="close-btn">Close</button>
+        </div>
+      </div>
+      <div class="card-stage">
+        <div id="detail-card-host"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/card_renderer.js"></script>
   <script>
-    const signedInNav = document.getElementById('signed-in-nav');
-    const signedOutNav = document.getElementById('signed-out-nav');
-    const accountStatus = document.getElementById('account-status');
-    const countBadge = document.getElementById('count-badge');
-    const queueBadge = document.getElementById('queue-badge');
     const QUEUE_DB_NAME = 'wildex-offline';
     const QUEUE_STORE = 'capture_queue';
+    const REGION_LABELS = { AU: 'Australia', NA: 'North America', SA: 'South America', EU: 'Europe', AF: 'Africa', AS: 'Asia' };
+    const state = {
+      user: null,
+      entries: [],
+      selectedRegion: null,
+      selectedKingdom: null,
+      selectedCategory: null,
+      selectedFamily: null,
+      activeEntry: null,
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
 
     function openQueueDb() {
       return new Promise((resolve, reject) => {
@@ -187,152 +640,559 @@
       return new Promise((resolve, reject) => {
         const tx = db.transaction(QUEUE_STORE, 'readonly');
         const req = tx.objectStore(QUEUE_STORE).count();
-        req.onsuccess = () => {
-          db.close();
-          resolve(req.result || 0);
-        };
-        req.onerror = () => {
-          db.close();
-          reject(req.error || new Error('Could not count queue'));
-        };
+        req.onsuccess = () => { db.close(); resolve(req.result || 0); };
+        req.onerror = () => { db.close(); reject(req.error || new Error('Could not count queue')); };
       });
     }
 
-    async function listQueuedCaptures() {
-      const db = await openQueueDb();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(QUEUE_STORE, 'readonly');
-        const req = tx.objectStore(QUEUE_STORE).getAll();
-        req.onsuccess = () => {
-          db.close();
-          resolve((req.result || []).sort((a, b) => a.id - b.id));
-        };
-        req.onerror = () => {
-          db.close();
-          reject(req.error || new Error('Could not read queue'));
-        };
-      });
+    function kingdomRoot(entry) {
+      const category = String(entry.category || entry.card?.category || '').toLowerCase();
+      const sub = String(entry.sub_category || entry.card?.sub_category || '').toLowerCase();
+      if (category === 'plant') return 'Plants';
+      if (category === 'fungi') return 'Fungi';
+      if (category === 'terrain') return 'Terrain';
+      if (sub === 'reptile') return 'Animals';
+      if (sub === 'mammal') return 'Animals';
+      if (sub === 'bird') return 'Animals';
+      if (sub === 'fish' || sub === 'marine') return 'Animals';
+      if (sub === 'insect' || sub === 'arachnid') return 'Insects';
+      if (sub === 'amphibian') return 'Animals';
+      return category === 'animal' ? 'Animals' : 'Other';
     }
 
-    async function deleteQueuedCapture(id) {
-      const db = await openQueueDb();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(QUEUE_STORE, 'readwrite');
-        tx.objectStore(QUEUE_STORE).delete(id);
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => {
-          db.close();
-          reject(tx.error || new Error('Could not delete queue item'));
-        };
-      });
+    function categoryLabel(entry) {
+      const category = String(entry.category || entry.card?.category || '').toLowerCase();
+      const sub = String(entry.sub_category || entry.card?.sub_category || '').toLowerCase();
+      if (sub === 'reptile') return 'Reptiles';
+      if (sub === 'mammal') return 'Mammals';
+      if (sub === 'bird') return 'Birds';
+      if (sub === 'fish' || sub === 'marine') return 'Fish / Marine';
+      if (sub === 'insect' || sub === 'arachnid') return 'Insects';
+      if (sub === 'amphibian') return 'Amphibians';
+      if (category === 'plant') return 'Plants';
+      if (category === 'fungi') return 'Fungi';
+      if (category === 'terrain') return 'Terrain';
+      return 'Other';
     }
 
-    async function refreshQueueBadge() {
-      const pending = await queuedCount().catch(() => 0);
-      document.getElementById('queue-count').textContent = pending;
-      queueBadge.classList.toggle('visible', pending > 0);
-      return pending;
+    function familyLabel(entry) {
+      const map = {
+        DRG: 'Dragons', GEK: 'Geckos', SKN: 'Skinks', SNK: 'Snakes', TRT: 'Turtles', CRO: 'Crocs',
+        MAR: 'Marsupials', BAT: 'Bats', SEA: 'Marine Mammals', ROD: 'Rodents', MAM: 'Mammals',
+        RAP: 'Raptors', PAR: 'Parrots', BRD: 'Birds',
+        EST: 'Estuary Fish', REF: 'Reef Fish', SHK: 'Sharks / Rays', FSH: 'Fish',
+        MED: 'Medicinal', TRE: 'Trees', GRS: 'Grasses', AQP: 'Aquatic', SHB: 'Shrubs', BOT: 'Botanical',
+        LEP: 'Butterflies / Moths', BET: 'Beetles', ODO: 'Dragonflies', INS: 'Insects', FRG: 'Frogs',
+      };
+      return map[entry.group_code] || entry.group_code || 'Group';
     }
 
-    async function uploadQueuedCapture(entry) {
-      const file = entry.file instanceof File
-        ? entry.file
-        : new File([entry.file], entry.file?.name || 'offline-capture.jpg', { type: entry.file?.type || 'application/octet-stream' });
-      const form = new FormData();
-      form.append('file', file, file.name || 'offline-capture');
-      if (entry.lat != null && entry.lon != null) {
-        form.append('lat', entry.lat);
-        form.append('lon', entry.lon);
+    function activeEntries() {
+      let rows = state.entries.slice();
+      if (state.selectedRegion) rows = rows.filter(entry => entry.region === state.selectedRegion);
+      if (state.selectedKingdom) rows = rows.filter(entry => kingdomRoot(entry) === state.selectedKingdom);
+      if (state.selectedCategory) rows = rows.filter(entry => categoryLabel(entry) === state.selectedCategory);
+      if (state.selectedFamily) rows = rows.filter(entry => familyLabel(entry) === state.selectedFamily);
+      return rows;
+    }
+
+    function unlockedRegions() {
+      return [...new Set(state.entries.filter(entry => entry.discovery_state !== 'UNKNOWN').map(entry => entry.region))];
+    }
+
+    function setHeroBackground() {
+      const hero = document.getElementById('hero-panel');
+      const favoriteId = state.user?.favorite_card_id;
+      const favoriteEntry = state.entries.find(entry => entry.card && entry.card.id === favoriteId);
+      if (favoriteEntry?.card?.image_url) {
+        hero.style.setProperty('--hero-image', `url("${favoriteEntry.card.image_url}")`);
+        document.getElementById('favorite-status').textContent = favoriteEntry.card.species_name || 'Selected';
+      } else {
+        hero.style.removeProperty('--hero-image');
+        document.getElementById('favorite-status').textContent = 'Default';
       }
-      const resp = await fetch('/capture', {
-        method: 'POST',
-        body: form,
-        credentials: 'same-origin',
-      });
-      if (resp.status === 401) {
-        location.href = '/login';
-        throw new Error('Authentication required');
-      }
-      if (!resp.ok) {
-        throw new Error(`Queued upload failed (${resp.status})`);
-      }
-      return resp.json();
     }
 
-    let syncInFlight = false;
-    async function processQueuedCaptures() {
-      if (syncInFlight || !navigator.onLine) {
-        await refreshQueueBadge();
+    function renderCounts() {
+      const captured = state.entries.filter(entry => entry.discovery_state === 'CAPTURED').length;
+      const seen = state.entries.filter(entry => entry.discovery_state === 'SEEN').length;
+      const unknown = state.entries.filter(entry => entry.discovery_state === 'UNKNOWN').length;
+      const regions = unlockedRegions();
+      document.getElementById('captures-count').textContent = captured;
+      document.getElementById('captured-total').textContent = captured;
+      document.getElementById('seen-total').textContent = seen;
+      document.getElementById('unknown-total').textContent = unknown;
+      document.getElementById('regions-count').textContent = regions.length;
+    }
+
+    function renderMap() {
+      const regions = new Set(unlockedRegions());
+      document.querySelectorAll('.map-region').forEach(node => {
+        const code = node.dataset.region;
+        node.classList.toggle('unlocked', regions.has(code));
+        node.classList.toggle('active', code === state.selectedRegion);
+      });
+      const strip = document.getElementById('region-strip');
+      const all = ['AU','NA','SA','EU','AF','AS'];
+      strip.innerHTML = all.map(code => `
+        <button class="region-pill ${regions.has(code) ? 'unlocked' : ''} ${state.selectedRegion === code ? 'active' : ''}" type="button" data-region="${code}">
+          ${escapeHtml(REGION_LABELS[code])}${regions.has(code) ? '' : ' · Locked'}
+        </button>`).join('');
+    }
+
+    function ensureSelection() {
+      const unlocked = unlockedRegions();
+      if (!state.selectedRegion || !unlocked.includes(state.selectedRegion)) {
+        state.selectedRegion = unlocked[0] || null;
+      }
+      const regionEntries = state.entries.filter(entry => !state.selectedRegion || entry.region === state.selectedRegion);
+      const kingdoms = [...new Set(regionEntries.map(kingdomRoot))];
+      if (!state.selectedKingdom || !kingdoms.includes(state.selectedKingdom)) {
+        state.selectedKingdom = kingdoms[0] || null;
+      }
+      const categoryEntries = regionEntries.filter(entry => !state.selectedKingdom || kingdomRoot(entry) === state.selectedKingdom);
+      const categories = [...new Set(categoryEntries.map(categoryLabel))];
+      if (!state.selectedCategory || !categories.includes(state.selectedCategory)) {
+        state.selectedCategory = categories[0] || null;
+      }
+      const familyEntries = categoryEntries.filter(entry => !state.selectedCategory || categoryLabel(entry) === state.selectedCategory);
+      const families = [...new Set(familyEntries.map(familyLabel))];
+      if (!state.selectedFamily || !families.includes(state.selectedFamily)) {
+        state.selectedFamily = families[0] || null;
+      }
+    }
+
+    function renderSelectors() {
+      ensureSelection();
+      const regionEntries = state.entries.filter(entry => !state.selectedRegion || entry.region === state.selectedRegion);
+      const kingdoms = [...new Set(regionEntries.map(kingdomRoot))];
+      document.getElementById('kingdom-row').innerHTML = kingdoms.map(label => `
+        <button class="chip ${label === state.selectedKingdom ? 'active' : ''}" type="button" data-kingdom="${escapeHtml(label)}">${escapeHtml(label)}</button>
+      `).join('') || '<div class="hint">No unlocked regions yet.</div>';
+
+      const categoryEntries = regionEntries.filter(entry => !state.selectedKingdom || kingdomRoot(entry) === state.selectedKingdom);
+      const categories = [...new Set(categoryEntries.map(categoryLabel))];
+      document.getElementById('category-row').innerHTML = categories.map(label => `
+        <button class="chip ${label === state.selectedCategory ? 'active' : ''}" type="button" data-category="${escapeHtml(label)}">${escapeHtml(label)}</button>
+      `).join('') || '<div class="hint">Select an unlocked region first.</div>';
+
+      const familyEntries = categoryEntries.filter(entry => !state.selectedCategory || categoryLabel(entry) === state.selectedCategory);
+      const families = [...new Set(familyEntries.map(familyLabel))];
+      document.getElementById('family-row').innerHTML = families.map(label => `
+        <button class="chip family-chip ${label === state.selectedFamily ? 'active' : ''}" type="button" data-family="${escapeHtml(label)}">${escapeHtml(label)}</button>
+      `).join('') || '<div class="hint">No active family branches in this path yet.</div>';
+    }
+
+    function renderEntries() {
+      const rows = activeEntries();
+      const hint = document.getElementById('entry-hint');
+      const list = document.getElementById('entry-list');
+      if (!state.selectedRegion) {
+        hint.classList.remove('hidden');
+        list.innerHTML = '';
         return;
       }
-      syncInFlight = true;
-      try {
-        const queue = await listQueuedCaptures();
-        for (const entry of queue) {
-          await uploadQueuedCapture(entry);
-          await deleteQueuedCapture(entry.id);
-        }
-      } catch (_) {
-      } finally {
-        syncInFlight = false;
-        await refreshQueueBadge();
+      hint.classList.add('hidden');
+      list.innerHTML = rows.map(entry => {
+        const locked = entry.discovery_state === 'UNKNOWN';
+        const title = locked ? '???' : (entry.name || entry.card?.species_name || entry.scientific_name || 'Unknown');
+        const subtitle = `${familyLabel(entry)}${entry.evolution_chain_id ? ` · Evolution stage ${entry.evolution_stage || '?'}` : ''}`;
+        return `
+          <button class="entry-row ${locked ? 'locked' : ''} ${entry.evolution_chain_id ? 'evolution' : ''}" type="button" data-entry="${entry.id}">
+            <div class="entry-top">
+              <div class="entry-id">${escapeHtml(entry.dex_id)}</div>
+              <div class="entry-state ${entry.discovery_state.toLowerCase()}">${escapeHtml(entry.discovery_state)}</div>
+            </div>
+            <div class="entry-name">${escapeHtml(title)}</div>
+            <div class="entry-meta">${escapeHtml(subtitle)}</div>
+          </button>`;
+      }).join('') || '<div class="hint">No Dex entries in this path yet.</div>';
+    }
+
+    function regionMapSvg(entry, data) {
+      const mode = data.range_mode;
+      const activeRegions = new Set(data.range_regions || []);
+      const markerSvg = (data.local_markers || []).map(marker =>
+        `<circle cx="${marker.x}" cy="${marker.y}" r="3.8" fill="#8c5c33" stroke="#f7ecd2" stroke-width="1.2"></circle>`
+      ).join('');
+      if (mode === 'region' && activeRegions.has('AU')) {
+        return `
+          <svg viewBox="0 0 140 100" aria-label="Australia range map">
+            <rect width="140" height="100" rx="10" fill="#ead8b8"></rect>
+            <path d="M34 50 L63 37 L96 43 L110 56 L101 76 L72 83 L42 74 L28 61 Z" fill="#a27d55" stroke="#6c4f34" stroke-width="2"></path>
+            ${markerSvg || '<circle cx="79" cy="60" r="4" fill="#7b4d2d" stroke="#f8eed8" stroke-width="1.2"></circle>'}
+          </svg>`;
       }
+      if (mode === 'ocean') {
+        return `
+          <svg viewBox="0 0 180 110" aria-label="Ocean range map">
+            <rect width="180" height="110" rx="12" fill="#d9e6ea"></rect>
+            <path d="M8 18 H172 V102 H8 Z" fill="#92c2cf"></path>
+            <path d="M12 22 L44 18 L62 36 L54 54 L18 56 Z" fill="#9f8865"></path>
+            <path d="M122 24 L168 30 L162 56 L136 62 L112 44 Z" fill="#9f8865"></path>
+            <path d="M54 70 L86 74 L98 95 L60 98 Z" fill="#9f8865"></path>
+            <path d="M105 68 L138 70 L150 92 L112 96 Z" fill="#9f8865"></path>
+            <path d="M18 70 C34 58, 58 58, 76 70 S118 82, 140 68 S162 58, 170 70" fill="none" stroke="#2f6f7f" stroke-width="12" stroke-linecap="round"></path>
+          </svg>`;
+      }
+      return `
+        <svg viewBox="0 0 180 110" aria-label="World range map">
+          <rect width="180" height="110" rx="12" fill="#d9e6ea"></rect>
+          <path d="M18 28 L42 18 L61 26 L66 43 L51 53 L32 59 L20 47 Z" fill="${activeRegions.has('NA') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
+          <path d="M53 60 L66 64 L73 82 L63 98 L51 89 L49 73 Z" fill="${activeRegions.has('SA') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
+          <path d="M82 24 L99 20 L114 26 L112 38 L90 36 Z" fill="${activeRegions.has('EU') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
+          <path d="M88 44 L110 46 L119 72 L104 96 L85 80 L82 56 Z" fill="${activeRegions.has('AF') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
+          <path d="M114 26 L148 24 L166 42 L158 62 L129 59 L118 48 Z" fill="${activeRegions.has('AS') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
+          <path d="M138 72 L162 76 L168 91 L146 98 L130 88 Z" fill="${activeRegions.has('AU') ? '#a27d55' : '#b8b8b8'}" stroke="#6c4f34" stroke-width="1.4"></path>
+          ${markerSvg}
+        </svg>`;
     }
 
-    function setSignedIn(user) {
-      accountStatus.classList.add('visible');
-      accountStatus.innerHTML = `Signed in as <strong>${escapeHtml(user.email)}</strong><small>Your captures and WildDex are now user-specific.</small>`;
-      signedInNav.style.display = '';
-      signedOutNav.classList.remove('visible');
+    function buildRenderData(entry) {
+      const card = entry.card || {};
+      const name = card.species_name || entry.name || entry.scientific_name || 'Unknown';
+      const scientific = card.scientific_name || entry.scientific_name || 'Unknown';
+      const kingdom = categoryLabel(entry);
+      const iconMap = {
+        Reptiles: 'Dragon', Mammals: 'Paw', Birds: 'Wing', 'Fish / Marine': 'Fish', Insects: 'Insect', Plants: 'Leaf', Fungi: 'Spore', Terrain: 'Stone'
+      };
+      const strengthMap = {
+        Reptiles: ['Desert', '+20% defence in arid zones'],
+        Mammals: ['Open Ground', '+20% movement in open terrain'],
+        Birds: ['High Wind', '+20% scouting in elevated zones'],
+        'Fish / Marine': ['Current', '+20% speed in open water'],
+        Insects: ['Camouflage', '+20% evasion in cover'],
+        Plants: ['Rooted Soil', '+20% resilience in native ground'],
+      };
+      const weaknessMap = {
+        Reptiles: ['Cold Rain', 'Reduced mobility and warmth in wet conditions'],
+        Mammals: ['Heat Stress', 'Reduced stamina during severe heat'],
+        Birds: ['Dense Brush', 'Reduced maneuvering in enclosed canopy'],
+        'Fish / Marine': ['Shallow Heat', 'Reduced endurance in warm shallow water'],
+        Insects: ['Cold Snap', 'Reduced activity in low temperatures'],
+        Plants: ['Transplant Shock', 'Reduced vitality outside stable habitat'],
+      };
+      const rangeMode = card.sub_category === 'marine' || card.sub_category === 'fish' ? 'ocean' : (entry.region === 'AU' ? 'region' : 'world');
+      const rangeRegions = rangeMode === 'region' ? [entry.region] : [entry.region];
+      const icons = iconMap[kingdom] || 'WildEx';
+      return {
+        species_name: name,
+        scientific_name: scientific,
+        dex_id: entry.dex_id,
+        card_number: entry.dex_id.split('-').pop(),
+        rarity: card.rarity_display || 'Common',
+        threat_level: (card.attack || 0) >= 70 ? 'High' : (card.attack || 0) >= 40 ? 'Medium' : 'Low',
+        aggression: (card.attack || 0) >= 78 ? 'High' : (card.attack || 0) >= 45 ? 'Medium' : 'Low',
+        length_text: kingdom === 'Reptiles' ? '8-10 inches (20-25 cm)' : kingdom === 'Mammals' ? 'Field size varies by species' : 'Field size varies by species',
+        habitat_text: card.capture_country === 'AU' ? 'Native habitat within Australia' : 'Habitat matched to local range',
+        diet_text: kingdom === 'Plants' ? 'Photosynthesis and nutrient uptake' : kingdom === 'Fish / Marine' ? 'Marine prey and forage' : 'Diet varies by species',
+        info_text: card.blurb || 'WildEx field record.',
+        fact_text: card.conservation_status ? `Conservation status: ${card.conservation_status}` : `Observed ${Number(card.observations_count || 0).toLocaleString()} times on iNaturalist.`,
+        image_url: card.image_url || '',
+        hp: card.stats?.hp ?? 0,
+        atk: card.stats?.attack ?? 0,
+        def: card.stats?.defence ?? 0,
+        spd: card.stats?.speed ?? 0,
+        type_label: kingdom.replace(' / Marine',''),
+        biome: kingdom === 'Reptiles' ? 'Rocky Desert' : kingdom === 'Mammals' ? 'Open Woodland' : kingdom === 'Birds' ? 'Sky / Cliff' : kingdom === 'Fish / Marine' ? 'Ocean Current' : kingdom === 'Insects' ? 'Brushland' : 'Botanical Habitat',
+        biome_bonus: strengthMap[kingdom]?.[1] || '+20% field advantage in native terrain',
+        strength_name: strengthMap[kingdom]?.[0] || 'Native Habitat',
+        strength_effect: strengthMap[kingdom]?.[1] || '+20% field advantage in native terrain',
+        weakness_name: weaknessMap[kingdom]?.[0] || 'Range Shift',
+        weakness_effect: weaknessMap[kingdom]?.[1] || 'Reduced performance outside native terrain',
+        abilities: card.provisional ? ['Pending Identification'] : ['Field Adaptation', 'Territory Sense'],
+        environment_triggers: [
+          `Gains advantage in ${(kingdom === 'Fish / Marine' ? 'marine' : 'native').toLowerCase()} terrain`,
+          `Vulnerable to ${(weaknessMap[kingdom]?.[0] || 'range shift').toLowerCase()} conditions`,
+        ],
+        range_mode: rangeMode,
+        range_regions: rangeRegions,
+        local_markers: entry.region === 'AU' ? [{ region: 'AU', x: 79, y: 60 }] : [],
+        theme_class: kingdom === 'Reptiles' ? 'theme-reptile' : kingdom === 'Mammals' ? 'theme-mammal' : kingdom === 'Birds' ? 'theme-bird' : kingdom === 'Fish / Marine' ? 'theme-fish' : kingdom === 'Insects' ? 'theme-insect' : 'theme-plant',
+        banner_icon: icons,
+        rank: card.rank || 'species',
+        sound_url: card.sound_url || '',
+      };
     }
 
-    function setSignedOut() {
-      signedInNav.style.display = 'none';
-      signedOutNav.classList.add('visible');
-      accountStatus.classList.remove('visible');
-      countBadge.classList.remove('visible');
-      queueBadge.classList.remove('visible');
+    function cardFrontHtml(data) {
+      return `
+        <section class="card-face ${data.theme_class}">
+          <div class="face-inner">
+            <div class="card-banner">
+              <div class="level-badge">${escapeHtml(data.card_number)}</div>
+              <div class="banner-title">WildEx</div>
+              <div class="icon-badge">${escapeHtml(data.banner_icon)}</div>
+            </div>
+            <div class="species-block">
+              <h3>${escapeHtml(data.species_name)}</h3>
+              <p>${escapeHtml(data.scientific_name)}</p>
+            </div>
+            <div class="front-main">
+              <div class="info-panel">
+                <div class="info-row"><div class="label">Common Name</div><div class="value">${escapeHtml(data.species_name)}</div></div>
+                <div class="info-row"><div class="label">Scientific Name</div><div class="value"><em>${escapeHtml(data.scientific_name)}</em></div></div>
+                <div class="info-row"><div class="label">Length</div><div class="value">${escapeHtml(data.length_text)}</div></div>
+                <div class="info-row"><div class="label">Habitat</div><div class="value">${escapeHtml(data.habitat_text)}</div></div>
+                <div class="info-row"><div class="label">Diet</div><div class="value">${escapeHtml(data.diet_text)}</div></div>
+              </div>
+              <div class="photo-panel">${data.image_url ? `<img src="${escapeHtml(data.image_url)}" alt="">` : ''}</div>
+            </div>
+            <div class="section-tag">Info</div>
+            <div class="lore-box">${escapeHtml(data.info_text)}</div>
+            <div class="fact-box"><strong>Fact</strong>${escapeHtml(data.fact_text)}</div>
+          </div>
+        </section>`;
     }
 
-    async function loadSession() {
+    function cardBackHtml(data, entry) {
+      return `
+        <section class="card-face back ${data.theme_class}">
+          <div class="face-inner" style="grid-template-rows:auto auto auto 1fr auto auto">
+            <div class="card-banner">
+              <div class="level-badge">${escapeHtml(data.card_number)}</div>
+              <div class="banner-title">${escapeHtml(data.dex_id)}</div>
+              <div class="icon-badge">${escapeHtml(data.banner_icon)}</div>
+            </div>
+            <div class="species-block">
+              <h3>${escapeHtml(data.species_name)}</h3>
+              <p>${escapeHtml(data.scientific_name)}</p>
+            </div>
+            <div class="back-grid">
+              <div class="back-col">
+                <div class="back-box">
+                  <h4>Status</h4>
+                  <div class="status-grid">
+                    <div><span>Rarity</span><strong>${escapeHtml(data.rarity)}</strong></div>
+                    <div><span>Threat</span><strong>${escapeHtml(data.threat_level)}</strong></div>
+                    <div><span>Aggression</span><strong>${escapeHtml(data.aggression)}</strong></div>
+                  </div>
+                </div>
+              </div>
+              <div class="back-col">
+                <div class="back-box map-panel">
+                  ${regionMapSvg(entry, data)}
+                </div>
+              </div>
+            </div>
+            <div class="back-grid">
+              <div class="back-col">
+                <div class="strip-box">
+                  <h4>Strength</h4>
+                  <div class="title">${escapeHtml(data.strength_name)}</div>
+                  <div class="effect">${escapeHtml(data.strength_effect)}</div>
+                </div>
+                <div class="strip-box">
+                  <h4>Weakness</h4>
+                  <div class="title">${escapeHtml(data.weakness_name)}</div>
+                  <div class="effect">${escapeHtml(data.weakness_effect)}</div>
+                </div>
+                <div class="lower-box">
+                  <h4>Stats</h4>
+                  <div class="stat-grid">
+                    <div><span>HP</span><strong>${data.hp}</strong></div>
+                    <div><span>ATK</span><strong>${data.atk}</strong></div>
+                    <div><span>DEF</span><strong>${data.def}</strong></div>
+                    <div><span>SPD</span><strong>${data.spd}</strong></div>
+                  </div>
+                </div>
+              </div>
+              <div class="back-col">
+                <div class="lower-box">
+                  <h4>Type</h4>
+                  <div class="type-grid">
+                    <div><span>Type</span><strong>${escapeHtml(data.type_label)}</strong></div>
+                    <div><span>Biome</span><strong>${escapeHtml(data.biome)}</strong></div>
+                    <div><span>Biome Bonus</span><strong>${escapeHtml(data.biome_bonus)}</strong></div>
+                  </div>
+                </div>
+                <div class="lower-box">
+                  <h4>Abilities</h4>
+                  <ul>${data.abilities.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                </div>
+                <div class="environment-box">
+                  <h4>Environment Triggers</h4>
+                  <ul>${data.environment_triggers.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                </div>
+              </div>
+            </div>
+            <div class="call-box ${data.sound_url ? '' : 'hidden'}">
+              <button class="btn btn-secondary" type="button" id="play-call-btn">Play Call</button>
+            </div>
+            <div class="bottom-bar">
+              <span>Rarity: ${escapeHtml(data.rarity)}</span>
+              <span>Threat Level: ${escapeHtml(data.threat_level)}</span>
+              <span>Aggression: ${escapeHtml(data.aggression)}</span>
+            </div>
+          </div>
+        </section>`;
+    }
+
+    function openEntry(entryId) {
+      const entry = state.entries.find(item => item.id === entryId);
+      if (!entry || !entry.card || entry.discovery_state !== 'CAPTURED') return;
+      state.activeEntry = entry;
+      const data = entry.card.render_card || buildRenderData(entry);
+      document.getElementById('modal-title').textContent = data.species_name;
+      document.getElementById('modal-subtitle').textContent = `${entry.dex_id} · ${familyLabel(entry)}`;
+      WildExCardRenderer.buildCard(document.getElementById('detail-card-host'), data);
+      document.getElementById('favorite-btn').textContent = state.user?.favorite_card_id === entry.card.id ? 'Favorite Selected' : 'Set Favorite';
+      document.getElementById('reid-btn').classList.toggle('hidden', (entry.card.species_name || '') !== 'Pending identification');
+      document.getElementById('play-call-btn').classList.toggle('hidden', !data.sound_url);
+      document.getElementById('card-modal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('card-modal').classList.remove('open');
+      state.activeEntry = null;
+    }
+
+    async function setFavoriteCard() {
+      const entry = state.activeEntry;
+      if (!entry?.card?.id) return;
+      const res = await fetch(`/cards/${entry.card.id}/favorite`, { method: 'POST', credentials: 'same-origin' });
+      if (!res.ok) return;
+      state.user.favorite_card_id = entry.card.id;
+      setHeroBackground();
+      document.getElementById('favorite-btn').textContent = 'Favorite Selected';
+    }
+
+    async function reidentifyActive() {
+      const entry = state.activeEntry;
+      if (!entry?.card?.id) return;
+      const res = await fetch(`/cards/${entry.card.id}/reidentify`, { method: 'POST', credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.detail || 'Re-ID failed'); return; }
+      await loadHub();
+      const refreshed = state.entries.find(item => item.id === entry.id);
+      if (refreshed) openEntry(refreshed.id);
+    }
+
+    async function releaseActive() {
+      const entry = state.activeEntry;
+      if (!entry?.card?.id) return;
+      if (!confirm(`Release ${entry.card.species_name || entry.name}?`)) return;
+      const res = await fetch(`/cards/${entry.card.id}`, { method: 'DELETE', credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.detail || 'Release failed'); return; }
+      closeModal();
+      await loadHub();
+    }
+
+    async function loadHub() {
       const me = await fetch('/auth/me', { credentials: 'same-origin' });
-      if (!me.ok) {
-        setSignedOut();
+      if (me.status === 401) {
+        document.getElementById('signin-line').innerHTML = 'Not signed in';
+        document.getElementById('mini-status').textContent = 'Sign in required';
+        document.getElementById('hero-panel').style.removeProperty('--hero-image');
+        document.querySelector('.tagline').textContent = 'Sign in to open your map, regional index, and saved collection.';
+        document.querySelector('.action-row').innerHTML = `
+          <a class="btn btn-primary" href="/login">Sign In</a>
+          <a class="btn btn-secondary" href="/login">Create Account</a>`;
+        document.getElementById('region-strip').innerHTML = '';
+        document.getElementById('kingdom-row').innerHTML = '<div class="hint">Sign in to unlock your WildEx map and index.</div>';
+        document.getElementById('category-row').innerHTML = '';
+        document.getElementById('family-row').innerHTML = '';
+        document.getElementById('entry-list').innerHTML = '';
         return;
       }
-      const user = await me.json();
-      setSignedIn(user);
-
-      const cards = await fetch('/cards', { credentials: 'same-origin' });
-      if (!cards.ok) return;
-      const rows = await cards.json();
-      document.getElementById('card-count').textContent = rows.length;
-      countBadge.classList.add('visible');
-      await refreshQueueBadge();
+      state.user = await me.json();
+      document.getElementById('signin-line').innerHTML = `Signed in as <strong>${escapeHtml(state.user.email)}</strong>`;
+      const entriesRes = await fetch('/wilddex/entries', { credentials: 'same-origin' });
+      state.entries = entriesRes.ok ? await entriesRes.json() : [];
+      renderCounts();
+      renderMap();
+      renderSelectors();
+      renderEntries();
+      setHeroBackground();
+      document.getElementById('mini-status').textContent = state.selectedRegion ? `${REGION_LABELS[state.selectedRegion]} active` : 'No regions unlocked yet';
+      document.getElementById('open-first-unlocked').disabled = !state.selectedRegion;
     }
 
-    document.getElementById('logout-link').addEventListener('click', async (event) => {
-      event.preventDefault();
+    document.addEventListener('click', (event) => {
+      const regionNode = event.target.closest('.map-region,.region-pill');
+      if (regionNode) {
+        const region = regionNode.dataset.region;
+        if (unlockedRegions().includes(region)) {
+          state.selectedRegion = region;
+          renderMap();
+          renderSelectors();
+          renderEntries();
+          document.getElementById('mini-status').textContent = `${REGION_LABELS[region]} active`;
+          document.getElementById('index-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+      }
+      const k = event.target.closest('[data-kingdom]');
+      if (k) {
+        state.selectedKingdom = k.dataset.kingdom;
+        state.selectedCategory = null;
+        state.selectedFamily = null;
+        renderSelectors();
+        renderEntries();
+        return;
+      }
+      const c = event.target.closest('[data-category]');
+      if (c) {
+        state.selectedCategory = c.dataset.category;
+        state.selectedFamily = null;
+        renderSelectors();
+        renderEntries();
+        return;
+      }
+      const f = event.target.closest('[data-family]');
+      if (f) {
+        state.selectedFamily = f.dataset.family;
+        renderSelectors();
+        renderEntries();
+        return;
+      }
+      const entry = event.target.closest('[data-entry]');
+      if (entry) {
+        const row = state.entries.find(item => item.id === Number(entry.dataset.entry));
+        if (row?.discovery_state === 'CAPTURED') openEntry(row.id);
+        return;
+      }
+      if (event.target === document.getElementById('card-modal')) closeModal();
+    });
+
+    document.getElementById('flip-btn').addEventListener('click', () => {
+      WildExCardRenderer.flip(document.getElementById('detail-card-host'));
+    });
+    document.getElementById('print-btn').addEventListener('click', () => {
+      WildExCardRenderer.printNode(document.getElementById('detail-card-host'));
+    });
+    document.getElementById('download-front-btn').addEventListener('click', () => {
+      if (!state.activeEntry) return;
+      WildExCardRenderer.exportFace(document.getElementById('detail-card-host'), 'front', state.activeEntry.dex_id || 'wildex-card').catch(() => {});
+    });
+    document.getElementById('download-back-btn').addEventListener('click', () => {
+      if (!state.activeEntry) return;
+      WildExCardRenderer.exportFace(document.getElementById('detail-card-host'), 'back', state.activeEntry.dex_id || 'wildex-card').catch(() => {});
+    });
+    document.getElementById('download-both-btn').addEventListener('click', () => {
+      if (!state.activeEntry) return;
+      WildExCardRenderer.exportBoth(document.getElementById('detail-card-host'), state.activeEntry.dex_id || 'wildex-card').catch(() => {});
+    });
+    document.getElementById('play-call-btn').addEventListener('click', () => {
+      const sound = state.activeEntry?.card?.render_card?.sound_url || state.activeEntry?.card?.sound_url;
+      if (!sound) return;
+      new Audio(sound).play().catch(() => {});
+    });
+    document.getElementById('close-btn').addEventListener('click', closeModal);
+    document.getElementById('favorite-btn').addEventListener('click', () => setFavoriteCard().catch(() => {}));
+    document.getElementById('reid-btn').addEventListener('click', () => reidentifyActive().catch(() => {}));
+    document.getElementById('release-btn').addEventListener('click', () => releaseActive().catch(() => {}));
+    document.getElementById('logout-link').addEventListener('click', async () => {
       await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
       location.href = '/login';
     });
+    document.getElementById('open-first-unlocked').addEventListener('click', () => {
+      if (state.selectedRegion) document.getElementById('index-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 
-    function escapeHtml(value) {
-      return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    window.addEventListener('online', () => processQueuedCaptures());
-    window.addEventListener('focus', () => processQueuedCaptures());
-    window.setInterval(() => { processQueuedCaptures().catch(() => {}); }, 15000);
-
-    loadSession().then(() => processQueuedCaptures()).catch(() => setSignedOut());
+    queuedCount().then(count => { document.getElementById('queue-count').textContent = count; }).catch(() => {});
+    loadHub().catch(() => {});
   </script>
 </body>
 </html>

@@ -1,0 +1,302 @@
+from __future__ import annotations
+
+from dataclasses import asdict, is_dataclass
+
+
+RARITY_VALUES = {
+    "common": "Common",
+    "uncommon": "Uncommon",
+    "rare": "Rare",
+    "very_rare": "Legendary",
+    "legendary": "Legendary",
+    "mythic": "Mythic",
+    "cryptic": "Cryptic",
+    "extinct": "Extinct",
+}
+
+THEMES = {
+    "reptile": {
+        "theme_class": "theme-reptile",
+        "accent": "#8a4d2f",
+        "accent_dark": "#5c3321",
+        "banner_text": "DRAGON",
+        "type_label": "Reptile",
+        "biome": "Rocky Desert",
+        "biome_bonus": "+20% defence in arid zones",
+        "strength_name": "Desert",
+        "strength_effect": "+20% defence in arid zones",
+        "weakness_name": "Cold Rain",
+        "weakness_effect": "Reduced mobility and warmth in wet conditions",
+    },
+    "mammal": {
+        "theme_class": "theme-mammal",
+        "accent": "#6f5938",
+        "accent_dark": "#4d3c24",
+        "banner_text": "PAW",
+        "type_label": "Mammal",
+        "biome": "Grassland",
+        "biome_bonus": "+20% damage in arid zones",
+        "strength_name": "Desert",
+        "strength_effect": "+20% damage in arid zones",
+        "weakness_name": "Heavy Rain",
+        "weakness_effect": "Reduced mobility and dodge in wet conditions",
+    },
+    "fish": {
+        "theme_class": "theme-fish",
+        "accent": "#3a7687",
+        "accent_dark": "#244b57",
+        "banner_text": "FISH",
+        "type_label": "Marine",
+        "biome": "Ocean Current",
+        "biome_bonus": "+20% speed in open water",
+        "strength_name": "Open Water",
+        "strength_effect": "+20% speed in marine zones",
+        "weakness_name": "Shallow Heat",
+        "weakness_effect": "Reduced endurance in warm shallow water",
+    },
+    "bird": {
+        "theme_class": "theme-bird",
+        "accent": "#7b8795",
+        "accent_dark": "#56606b",
+        "banner_text": "WING",
+        "type_label": "Bird",
+        "biome": "Sky / Cliff",
+        "biome_bonus": "+20% speed in open air",
+        "strength_name": "High Wind",
+        "strength_effect": "+20% scouting in elevated terrain",
+        "weakness_name": "Dense Brush",
+        "weakness_effect": "Reduced maneuvering in enclosed canopy",
+    },
+    "insect": {
+        "theme_class": "theme-insect",
+        "accent": "#8b7a34",
+        "accent_dark": "#625523",
+        "banner_text": "INSECT",
+        "type_label": "Insect",
+        "biome": "Brushland",
+        "biome_bonus": "+20% evasion in dense foliage",
+        "strength_name": "Camouflage",
+        "strength_effect": "+20% evasion in natural cover",
+        "weakness_name": "Cold Snap",
+        "weakness_effect": "Reduced activity in low temperatures",
+    },
+    "plant": {
+        "theme_class": "theme-plant",
+        "accent": "#4c7f4f",
+        "accent_dark": "#305533",
+        "banner_text": "LEAF",
+        "type_label": "Plant",
+        "biome": "Botanical Habitat",
+        "biome_bonus": "+20% resilience in native soil",
+        "strength_name": "Rooted Soil",
+        "strength_effect": "+20% resilience in stable ground",
+        "weakness_name": "Transplant Shock",
+        "weakness_effect": "Reduced vitality outside native habitat",
+    },
+}
+
+
+def _value(source, key, default=None):
+    if isinstance(source, dict):
+        return source.get(key, default)
+    return getattr(source, key, default)
+
+
+def _stats(source) -> dict:
+    stats = _value(source, "stats") or {}
+    if is_dataclass(stats):
+        return asdict(stats)
+    return stats
+
+
+def _kingdom(category: str | None, sub_category: str | None, iconic_taxon: str | None) -> str:
+    category = (category or "").lower()
+    sub_category = (sub_category or "").lower()
+    iconic_taxon = (iconic_taxon or "").lower()
+    if sub_category == "reptile" or iconic_taxon == "reptilia":
+        return "reptile"
+    if sub_category == "bird" or iconic_taxon == "aves":
+        return "bird"
+    if sub_category in {"fish", "marine"} or iconic_taxon == "actinopterygii":
+        return "fish"
+    if sub_category in {"insect", "arachnid"}:
+        return "insect"
+    if category == "plant" or iconic_taxon == "plantae":
+        return "plant"
+    return "mammal"
+
+
+def _rarity(source) -> str:
+    display = str(_value(source, "rarity_display") or "").strip()
+    if display in {"Common", "Uncommon", "Rare", "Legendary", "Mythic", "Cryptic", "Extinct"}:
+        return display
+    return RARITY_VALUES.get(str(_value(source, "rarity_tier") or "").strip().lower(), "Common")
+
+
+def _threat_level(attack: int, hp: int) -> str:
+    score = attack * 0.65 + hp * 0.35
+    if score >= 82:
+        return "Extreme"
+    if score >= 62:
+        return "High"
+    if score >= 38:
+        return "Medium"
+    return "Low"
+
+
+def _aggression(attack: int, speed: int) -> str:
+    score = attack * 0.7 + speed * 0.3
+    if score >= 82:
+        return "Very High"
+    if score >= 62:
+        return "High"
+    if score >= 38:
+        return "Medium"
+    return "Low"
+
+
+def _length_text(name: str, kingdom: str) -> str:
+    lowered = name.lower()
+    if "ring-tailed dragon" in lowered:
+        return "8-10 inches (20-25 cm)"
+    if "red kangaroo" in lowered:
+        return "1.0-1.6 m body length"
+    if "great white shark" in lowered:
+        return "3.5-6.0 m"
+    if "bald eagle" in lowered:
+        return "70-102 cm body length"
+    if "mantis" in lowered:
+        return "6-10 cm"
+    if "pitcher plant" in lowered:
+        return "Pitchers to 30 cm"
+    return "Field size varies by species"
+
+
+def _habitat_text(name: str, kingdom: str, capture_country: str | None) -> str:
+    lowered = name.lower()
+    if "ring-tailed dragon" in lowered:
+        return "Rocky terrain of arid Australian outback"
+    if "red kangaroo" in lowered:
+        return "Arid plains and open woodland"
+    if "great white shark" in lowered:
+        return "Coastal shelf waters and offshore marine zones"
+    if "bald eagle" in lowered:
+        return "Large lakes, coasts, and river systems"
+    if "mantis" in lowered:
+        return "Shrubland, gardens, and dry grassland"
+    if "pitcher plant" in lowered:
+        return "Humid wetlands and nutrient-poor ground"
+    return f"Native habitat{f' in {capture_country}' if capture_country else ''}"
+
+
+def _diet_text(name: str, kingdom: str) -> str:
+    lowered = name.lower()
+    if "ring-tailed dragon" in lowered:
+        return "Insects and small invertebrates"
+    if "red kangaroo" in lowered:
+        return "Grasses and low vegetation"
+    if "great white shark" in lowered:
+        return "Fish, rays, and marine mammals"
+    if "bald eagle" in lowered:
+        return "Fish, birds, and carrion"
+    if "mantis" in lowered:
+        return "Insects and small arthropods"
+    if "pitcher plant" in lowered:
+        return "Insects trapped in pitcher fluid"
+    return "Diet varies by species"
+
+
+def _abilities(name: str, kingdom: str) -> list[str]:
+    lowered = name.lower()
+    if "ring-tailed dragon" in lowered:
+        return ["Flatten Body", "Band-tail Decoy"]
+    if "red kangaroo" in lowered:
+        return ["Powerful Kick", "Hop Away"]
+    if "great white shark" in lowered:
+        return ["Burst Rush", "Ambush Bite"]
+    if "bald eagle" in lowered:
+        return ["High Scan", "Dive Strike"]
+    if "mantis" in lowered:
+        return ["Ambush Grab", "Leaf Stillness"]
+    if "pitcher plant" in lowered:
+        return ["Pitfall Trap", "Digestive Pool"]
+    return ["Field Adaptation", "Territory Sense"]
+
+
+def _range_mode(name: str, kingdom: str, capture_country: str | None) -> tuple[str, list[str], list[dict]]:
+    lowered = name.lower()
+    if "shark" in lowered or kingdom == "fish":
+        return "ocean", ["PACIFIC", "INDIAN", "ATLANTIC"], []
+    if capture_country == "AU" or "kangaroo" in lowered or "dragon" in lowered:
+        return "region", ["AU"], [{"region": "AU", "x": 79, "y": 60}]
+    if "bald eagle" in lowered:
+        return "world", ["NA"], [{"region": "NA", "x": 34, "y": 36}]
+    if "pitcher plant" in lowered:
+        return "world", ["AS"], [{"region": "AS", "x": 139, "y": 48}]
+    return "world", ([capture_country] if capture_country else ["GLOBAL"]), []
+
+
+def build_render_card(source) -> dict:
+    stats = _stats(source)
+    species_name = _value(source, "species_name") or _value(source, "common_name") or _value(source, "scientific_name") or "Unknown"
+    scientific_name = _value(source, "scientific_name") or "Unknown"
+    kingdom_key = _kingdom(_value(source, "category"), _value(source, "sub_category"), _value(source, "iconic_taxon"))
+    theme = THEMES[kingdom_key]
+    speed = int(stats.get("speed", 50) or 50)
+    attack = int(stats.get("attack", 50) or 50)
+    defence = int(stats.get("defence", 50) or 50)
+    hp = int(stats.get("hp", 50) or 50)
+    rarity = _rarity(source)
+    capture_country = _value(source, "capture_country")
+    range_mode, range_regions, local_markers = _range_mode(species_name, kingdom_key, capture_country)
+    return {
+        "species_name": species_name,
+        "scientific_name": scientific_name,
+        "common_name": species_name,
+        "kingdom": kingdom_key.title(),
+        "group": _value(source, "group_code"),
+        "dex_id": _value(source, "dex_id"),
+        "card_number": (str(_value(source, "dex_id") or "").split("-")[-1] or str(_value(source, "id") or "")),
+        "rarity": rarity,
+        "threat_level": _threat_level(attack, hp),
+        "aggression": _aggression(attack, speed),
+        "length_text": _length_text(species_name, kingdom_key),
+        "habitat_text": _habitat_text(species_name, kingdom_key, capture_country),
+        "diet_text": _diet_text(species_name, kingdom_key),
+        "info_text": _value(source, "blurb") or f"{species_name} is logged as a WildEx field record.",
+        "fact_text": (_value(source, "wikipedia_summary") or "").strip() or (
+            f"{species_name} has {int(_value(source, 'observations_count') or 0):,} recorded observations."
+            if _value(source, "observations_count") else
+            f"{species_name} has a confirmed WildEx entry."
+        ),
+        "image_url": _value(source, "image_url"),
+        "sound_url": _value(source, "sound_url"),
+        "hp": hp,
+        "atk": attack,
+        "def": defence,
+        "spd": speed,
+        "type_label": theme["type_label"],
+        "biome": theme["biome"],
+        "biome_bonus": theme["biome_bonus"],
+        "strength_name": theme["strength_name"],
+        "strength_effect": theme["strength_effect"],
+        "weakness_name": theme["weakness_name"],
+        "weakness_effect": theme["weakness_effect"],
+        "abilities": _abilities(species_name, kingdom_key),
+        "environment_triggers": [
+            f"Gains advantage in {theme['biome'].lower()} terrain",
+            f"Vulnerable to {theme['weakness_name'].lower()} conditions",
+        ],
+        "range_mode": range_mode,
+        "range_regions": range_regions,
+        "local_markers": local_markers,
+        "evolution_chain_id": _value(source, "evolution_chain_id"),
+        "evolution_stage": _value(source, "evolution_stage"),
+        "theme_class": theme["theme_class"],
+        "accent": theme["accent"],
+        "accent_dark": theme["accent_dark"],
+        "banner_text": theme["banner_text"],
+        "confidence": _value(source, "confidence"),
+        "provisional": _value(source, "provisional"),
+        "rank": _value(source, "rank"),
+    }

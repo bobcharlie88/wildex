@@ -6,6 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>WildEx — Capture</title>
+  <link rel="stylesheet" href="/static/card_renderer.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -408,10 +409,172 @@
         linear-gradient(160deg, rgba(35,35,49,0.98), rgba(14,14,24,0.98)),
         radial-gradient(circle at top right, rgba(135,146,255,0.18), transparent 34%);
     }
+    .reptile-template {
+      color: #322117;
+      background:
+        linear-gradient(180deg, rgba(103,59,38,0.22), transparent 18%),
+        linear-gradient(180deg, #d3bc9c 0%, #c9b08a 42%, #b89973 100%);
+    }
+    .reptile-template::before {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border: 3px solid rgba(77,45,28,0.85);
+      border-radius: 22px;
+      pointer-events: none;
+      box-shadow: inset 0 0 0 2px rgba(213,182,139,0.35);
+    }
+    .reptile-template .card-face-body {
+      background: transparent;
+      gap: 12px;
+    }
+    .reptile-template .card-face-body::before {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(255,255,255,0.18), transparent 18%),
+        radial-gradient(circle at 86% 88%, rgba(255,160,76,0.24), transparent 12%),
+        repeating-linear-gradient(0deg, rgba(58,36,24,0.05) 0 2px, transparent 2px 14px);
+      opacity: 0.85;
+    }
+    .reptile-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 14px 0;
+      color: #f4e5cf;
+    }
+    .reptile-level {
+      width: 54px;
+      height: 54px;
+      clip-path: polygon(25% 6%, 75% 6%, 96% 50%, 75% 94%, 25% 94%, 4% 50%);
+      background: linear-gradient(180deg, #295f37, #163820);
+      border: 3px solid #ccb793;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 1.45rem;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.35);
+      flex-shrink: 0;
+    }
+    .reptile-banner {
+      flex: 1;
+      min-height: 44px;
+      border-radius: 10px;
+      border: 2px solid rgba(80,48,30,0.95);
+      background: linear-gradient(180deg, #6b4834, #4f3125);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      box-shadow: inset 0 0 0 2px rgba(223,194,151,0.18);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .reptile-banner strong {
+      font-size: 1.05rem;
+    }
+    .reptile-banner span {
+      font-size: 0.88rem;
+      color: #f6d9b0;
+    }
+    .reptile-title {
+      padding: 0 18px;
+      text-align: left;
+    }
+    .reptile-title .common-name {
+      font-size: 1.85rem;
+      line-height: 1.05;
+      color: #4a2a1a;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      text-shadow: none;
+    }
+    .reptile-title .sci-name {
+      color: #5e3f2e;
+      font-size: 1.02rem;
+    }
+    .reptile-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(150px, 0.95fr);
+      gap: 14px;
+      align-items: start;
+    }
+    .reptile-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+    .reptile-row {
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(74,42,26,0.16);
+    }
+    .reptile-row .label {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: #4d2f1f;
+    }
+    .reptile-row .value {
+      margin-top: 3px;
+      font-size: 0.94rem;
+      line-height: 1.35;
+      color: #3d291e;
+    }
+    .reptile-photo-frame {
+      border-radius: 14px;
+      padding: 8px;
+      background: linear-gradient(180deg, rgba(112,73,50,0.95), rgba(73,47,34,0.98));
+      border: 2px solid rgba(80,48,30,0.95);
+      box-shadow: inset 0 0 0 2px rgba(223,194,151,0.18);
+    }
+    .reptile-photo-frame img {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      object-fit: cover;
+      display: block;
+      border-radius: 10px;
+      border: 1px solid rgba(222,197,161,0.42);
+    }
+    .reptile-section-tag {
+      align-self: flex-start;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 2px solid rgba(96,58,39,0.95);
+      background: linear-gradient(180deg, #d2b083, #b98d61);
+      color: #4b2b1a;
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .reptile-lore {
+      font-size: 0.98rem;
+      line-height: 1.55;
+      color: #382418;
+    }
+    .reptile-fact {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #513226, #362017);
+      border: 2px solid rgba(89,55,38,0.98);
+      color: #f2dec2;
+    }
+    .reptile-fact strong {
+      display: block;
+      font-size: 0.84rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      color: #f6cf95;
+    }
+    .reptile-fact span {
+      font-size: 0.92rem;
+      line-height: 1.4;
+      font-style: italic;
+    }
     @media (max-width: 420px) {
       .flip-card-inner { min-height: 580px; }
       .card-back-grid { grid-template-columns: 1fr; }
       .card-front-title .common-name { font-size: 1.65rem; }
+      .reptile-body { grid-template-columns: 1fr; }
     }
     @media print {
       body { background: #fff; }
@@ -547,6 +710,7 @@
     <div class="result-body" id="result-body"></div>
   </div>
 
+  <script src="/static/card_renderer.js"></script>
   <script>
     const $ = id => document.getElementById(id);
     const screens = ['capture-screen','loading-screen','result-screen'].map($);
@@ -836,6 +1000,70 @@
       return `<div class="meta-chip"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div></div>`;
     }
 
+    function factTextForCard(c, theme) {
+      if (c.invasive_at_location) return `${c.species_name} is flagged as invasive at this capture location.`;
+      if (c.conservation_status) return `Conservation status: ${c.conservation_status}.`;
+      if (c.observations_count) return `${c.species_name} has ${c.observations_count.toLocaleString()} recorded iNaturalist sightings.`;
+      return `${c.species_name} is catalogued in ${theme.habitat.toLowerCase()} conditions.`;
+    }
+
+    function reptileFrontTemplate(c, theme, pct, displayPhoto) {
+      const locationText = c.capture_country || (c.latitude != null && c.longitude != null
+        ? `${c.latitude.toFixed(2)}, ${c.longitude.toFixed(2)}`
+        : 'Unknown zone');
+      const lengthText = c.rank ? `${c.rank.replace(/_/g, ' ')} record` : `${pct}% match confidence`;
+      const statusText = c.provisional ? 'Provisional field identification' : (c.rarity_display || 'Confirmed field record');
+      return `
+        <section class="card-face front reptile-template">
+          <div class="reptile-header">
+            <div class="reptile-level">${Math.max(1, Math.min(99, Math.round(pct / 6) || 17))}</div>
+            <div class="reptile-banner">
+              <strong>WildEx</strong>
+              <span>Dragon</span>
+            </div>
+          </div>
+          <div class="card-face-body">
+            <div class="reptile-title">
+              <div class="common-name">${esc(c.species_name)}</div>
+              <div class="sci-name">${esc(c.scientific_name)}</div>
+            </div>
+            <div class="reptile-body">
+              <div class="reptile-stats">
+                <div class="reptile-row">
+                  <div class="label">Common Name:</div>
+                  <div class="value">${esc(c.species_name)}</div>
+                </div>
+                <div class="reptile-row">
+                  <div class="label">Scientific Name:</div>
+                  <div class="value"><em>${esc(c.scientific_name)}</em></div>
+                </div>
+                <div class="reptile-row">
+                  <div class="label">Record Type:</div>
+                  <div class="value">${esc(lengthText)}</div>
+                </div>
+                <div class="reptile-row">
+                  <div class="label">Habitat:</div>
+                  <div class="value">${esc(theme.habitat)}<br>${esc(locationText)}</div>
+                </div>
+                <div class="reptile-row">
+                  <div class="label">Status:</div>
+                  <div class="value">${esc(statusText)}</div>
+                </div>
+              </div>
+              <div class="reptile-photo-frame">
+                <img id="result-photo-live" src="${esc(displayPhoto)}" alt="">
+              </div>
+            </div>
+            <div class="reptile-section-tag">Info</div>
+            <div class="reptile-lore">${esc(c.blurb || `${c.species_name} was captured as a reptile field record in WildEx.`)}</div>
+            <div class="reptile-fact">
+              <strong>Fact</strong>
+              <span>${esc(factTextForCard(c, theme))}</span>
+            </div>
+          </div>
+        </section>`;
+    }
+
     function applyOrientationClass(container, width, height) {
       if (!container || !width || !height) return;
       container.classList.remove('landscape', 'portrait', 'square');
@@ -862,13 +1090,28 @@
       if (img.complete) apply();
     }
 
+    let currentResultExportName = 'wildex-card';
+
     function flipResultCard() {
-      const card = $('result-flip-card');
-      if (card) card.classList.toggle('flipped');
+      WildExCardRenderer.flip($('result-card-host'));
     }
 
     function printResultCard() {
-      window.print();
+      WildExCardRenderer.printNode($('result-card-host'));
+    }
+
+    function downloadResultFace(side) {
+      WildExCardRenderer.exportFace($('result-card-host'), side, currentResultExportName).catch(() => {});
+    }
+
+    function downloadResultBoth() {
+      WildExCardRenderer.exportBoth($('result-card-host'), currentResultExportName).catch(() => {});
+    }
+
+    function playResultCall() {
+      const sound = $('result-card-host')?.__wxData?.sound_url;
+      if (!sound) return;
+      new Audio(sound).play().catch(() => {});
     }
 
     // ── File selection ──────────────────────────────────────────────
@@ -960,7 +1203,7 @@
         const data = await resp.json();
         ['s0','s1','s2','s3','s4','s5'].forEach(id => { if ($(id)) $(id).className = 'step done'; });
         await new Promise(r => setTimeout(r, 400));
-        renderStyledCard(data);
+        renderRenderedCard(data);
 
       } catch (e) {
         timers.forEach(clearTimeout);
@@ -1085,6 +1328,46 @@
       const pct = Math.round(c.confidence * 100);
       const confColor = c.provisional ? 'var(--warn)' : 'var(--accent)';
       const statRows = statRowsForCard(c.stats);
+      const frontFace = kingdom === 'reptile'
+        ? reptileFrontTemplate(c, theme, pct, displayPhoto)
+        : `
+              <section class="card-face front">
+                <div class="card-front-photo">
+                  <img id="result-photo-live" src="${esc(displayPhoto)}" alt="">
+                  <div class="card-front-overlay"></div>
+                  <div class="card-ribbon"><span class="card-ribbon-icon">${theme.icon}</span><span>${esc(theme.label)}</span></div>
+                  <div class="card-front-title">
+                    <div class="name-block">
+                      <div class="common-name">${esc(c.species_name)}</div>
+                      <div class="sci-name">${esc(c.scientific_name)}</div>
+                    </div>
+                    <div class="score-chip">
+                      <strong>${pct}%</strong>
+                      <span>${c.provisional ? 'uncertain' : 'verified'}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-face-body">
+                  <div class="card-meta-row">
+                    <div class="card-title-kicker">${esc(theme.habitat)}</div>
+                    <div class="card-rank-pill">${esc((c.rank || 'unknown').replace(/_/g, ' '))}</div>
+                  </div>
+                  ${badges.length ? `<div class="badges">${badges.join('')}</div>` : ''}
+                  <div class="conf-row">
+                    <div class="conf-label">
+                      <span>Confidence</span>
+                      <span>${pct}%${c.provisional ? ' â€” uncertain' : ''}</span>
+                    </div>
+                    <div class="conf-track">
+                      <div class="conf-fill" id="conf-fill-live" style="width:0;background:${confColor}"></div>
+                    </div>
+                  </div>
+                  <div class="stats-card">
+                    <div class="stats-title">Field Stats</div>
+                    ${statRows}
+                  </div>
+                </div>
+              </section>`;
 
       const details = [];
       if (c.conservation_status) details.push(detailRow('Conservation', c.conservation_status));
@@ -1173,6 +1456,13 @@
         <a class="btn btn-secondary" href="/wildex" style="text-align:center;text-decoration:none;display:block;padding:15px">View WildDex</a>
       `;
 
+      if (kingdom === 'reptile') {
+        const inner = document.querySelector('#result-flip-card .flip-card-inner');
+        if (inner && inner.firstElementChild) {
+          inner.firstElementChild.outerHTML = reptileFrontTemplate(c, theme, pct, displayPhoto);
+        }
+      }
+
       bindCardImageOrientation('result-photo-live', '.card-front-photo', fallbackPhoto);
 
       show('result-screen');
@@ -1191,6 +1481,41 @@
       $('result-body').innerHTML = `
         <div class="error-box">${esc(msg)}</div>
         <button class="btn btn-secondary" style="margin-top:16px" onclick="resetCapture()">Try Again</button>`;
+      show('result-screen');
+    }
+
+    function renderRenderedCard(resp) {
+      const c = resp.card;
+      const banner = resp.saved
+        ? `<div class="save-banner saved">&#10003; Saved to WildDex &mdash; card #${resp.card_id}</div>`
+        : `<div class="save-banner unsaved">&#9888; Card generated &mdash; database offline</div>`;
+      const details = [];
+      if (c.conservation_status) details.push(detailRow('Conservation', c.conservation_status));
+      if (c.observations_count) details.push(detailRow('iNat sightings', c.observations_count.toLocaleString()));
+      if (c.taxon_id) details.push(detailRow('Taxon ID', c.taxon_id));
+      if (c.latitude != null) details.push(detailRow('Captured at', `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`));
+      if (resp.identification_error && c.species_name === 'Pending identification') details.push(detailRow('ID status', resp.identification_error));
+      if (resp.db_error) details.push(detailRow('Save status', resp.db_error));
+
+      $('result-body').innerHTML = `
+        ${banner}
+        <div class="card-display">
+          <div id="result-card-host"></div>
+          <div class="flip-actions">
+            <button class="btn btn-secondary" onclick="flipResultCard()">Flip Card</button>
+            <button class="btn btn-secondary" onclick="printResultCard()">Print</button>
+            <button class="btn btn-secondary" onclick="downloadResultFace('front')">Front PNG</button>
+            <button class="btn btn-secondary" onclick="downloadResultFace('back')">Back PNG</button>
+            <button class="btn btn-secondary" onclick="downloadResultBoth()">Both PNG</button>
+            ${(c.render_card && c.render_card.sound_url) ? '<button class="btn btn-secondary" onclick="playResultCall()">Play Call</button>' : ''}
+          </div>
+        </div>
+        ${details.length ? `<div class="detail-card">${details.join('')}</div>` : ''}
+        <button class="btn btn-secondary" onclick="resetCapture()">Capture Another</button>
+        <a class="btn btn-secondary" href="/wildex" style="text-align:center;text-decoration:none;display:block;padding:15px">View WildDex</a>
+      `;
+      currentResultExportName = (c.render_card && c.render_card.dex_id) || c.dex_id || c.species_name || 'wildex-card';
+      WildExCardRenderer.buildCard($('result-card-host'), c.render_card);
       show('result-screen');
     }
 

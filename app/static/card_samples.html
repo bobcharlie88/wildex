@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WildEx Card Samples</title>
+  <link rel="stylesheet" href="/static/card_renderer.css">
+  <style>
+    body { margin: 0; padding: 18px; background: #091118; color: #eef5ef; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    h1 { margin: 0 0 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+    .sample { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 18px; padding: 14px; }
+    .sample h2 { font-size: 16px; margin: 0 0 12px; }
+  </style>
+</head>
+<body>
+  <h1>WildEx Proof Cards</h1>
+  <div class="grid" id="samples"></div>
+  <script src="/static/card_renderer.js"></script>
+  <script>
+    const root = document.getElementById('samples');
+    WildExCardRenderer.sampleCards().forEach((card, index) => {
+      const host = document.createElement('section');
+      host.className = 'sample';
+      host.innerHTML = `<h2>${card.species_name}</h2><div id="card-${index}"></div>`;
+      root.appendChild(host);
+      WildExCardRenderer.buildCard(host.querySelector(`#card-${index}`), card);
+    });
+  </script>
+</body>
+</html>

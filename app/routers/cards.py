@@ -8,10 +8,12 @@ from sqlalchemy import desc
 
 from app.auth import require_user
 from app.database import SessionLocal, db_available
-from app.models import Card, User
+from app.models import Card, User, UserDexDiscovery
 from app.pipeline.card_generator import generate_card
 from app.pipeline.species_data import get_species_data
 from app.pipeline.species_id import TemporaryIdentificationError, identify_species, is_temporary_identification_error
+from app.services.card_render import build_render_card
+from app.services.dex import DISCOVERY_CAPTURED, DISCOVERY_SEEN, sync_card_to_dex
 
 router = APIRouter()
 UPLOADS_DIR = Path("uploads")
@@ -62,6 +64,14 @@ def _card_dict(c: Card) -> dict:
         "longitude":       c.longitude,
         "capture_country": c.capture_country,
         "image_url":       c.image_url,
+        "dex_id":          c.dex_id,
+        "discovery_state": c.discovery_state,
+        "region":          c.region,
+        "kingdom":         c.kingdom,
+        "group_code":      c.group_code,
+        "evolution_chain_id": c.evolution_chain_id,
+        "evolution_stage": c.evolution_stage,
+        "render_card":     build_render_card(c),
     }
 
 
@@ -97,12 +107,51 @@ def delete_card(card_id: int, current_user: User = Depends(require_user)):
         raise HTTPException(503, "Database unavailable")
     db = SessionLocal()
     try:
+        user = db.query(User).filter(User.id == current_user.id).first()
         row = db.query(Card).filter(Card.id == card_id, Card.owner_id == current_user.id).first()
         if not row:
             raise HTTPException(404, "Card not found")
+        dex_entry_id = row.dex_entry_id
+        if user and user.favorite_card_id == row.id:
+            user.favorite_card_id = None
         db.delete(row)
+        db.flush()
+        if dex_entry_id:
+            remaining = (
+                db.query(Card)
+                .filter(Card.owner_id == current_user.id, Card.dex_entry_id == dex_entry_id)
+                .count()
+            )
+            discovery = (
+                db.query(UserDexDiscovery)
+                .filter(
+                    UserDexDiscovery.user_id == current_user.id,
+                    UserDexDiscovery.dex_entry_id == dex_entry_id,
+                )
+                .first()
+            )
+            if discovery and remaining == 0:
+                discovery.discovery_state = DISCOVERY_SEEN
+                discovery.last_card_id = None
         db.commit()
         return {"deleted": True, "card_id": card_id}
+    finally:
+        db.close()
+
+
+@router.post("/cards/{card_id}/favorite")
+def favorite_card(card_id: int, current_user: User = Depends(require_user)):
+    if not db_available():
+        raise HTTPException(503, "Database unavailable")
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == current_user.id).first()
+        row = db.query(Card).filter(Card.id == card_id, Card.owner_id == current_user.id).first()
+        if not user or not row:
+            raise HTTPException(404, "Card not found")
+        user.favorite_card_id = row.id
+        db.commit()
+        return {"ok": True, "favorite_card_id": row.id}
     finally:
         db.close()
 
@@ -188,6 +237,8 @@ def reidentify_card(card_id: int, current_user: User = Depends(require_user)):
             row.hp = card.stats.hp
             row.stamina_regen = card.stats.stamina_regen
             row.capture_country = gbif.query_country if gbif else row.capture_country
+            sync_card_to_dex(db, row)
+            row.discovery_state = DISCOVERY_CAPTURED
             db.commit()
             db.refresh(row)
             return _card_dict(row)

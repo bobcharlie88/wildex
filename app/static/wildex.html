@@ -631,9 +631,164 @@
   .theme-fungi { background: linear-gradient(160deg, rgba(76,40,54,.98), rgba(32,18,28,.98)); }
   .theme-terrain { background: linear-gradient(160deg, rgba(65,60,52,.98), rgba(26,24,23,.98)); }
   .theme-pending { background: linear-gradient(160deg, rgba(35,35,49,.98), rgba(14,14,24,.98)); }
+  .reptile-template {
+    color: #322117;
+    background:
+      linear-gradient(180deg, rgba(103,59,38,0.22), transparent 18%),
+      linear-gradient(180deg, #d3bc9c 0%, #c9b08a 42%, #b89973 100%);
+  }
+  .reptile-template::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border: 3px solid rgba(77,45,28,0.85);
+    border-radius: 22px;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 2px rgba(213,182,139,0.35);
+  }
+  .reptile-template .card-face-body {
+    background: transparent;
+    gap: 12px;
+  }
+  .reptile-template .card-face-body::before {
+    background:
+      radial-gradient(circle at 12% 18%, rgba(255,255,255,0.18), transparent 18%),
+      radial-gradient(circle at 86% 88%, rgba(255,160,76,0.24), transparent 12%),
+      repeating-linear-gradient(0deg, rgba(58,36,24,0.05) 0 2px, transparent 2px 14px);
+    opacity: 0.85;
+  }
+  .reptile-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 14px 0;
+    color: #f4e5cf;
+  }
+  .reptile-level {
+    width: 54px;
+    height: 54px;
+    clip-path: polygon(25% 6%, 75% 6%, 96% 50%, 75% 94%, 25% 94%, 4% 50%);
+    background: linear-gradient(180deg, #295f37, #163820);
+    border: 3px solid #ccb793;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .reptile-banner {
+    flex: 1;
+    min-height: 44px;
+    border-radius: 10px;
+    border: 2px solid rgba(80,48,30,0.95);
+    background: linear-gradient(180deg, #6b4834, #4f3125);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    box-shadow: inset 0 0 0 2px rgba(223,194,151,0.18);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .reptile-banner strong { font-size: 17px; }
+  .reptile-banner span { font-size: 14px; color: #f6d9b0; }
+  .reptile-title {
+    padding: 0 18px;
+    text-align: left;
+  }
+  .reptile-title .modal-title {
+    font-size: 30px;
+    line-height: 1.05;
+    color: #4a2a1a;
+    text-transform: uppercase;
+  }
+  .reptile-title .modal-sci {
+    color: #5e3f2e;
+    font-size: 16px;
+    margin-top: 4px;
+  }
+  .reptile-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(150px, 0.95fr);
+    gap: 14px;
+    align-items: start;
+  }
+  .reptile-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+  .reptile-row {
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(74,42,26,0.16);
+  }
+  .reptile-row .label {
+    font-size: 13px;
+    font-weight: 800;
+    color: #4d2f1f;
+  }
+  .reptile-row .value {
+    margin-top: 3px;
+    font-size: 14px;
+    line-height: 1.35;
+    color: #3d291e;
+  }
+  .reptile-photo-frame {
+    border-radius: 14px;
+    padding: 8px;
+    background: linear-gradient(180deg, rgba(112,73,50,0.95), rgba(73,47,34,0.98));
+    border: 2px solid rgba(80,48,30,0.95);
+    box-shadow: inset 0 0 0 2px rgba(223,194,151,0.18);
+  }
+  .reptile-photo-frame img {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    display: block;
+    border-radius: 10px;
+    border: 1px solid rgba(222,197,161,0.42);
+  }
+  .reptile-section-tag {
+    align-self: flex-start;
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(96,58,39,0.95);
+    background: linear-gradient(180deg, #d2b083, #b98d61);
+    color: #4b2b1a;
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .reptile-lore {
+    font-size: 15px;
+    line-height: 1.55;
+    color: #382418;
+  }
+  .reptile-fact {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #513226, #362017);
+    border: 2px solid rgba(89,55,38,0.98);
+    color: #f2dec2;
+  }
+  .reptile-fact strong {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    color: #f6cf95;
+  }
+  .reptile-fact span {
+    font-size: 14px;
+    line-height: 1.4;
+    font-style: italic;
+  }
   @media (max-width: 420px) {
     .flip-card-inner { min-height: 580px; }
     .card-back-grid { grid-template-columns: 1fr; }
+    .reptile-body { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -751,6 +906,20 @@ let allCards = [];
 let activeKingdom = 'all';
 let activeSub = 'all';
 let activeModalCardId = null;
+let activeModalEntryId = null;
+
+function entryCard(entry) {
+  return entry && entry.card ? entry.card : null;
+}
+
+function entryTaxon(entry) {
+  const card = entryCard(entry) || {};
+  return {
+    category: String(card.category || entry.category || '').toLowerCase(),
+    sub: String(card.sub_category || entry.sub_category || '').toLowerCase(),
+    iconic: String(card.iconic_taxon || '').toLowerCase(),
+  };
+}
 
 function normalizeKingdom(c) {
   const category = (c.category || '').toLowerCase();
@@ -797,6 +966,55 @@ function metaChip(label, value) {
   return `<div class="meta-chip"><div class="label">${label}</div><div class="value">${value}</div></div>`;
 }
 
+function factTextForCard(c, theme) {
+  if (c.invasive_at_location) return `${c.species_name} is flagged as invasive at this capture location.`;
+  if (c.conservation_status) return `Conservation status: ${c.conservation_status}.`;
+  if (c.observations_count) return `${c.species_name} has ${Number(c.observations_count).toLocaleString()} recorded iNaturalist sightings.`;
+  return `${c.species_name} is catalogued in ${theme.habitat.toLowerCase()} conditions.`;
+}
+
+function reptileFrontTemplate(c, theme, pct, displayPhoto) {
+  const locationText = c.capture_country || ((c.latitude != null && c.longitude != null)
+    ? `${Number(c.latitude).toFixed(2)}, ${Number(c.longitude).toFixed(2)}`
+    : 'Unknown zone');
+  const recordType = c.rank ? `${String(c.rank).replace(/_/g, ' ')} record` : `${pct}% match confidence`;
+  const statusText = c.provisional ? 'Provisional field identification' : (c.rarity_display || 'Confirmed field record');
+  return `
+    <section class="card-face front reptile-template">
+      <div class="reptile-header">
+        <div class="reptile-level">${Math.max(1, Math.min(99, Math.round(pct / 6) || 17))}</div>
+        <div class="reptile-banner">
+          <strong>WildEx</strong>
+          <span>Dragon</span>
+        </div>
+      </div>
+      <div class="card-face-body">
+        <div class="reptile-title">
+          <div class="modal-title">${c.species_name || c.scientific_name}</div>
+          <div class="modal-sci">${c.scientific_name || ''}</div>
+        </div>
+        <div class="reptile-body">
+          <div class="reptile-stats">
+            <div class="reptile-row"><div class="label">Common Name:</div><div class="value">${c.species_name || c.scientific_name}</div></div>
+            <div class="reptile-row"><div class="label">Scientific Name:</div><div class="value"><em>${c.scientific_name || ''}</em></div></div>
+            <div class="reptile-row"><div class="label">Record Type:</div><div class="value">${recordType}</div></div>
+            <div class="reptile-row"><div class="label">Habitat:</div><div class="value">${theme.habitat}<br>${locationText}</div></div>
+            <div class="reptile-row"><div class="label">Status:</div><div class="value">${statusText}</div></div>
+          </div>
+          <div class="reptile-photo-frame">
+            <img id="modal-card-photo" src="${displayPhoto}" alt="">
+          </div>
+        </div>
+        <div class="reptile-section-tag">Info</div>
+        <div class="reptile-lore">${c.blurb || `${c.species_name} was captured as a reptile field record in WildEx.`}</div>
+        <div class="reptile-fact">
+          <strong>Fact</strong>
+          <span>${factTextForCard(c, theme)}</span>
+        </div>
+      </div>
+    </section>`;
+}
+
 function applyOrientationClass(container, width, height) {
   if (!container || !width || !height) return;
   container.classList.remove('landscape', 'portrait', 'square');
@@ -832,7 +1050,7 @@ function printModalCard() {
 
 async function loadCards() {
   try {
-    const res = await fetch('/cards', { credentials: 'same-origin' });
+    const res = await fetch('/wilddex/entries', { credentials: 'same-origin' });
     if (res.status === 401) {
       location.href = '/login';
       return;
@@ -841,8 +1059,8 @@ async function loadCards() {
     allCards = await res.json();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('total-count').textContent =
-      allCards.length + (allCards.length === 1 ? ' card' : ' cards');
-    renderGrid();
+      allCards.length + (allCards.length === 1 ? ' entry' : ' entries');
+    renderDexGrid();
   } catch (e) {
     document.getElementById('loading').innerHTML =
       '<p style="color:#ef9a9a">Could not load WildDex. Check your connection.</p>';
@@ -851,9 +1069,10 @@ async function loadCards() {
 
 function filterCards() {
   return allCards.filter(c => {
-    const cat = (c.category || '').toLowerCase();
-    const sub = (c.sub_category || '').toLowerCase();
-    const iconic = (c.iconic_taxon || '').toLowerCase();
+    const taxon = entryTaxon(c);
+    const cat = taxon.category;
+    const sub = taxon.sub;
+    const iconic = taxon.iconic;
 
     if (activeKingdom === 'all') return true;
 
@@ -915,6 +1134,59 @@ function renderGrid() {
         </div>
       </div>
     </div>`;
+
+  if (frontFace) {
+    const inner = document.querySelector('#modal-flip-card .flip-card-inner');
+    if (inner && inner.firstElementChild) {
+      inner.firstElementChild.outerHTML = frontFace;
+    }
+  }
+  }).join('');
+}
+
+function renderDexGrid() {
+  const entries = filterCards();
+  const grid = document.getElementById('card-grid');
+  const empty = document.getElementById('empty-state');
+
+  if (entries.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.add('visible');
+    return;
+  }
+  empty.classList.remove('visible');
+
+  grid.innerHTML = entries.map(entry => {
+    const card = entryCard(entry);
+    const emoji = TAXON_EMOJI[(card?.sub_category || entry.sub_category || '').trim()] || TAXON_EMOJI[(card?.iconic_taxon || '').trim()] || '🌍';
+    const rarity = card?.rarity_tier || 'unknown';
+    const rClass = RARITY_CLASS[rarity] || 'badge-unknown';
+    const rLabel = entry.discovery_state === 'UNKNOWN'
+      ? '???'
+      : entry.discovery_state === 'SEEN'
+        ? 'Seen'
+        : (card?.rarity_display || 'Captured');
+    const invasiveBadge = card?.invasive_at_location ? `<span class="badge badge-invasive">Invasive</span>` : '';
+    const safeEmoji = emoji.replace(/'/g, '');
+    const thumb = card?.image_url
+      ? `<img src="${card.image_url}" alt="" loading="lazy" onload="setThumbOrientation(this)" onerror="this.parentNode.classList.add('no-img');this.parentNode.innerHTML='${safeEmoji}'">`
+      : '';
+    const name = entry.discovery_state === 'UNKNOWN'
+      ? '???'
+      : (entry.name || card?.species_name || card?.scientific_name || 'Unknown');
+    const stateClass = entry.discovery_state === 'CAPTURED' ? rClass : 'badge-unknown';
+    const chainBadge = entry.evolution_chain_id ? `<span class="badge badge-unknown">Stage ${entry.evolution_stage || '?'}</span>` : '';
+
+    return `<div class="card-tile" ${card ? `onclick="openDexStyledModal(${entry.id})"` : ''} style="${card ? '' : 'cursor:default;'}">
+      <div class="card-thumb${thumb ? '' : ' no-img'}">${thumb || (entry.discovery_state === 'UNKNOWN' ? '???' : emoji)}</div>
+      <div class="card-info">
+        <div style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.5px;margin-bottom:4px">${entry.dex_id}</div>
+        <div class="card-name">${name}</div>
+        <div class="card-badges">
+          <span class="badge ${stateClass}">${rLabel}</span>${chainBadge}${invasiveBadge}
+        </div>
+      </div>
+    </div>`;
   }).join('');
 }
 
@@ -933,7 +1205,7 @@ document.getElementById('kingdom-tabs').addEventListener('click', e => {
     subEl.querySelectorAll('button').forEach(b => b.classList.remove('active'));
     subEl.querySelector('[data-sub="all"]').classList.add('active');
   }
-  renderGrid();
+  renderDexGrid();
 });
 
 document.querySelectorAll('.sub-tabs').forEach(panel => {
@@ -943,7 +1215,7 @@ document.querySelectorAll('.sub-tabs').forEach(panel => {
     panel.querySelectorAll('button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     activeSub = btn.dataset.sub;
-    renderGrid();
+    renderDexGrid();
   });
 });
 
@@ -1001,16 +1273,29 @@ function openModal(id) {
   document.body.style.overflow = 'hidden';
 }
 
+function openDexStyledModal(entryId) {
+  const entry = allCards.find(x => x.id === entryId);
+  const c = entryCard(entry);
+  if (!c) return;
+  activeModalEntryId = entryId;
+  openStyledModal(c.id);
+}
+
 function openStyledModal(id) {
-  const c = allCards.find(x => x.id === id);
+  const entry = allCards.find(x => (x.card && x.card.id === id) || x.id === activeModalEntryId);
+  const c = entryCard(entry);
   if (!c) return;
   activeModalCardId = id;
+  if (entry) activeModalEntryId = entry.id;
 
   const emoji = TAXON_EMOJI[c.sub_category] || TAXON_EMOJI[c.iconic_taxon] || '🌍';
   const kingdom = normalizeKingdom(c);
   const theme = biomeTheme(c, kingdom);
   const pct = c.confidence ? Math.round(c.confidence * 100) : 0;
   const rarity = c.rarity_display || 'Unknown';
+  const frontFace = kingdom === 'reptile'
+    ? reptileFrontTemplate(c, theme, pct, c.image_url || '')
+    : null;
   const date = c.captured_at ? new Date(c.captured_at).toLocaleDateString() : '—';
   const location = (c.latitude != null && c.longitude != null)
     ? `${Number(c.latitude).toFixed(4)}, ${Number(c.longitude).toFixed(4)}`
@@ -1093,6 +1378,7 @@ function openStyledModal(id) {
   document.getElementById('s-hp').textContent = '—';
   document.getElementById('s-sta').textContent = '—';
   document.getElementById('modal-meta').innerHTML = '';
+  bindModalOrientation();
 
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -1102,6 +1388,7 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
   document.body.style.overflow = '';
   activeModalCardId = null;
+  activeModalEntryId = null;
   document.querySelector('.modal-body').style.display = '';
 }
 
@@ -1125,10 +1412,8 @@ async function reidentifyActiveCard() {
     if (!res.ok) {
       throw new Error(data.detail || `Re-ID failed (${res.status})`);
     }
-    const idx = allCards.findIndex(card => card.id === activeModalCardId);
-    if (idx >= 0) allCards[idx] = data;
-    renderGrid();
-    openModal(activeModalCardId);
+    await loadCards();
+    if (activeModalEntryId) openDexStyledModal(activeModalEntryId);
   } catch (err) {
     if (btn) {
       btn.disabled = false;
@@ -1140,8 +1425,9 @@ async function reidentifyActiveCard() {
 
 async function releaseActiveCard() {
   if (!activeModalCardId) return;
-  const c = allCards.find(card => card.id === activeModalCardId);
-  const name = c?.species_name || c?.scientific_name || 'this card';
+  const entry = allCards.find(item => item.id === activeModalEntryId);
+  const c = entryCard(entry);
+  const name = c?.species_name || c?.scientific_name || entry?.name || 'this card';
   if (!confirm(`Release ${name}? This will delete the card from your WildDex.`)) return;
 
   try {
@@ -1157,11 +1443,8 @@ async function releaseActiveCard() {
     if (!res.ok) {
       throw new Error(data.detail || `Release failed (${res.status})`);
     }
-    allCards = allCards.filter(card => card.id !== activeModalCardId);
-    document.getElementById('total-count').textContent =
-      allCards.length + (allCards.length === 1 ? ' card' : ' cards');
+    await loadCards();
     closeModal();
-    renderGrid();
   } catch (err) {
     alert(err.message || 'Release failed');
   }

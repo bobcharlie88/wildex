@@ -10,4 +10,4 @@ router = APIRouter()
 def wildex(request: Request):
     if get_current_user(request) is None:
         return RedirectResponse("/login", status_code=303)
-    return FileResponse("app/static/wildex.html")
+    return FileResponse("app/static/home.html")
