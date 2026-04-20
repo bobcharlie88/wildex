@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 import re
 
 from sqlalchemy import func
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Card, DexEntry, UserDexDiscovery
 from app.services.card_render import apply_render_fields, build_render_card
+
+log = logging.getLogger("wildex.dex")
 
 DISCOVERY_UNKNOWN = "UNKNOWN"
 DISCOVERY_SEEN = "SEEN"
@@ -73,6 +76,22 @@ def normalize_text(value: str | None) -> str:
 def derive_region_code(capture_country: str | None, lat: float | None = None, lon: float | None = None) -> str:
     if capture_country:
         return re.sub(r"[^A-Z]", "", capture_country.upper())[:4] or "UNK"
+    if lat is None or lon is None:
+        return "UNK"
+
+    # Broad region fallback for unlock/map routing when reverse-geocoded country is missing.
+    if -50 <= lat <= -8 and 110 <= lon <= 180:
+        return "AU"
+    if 7 <= lat <= 84 and -170 <= lon <= -50:
+        return "NA"
+    if -60 <= lat <= 15 and -92 <= lon <= -30:
+        return "SA"
+    if 35 <= lat <= 72 and -25 <= lon <= 45:
+        return "EU"
+    if -35 <= lat <= 38 and -20 <= lon <= 55:
+        return "AF"
+    if -10 <= lat <= 82 and 45 <= lon <= 180:
+        return "AS"
     return "UNK"
 
 
@@ -301,21 +320,22 @@ def _ensure_group_capacity(
         .count()
     )
     category, sub_category = _base_category_for_kingdom(kingdom)
+    next_number = _next_group_number(db, region, kingdom, group_code)
     while total < minimum_total:
-        number = _next_group_number(db, region, kingdom, group_code)
         db.add(
             DexEntry(
-                dex_id=_make_dex_id(region, derive_kingdom(category, sub_category)[1], group_code, number),
+                dex_id=_make_dex_id(region, kingdom_code, group_code, next_number),
                 region=region,
                 kingdom=kingdom,
                 group_code=group_code,
-                number=number,
+                number=next_number,
                 category=category,
                 sub_category=sub_category,
                 is_placeholder=True,
             )
         )
         total += 1
+        next_number += 1
 
 
 def _populate_entry(
@@ -346,8 +366,10 @@ def resolve_or_create_dex_entry(
     sub_category: str | None,
     iconic_taxon: str | None,
     capture_country: str | None,
+    lat: float | None = None,
+    lon: float | None = None,
 ) -> DexEntry:
-    region = derive_region_code(capture_country)
+    region = derive_region_code(capture_country, lat=lat, lon=lon)
     kingdom, kingdom_code = derive_kingdom(category, sub_category, iconic_taxon)
     group_code = derive_group_code(kingdom, common_name, scientific_name, sub_category)
     canonical_key = canonical_species_key(region, kingdom_code, group_code, scientific_name, common_name)
@@ -511,6 +533,8 @@ def sync_card_to_dex(db: Session, card: Card) -> DexEntry:
         sub_category=card.sub_category,
         iconic_taxon=card.iconic_taxon,
         capture_country=card.capture_country,
+        lat=card.latitude,
+        lon=card.longitude,
     )
     card.dex_entry_id = entry.id
     card.dex_id = entry.dex_id
@@ -543,6 +567,7 @@ def backfill_user_cards(db: Session, user_id: int) -> None:
     changed = False
     for row in rows:
         if row.dex_entry_id is None:
+            log.info("Backfilling missing dex link for card id=%s user_id=%s species=%s", row.id, user_id, row.species_name)
             sync_card_to_dex(db, row)
             changed = True
         if any(

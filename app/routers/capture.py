@@ -186,8 +186,10 @@ async def capture(
                         db.refresh(row)
                         card_id = row.id
                         saved = True
+                        log.info("Saved pending capture card id=%s user_id=%s image_url=%s", row.id, current_user.id, image_url)
                     except Exception as db_exc:
                         db.rollback()
+                        log.exception("Failed to save pending capture for user_id=%s", current_user.id)
                         db_error = str(db_exc)
                     finally:
                         db.close()
@@ -286,8 +288,17 @@ async def capture(
                 card_id = row.id
                 dex_id = row.dex_id
                 saved = True
+                log.info(
+                    "Saved capture card id=%s dex_id=%s region=%s user_id=%s image_url=%s",
+                    row.id,
+                    row.dex_id,
+                    row.region,
+                    current_user.id,
+                    image_url,
+                )
             except Exception as exc:
                 db.rollback()
+                log.exception("Failed to save capture card for user_id=%s species=%s", current_user.id, card.common_name)
                 db_error = str(exc)
             finally:
                 db.close()

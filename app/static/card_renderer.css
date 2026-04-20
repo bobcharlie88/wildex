@@ -5,7 +5,11 @@
 }
 
 .wx-flip-card {
-  width: min(100%, 390px);
+  width: min(
+    100%,
+    390px,
+    calc((100svh - var(--wx-card-viewport-offset, 0px)) * 0.7159)
+  );
   aspect-ratio: 63 / 88;
   perspective: 1600px;
   margin: 0 auto;

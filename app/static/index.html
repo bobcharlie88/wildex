@@ -153,6 +153,13 @@
       display: flex;
       flex-direction: column;
       gap: 14px;
+      align-items: center;
+    }
+    #result-card-host {
+      width: 100%;
+      display: grid;
+      justify-items: center;
+      --wx-card-viewport-offset: 270px;
     }
     .flip-card {
       perspective: 1400px;
@@ -582,6 +589,7 @@
       .screen { position: static; opacity: 1 !important; pointer-events: all !important; }
       #capture-screen, #loading-screen { display: none !important; }
       #result-screen { overflow: visible; }
+      #result-card-host { --wx-card-viewport-offset: 220px; }
       .result-body { padding: 0; }
       .flip-card { perspective: none; }
       .flip-card-inner { transform: none !important; min-height: auto; display: grid; gap: 16px; }

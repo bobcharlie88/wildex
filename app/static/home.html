@@ -402,6 +402,12 @@
       gap: 12px;
       justify-items: center;
     }
+    #detail-card-host {
+      width: 100%;
+      display: grid;
+      justify-items: center;
+      --wx-card-viewport-offset: 220px;
+    }
     .flip-card {
       width: min(100%, 380px);
       aspect-ratio: 63 / 88;
@@ -528,6 +534,7 @@
       .hero { min-height: 0; }
       .hero-head { flex-direction: column; }
       .wordmark { font-size: 28px; }
+      #detail-card-host { --wx-card-viewport-offset: 200px; }
       .front-main, .back-grid { grid-template-columns: 1fr; }
       .bottom-bar { flex-direction: column; }
     }
