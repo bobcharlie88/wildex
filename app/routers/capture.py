@@ -28,11 +28,11 @@ def _is_temporary_identification_failure(exc: Exception) -> bool:
     return isinstance(exc, TemporaryIdentificationError) or is_temporary_identification_error(exc)
 
 
-def _identify_with_retry(image_path: str):
+def _identify_with_retry(image_path: str, lat: float | None = None, lon: float | None = None):
     last_exc = None
     for idx in range(len(IDENTIFY_RETRY_DELAYS) + 1):
         try:
-            return identify_species(image_path)
+            return identify_species(image_path, lat=lat, lon=lon)
         except EnvironmentError:
             raise
         except Exception as exc:
@@ -140,7 +140,7 @@ async def capture(
             log.error("Capture image upload failed; continuing without persistent image")
 
         try:
-            species = _identify_with_retry(identify_path)
+            species = _identify_with_retry(identify_path, lat=lat, lon=lon)
         except EnvironmentError as exc:
             raise HTTPException(503, str(exc))
         except Exception as exc:

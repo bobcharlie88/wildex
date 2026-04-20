@@ -30,6 +30,10 @@ GEMINI_MODEL = "gemini-2.5-flash"
 INAT_TAXA_URL = "https://api.inaturalist.org/v1/taxa"
 INAT_CV_URL = "https://api.inaturalist.org/v1/computervision/score_image"
 GOOGLE_VISION_URL = "https://vision.googleapis.com/v1/images:annotate"
+GBIF_SPECIES_MATCH_URL = "https://api.gbif.org/v1/species/match"
+GBIF_OCCURRENCE_URL = "https://api.gbif.org/v1/occurrence/search"
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
+GEO_HEADERS = {"User-Agent": "WildEx/0.1 (wildlife-discovery-game)"}
 CONFIDENCE_THRESHOLD = 0.70
 TEMPORARY_ERROR_MARKERS = (
     "429",
@@ -242,6 +246,100 @@ def _file_mime(path: Path) -> str:
     return "image/jpeg"
 
 
+def _location_hint_from_coords(lat: float | None, lon: float | None) -> dict | None:
+    if lat is None or lon is None:
+        return None
+    response = httpx.get(
+        NOMINATIM_URL,
+        params={"lat": lat, "lon": lon, "format": "json"},
+        headers=GEO_HEADERS,
+        timeout=15.0,
+    )
+    response.raise_for_status()
+    address = response.json().get("address", {})
+    country_code = (address.get("country_code") or "").upper()
+    if not country_code:
+        return None
+    return {
+        "country": address.get("country") or country_code,
+        "country_code": country_code,
+        "state": address.get("state") or address.get("region") or "",
+        "locality": address.get("city") or address.get("town") or address.get("suburb") or "",
+    }
+
+
+def _build_gemini_prompt(location_hint: dict | None) -> str:
+    if not location_hint:
+        return SPECIES_ID_PROMPT
+
+    country = location_hint.get("country") or location_hint.get("country_code") or "unknown"
+    state = location_hint.get("state") or "unknown"
+    locality = location_hint.get("locality") or "unknown"
+
+    return (
+        SPECIES_ID_PROMPT
+        + f"""
+
+Capture location context:
+- Country: {country}
+- State/region: {state}
+- Locality: {locality}
+
+Use the location as a plausibility filter when visually similar species overlap.
+- Prefer taxa that are known from the capture region when multiple look-alikes fit the image.
+- If the location makes a species unlikely, lower confidence and prefer genus/family instead of forcing a precise species.
+- Do not return an out-of-range exotic species unless the image is visually unmistakable or clearly captive/domestic.
+"""
+    )
+
+
+def _country_occurrence_count(scientific_name: str, country_code: str) -> int | None:
+    if not scientific_name or not country_code:
+        return None
+
+    match = httpx.get(
+        GBIF_SPECIES_MATCH_URL,
+        params={"name": scientific_name, "strict": "false"},
+        timeout=15.0,
+    )
+    match.raise_for_status()
+    usage_key = match.json().get("usageKey")
+    if not usage_key:
+        return None
+
+    response = httpx.get(
+        GBIF_OCCURRENCE_URL,
+        params={"taxonKey": usage_key, "country": country_code, "limit": 0},
+        timeout=15.0,
+    )
+    response.raise_for_status()
+    return int(response.json().get("count", 0))
+
+
+def _apply_location_plausibility(result: SpeciesResult, location_hint: dict | None) -> SpeciesResult:
+    if not location_hint or result.category == "terrain" or result.rank != "species":
+        return result
+
+    country_code = location_hint.get("country_code") or ""
+    if not country_code:
+        return result
+
+    try:
+        occurrence_count = _country_occurrence_count(result.scientific_name, country_code)
+    except Exception as exc:
+        log.warning("Location plausibility check failed: %s", exc)
+        return result
+
+    if occurrence_count == 0:
+        result.provisional = True
+        result.confidence = min(result.confidence, 0.55)
+        warning = f" GPS plausibility warning: no GBIF occurrences found in {country_code}."
+        if warning.strip() not in result.reasoning:
+            result.reasoning = (result.reasoning or "").rstrip(".") + "." + warning
+
+    return result
+
+
 def _build_result(
     *,
     scientific_name: str,
@@ -361,7 +459,7 @@ def _inat_headers() -> dict[str, str]:
     return headers
 
 
-def identify_with_gemini(image_path: str) -> SpeciesResult:
+def identify_with_gemini(image_path: str, *, location_hint: dict | None = None) -> SpeciesResult:
     if not GEMINI_API_KEY or GEMINI_API_KEY.startswith("your_"):
         raise EnvironmentError(
             "GEMINI_API_KEY not set. Get a key at https://aistudio.google.com/apikey "
@@ -377,7 +475,7 @@ def identify_with_gemini(image_path: str) -> SpeciesResult:
         model=GEMINI_MODEL,
         contents=[
             types.Part.from_bytes(data=image_bytes, mime_type=_file_mime(path)),
-            SPECIES_ID_PROMPT,
+            _build_gemini_prompt(location_hint),
         ],
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
@@ -735,14 +833,21 @@ _CATEGORY_ICONIC = {
 }
 
 
-def identify_species(image_path: str) -> SpeciesResult:
+def identify_species(image_path: str, lat: float | None = None, lon: float | None = None) -> SpeciesResult:
     provider_errors: list[str] = []
     skipped_providers: list[str] = []
     temporary_failures: list[str] = []
     hard_failures: list[str] = []
+    location_hint = None
+
+    if lat is not None and lon is not None:
+        try:
+            location_hint = _location_hint_from_coords(lat, lon)
+        except Exception as exc:
+            log.warning("Could not derive location hint from GPS: %s", exc)
 
     for provider_name, provider in (
-        ("gemini", identify_with_gemini),
+        ("gemini", lambda path: identify_with_gemini(path, location_hint=location_hint)),
         ("inaturalist_cv", identify_with_inat_cv),
         ("google_vision", identify_with_google_vision),
         ("google_web", identify_with_google_web),
@@ -791,4 +896,4 @@ def identify_species(image_path: str) -> SpeciesResult:
             if _looks_like_generic_plant_name(result.common_name) and not result.inat_validated:
                 result.provisional = True
 
-    return result
+    return _apply_location_plausibility(result, location_hint)

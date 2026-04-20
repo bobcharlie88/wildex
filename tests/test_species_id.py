@@ -154,6 +154,35 @@ def test_gemini_with_mocked_response():
         os.unlink(tmp)
 
 
+def test_gemini_prompt_includes_location_context():
+    mock_response = MagicMock()
+    mock_response.text = json.dumps(MOCK_GEMINI_KOALA)
+
+    fake_image = b"\xff\xd8\xff" + b"\x00" * 64
+
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+        f.write(fake_image)
+        tmp = f.name
+
+    try:
+        with patch("app.pipeline.species_id.GEMINI_API_KEY", "fake_key_abc123"):
+            with patch("google.genai.Client") as MockClient:
+                MockClient.return_value.models.generate_content.return_value = mock_response
+                identify_with_gemini(
+                    tmp,
+                    location_hint={"country": "Australia", "country_code": "AU", "state": "Western Australia", "locality": "Perth"},
+                )
+
+                prompt = MockClient.return_value.models.generate_content.call_args.kwargs["contents"][1]
+                assert "Country: Australia" in prompt
+                assert "State/region: Western Australia" in prompt
+                assert "Prefer taxa that are known from the capture region" in prompt
+                print("  Gemini prompt includes GPS-derived location context")
+                print("  PASS")
+    finally:
+        os.unlink(tmp)
+
+
 def test_inat_enrichment_with_mocked_response():
     result = SpeciesResult(
         scientific_name="Phascolarctos cinereus",
@@ -285,6 +314,32 @@ def test_fourth_provider_runs_after_google_vision():
     print("  PASS")
 
 
+def test_location_conflict_marks_species_provisional():
+    out_of_range = SpeciesResult(
+        scientific_name="Cordylus tropidosternum",
+        common_name="Tropical girdled lizard",
+        confidence=0.91,
+        rank="species",
+        provisional=False,
+        reasoning="Spiny-bodied lizard with keeled scales.",
+        subject_visible=True,
+        category="animal",
+        sub_category="reptile",
+    )
+
+    with patch("app.pipeline.species_id._location_hint_from_coords", return_value={"country": "Australia", "country_code": "AU"}):
+        with patch("app.pipeline.species_id.identify_with_gemini", return_value=out_of_range):
+            with patch("app.pipeline.species_id.enrich_with_inat", side_effect=lambda result: result):
+                with patch("app.pipeline.species_id._country_occurrence_count", return_value=0):
+                    result = identify_species("/fake/image.jpg", lat=-31.9505, lon=115.8605)
+
+    assert result.provisional is True
+    assert result.confidence == 0.55
+    assert "no GBIF occurrences found in AU" in result.reasoning
+    print("  GPS plausibility check downgrades out-of-range species IDs")
+    print("  PASS")
+
+
 # ---------------------------------------------------------------------------
 # Live test — requires GEMINI_API_KEY in .env
 # ---------------------------------------------------------------------------
@@ -396,6 +451,9 @@ if __name__ == "__main__":
     print("\n[test_gemini_with_mocked_response]")
     test_gemini_with_mocked_response()
 
+    print("\n[test_gemini_prompt_includes_location_context]")
+    test_gemini_prompt_includes_location_context()
+
     print("\n[test_inat_enrichment_with_mocked_response]")
     test_inat_enrichment_with_mocked_response()
 
@@ -416,6 +474,9 @@ if __name__ == "__main__":
 
     print("\n[test_fourth_provider_runs_after_google_vision]")
     test_fourth_provider_runs_after_google_vision()
+
+    print("\n[test_location_conflict_marks_species_provisional]")
+    test_location_conflict_marks_species_provisional()
 
     if live:
         print("\n=== LIVE TESTS ===")
