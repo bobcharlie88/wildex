@@ -194,6 +194,7 @@ async def capture(
                     "saved": saved,
                     "card_id": card_id,
                     "db_error": db_error,
+                    "identification_error": str(exc),
                     "card": _pending_card_payload(image_url, lat, lon, pending_message),
                 }
             raise HTTPException(500, f"Species identification failed: {exc}")

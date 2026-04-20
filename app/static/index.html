@@ -658,6 +658,12 @@
       if (c.observations_count)  details.push(detailRow('iNat sightings', c.observations_count.toLocaleString()));
       if (c.taxon_id)            details.push(detailRow('Taxon ID', c.taxon_id));
       if (c.latitude != null)    details.push(detailRow('Captured at', `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`));
+      if (resp.identification_error && c.species_name === 'Pending identification') {
+        details.push(detailRow('ID status', resp.identification_error));
+      }
+      if (resp.db_error) {
+        details.push(detailRow('Save status', resp.db_error));
+      }
 
       $('result-body').innerHTML = `
         ${banner}
