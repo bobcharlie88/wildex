@@ -297,6 +297,25 @@
     setTimeout(() => URL.revokeObjectURL(link.href), 1500);
   }
 
+  async function svgToPngBlob(svgNode) {
+    const svgString = new XMLSerializer().serializeToString(svgNode);
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+    await img.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = CARD_W * 2;
+    canvas.height = CARD_H * 2;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  }
+
   async function exportFace(target, side, nameBase) {
     const data = target.__wxData;
     const imageHref = side === 'front' ? await imageToDataUrl(data.image_url || '') : '';
@@ -309,6 +328,15 @@
   async function exportBoth(target, nameBase) {
     await exportFace(target, 'front', nameBase);
     await exportFace(target, 'back', nameBase);
+  }
+
+  async function exportFaceBlob(target, side) {
+    const data = target.__wxData;
+    const imageHref = side === 'front' ? await imageToDataUrl(data.image_url || '') : '';
+    const svgMarkup = side === 'front' ? frontSvg(data, imageHref) : backSvg(data);
+    const temp = document.createElement('div');
+    temp.innerHTML = svgMarkup.trim();
+    return svgToPngBlob(temp.firstElementChild);
   }
 
   function sampleCards() {
@@ -422,6 +450,7 @@
     printNode,
     exportFace,
     exportBoth,
+    exportFaceBlob,
     sampleCards,
   };
 })();

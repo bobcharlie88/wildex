@@ -98,6 +98,7 @@ class Card(Base):
     longitude: Mapped[float | None] = mapped_column(Float)
     capture_country: Mapped[str | None] = mapped_column(String(10))
     image_url: Mapped[str | None] = mapped_column(String(1000))
+    supporting_image_urls: Mapped[str | None] = mapped_column(Text)
     dex_entry_id: Mapped[int | None] = mapped_column(ForeignKey("dex_entries.id"), index=True)
     dex_id: Mapped[str | None] = mapped_column(String(32), index=True)
     discovery_state: Mapped[str | None] = mapped_column(String(20))
@@ -112,6 +113,41 @@ class Card(Base):
         foreign_keys=[owner_id],
     )
     dex_entry: Mapped[DexEntry | None] = relationship(back_populates="cards")
+
+
+class CaptureJob(Base):
+    __tablename__ = "capture_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="queued", index=True, nullable=False)
+    media_type: Mapped[str | None] = mapped_column(String(32))
+    image_url: Mapped[str | None] = mapped_column(String(1000))
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
+    encounter_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    primary_job_id: Mapped[int | None] = mapped_column(ForeignKey("capture_jobs.id"), index=True)
+    grouped_job_ids: Mapped[str | None] = mapped_column(Text)
+    grouped_count: Mapped[int] = mapped_column(Integer, default=1)
+    species_name: Mapped[str | None] = mapped_column(String(200))
+    scientific_name: Mapped[str | None] = mapped_column(String(200))
+    confidence: Mapped[float | None] = mapped_column(Float)
+    provisional: Mapped[bool] = mapped_column(Boolean, default=False)
+    repeat_state: Mapped[str | None] = mapped_column(String(32))
+    card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"), index=True)
+    region: Mapped[str | None] = mapped_column(String(8))
+    region_unlocked: Mapped[bool] = mapped_column(Boolean, default=False)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    review_reason: Mapped[str | None] = mapped_column(Text)
+    supporting_image_urls: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    owner: Mapped[User] = relationship()
+    card: Mapped[Card | None] = relationship(foreign_keys=[card_id])
+    primary_job: Mapped["CaptureJob | None"] = relationship(remote_side=[id], foreign_keys=[primary_job_id])
 
 
 class UserDexDiscovery(Base):

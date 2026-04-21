@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -73,6 +74,7 @@ def _card_dict(c: Card) -> dict:
         "longitude":       c.longitude,
         "capture_country": c.capture_country,
         "image_url":       c.image_url,
+        "supporting_image_urls": json.loads(c.supporting_image_urls) if c.supporting_image_urls else [],
         "dex_id":          c.dex_id,
         "discovery_state": c.discovery_state,
         "region":          c.region,

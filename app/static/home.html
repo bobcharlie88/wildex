@@ -525,6 +525,19 @@
     .lower-box ul, .environment-box ul { padding-left: 16px; display: grid; gap: 4px; font-size: 12px; line-height: 1.35; }
     .call-box button { width: 100%; }
     .bottom-bar { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+    .job-banner {
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .job-banner.visible { display: flex; }
+    .job-banner strong { display: block; font-size: 13px; }
+    .job-banner span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
     .hidden { display: none !important; }
     @media (max-width: 920px) {
       .layout { grid-template-columns: 1fr; }
@@ -556,11 +569,13 @@
         <div class="status-pills">
           <div class="pill"><strong id="captures-count">0</strong> captures</div>
           <div class="pill"><strong id="regions-count">0</strong> regions unlocked</div>
+          <div class="pill"><strong id="processing-count">0</strong> background jobs</div>
           <div class="pill"><strong id="queue-count">0</strong> queued offline</div>
         </div>
       </div>
       <div class="action-row">
         <a class="btn btn-primary" href="/capture">Capture</a>
+        <button class="btn btn-secondary" id="share-app-btn" type="button">Share App</button>
         <button class="btn btn-secondary" id="open-first-unlocked" type="button">Open Index</button>
         <button class="btn btn-danger" id="logout-link" type="button">Sign Out</button>
       </div>
@@ -570,6 +585,14 @@
         <div class="stat-card"><strong id="unknown-total">0</strong><span>Unknown slots</span></div>
       </div>
     </section>
+
+    <div class="job-banner" id="job-banner">
+      <div>
+        <strong id="job-banner-title">Background capture update</strong>
+        <span id="job-banner-body">New cards and region unlocks will appear here.</span>
+      </div>
+      <button class="btn btn-secondary small" type="button" id="job-banner-action">Open</button>
+    </div>
 
     <section class="layout">
       <section class="panel">
@@ -705,6 +728,7 @@
           <button class="btn btn-secondary small" type="button" id="download-back-btn">Back PNG</button>
           <button class="btn btn-secondary small" type="button" id="download-both-btn">Both PNG</button>
           <button class="btn btn-secondary small hidden" type="button" id="play-call-btn">Play Call</button>
+          <button class="btn btn-secondary small" type="button" id="share-card-btn">Share Card</button>
           <button class="btn btn-secondary small" type="button" id="favorite-btn">Set Favorite</button>
           <button class="btn btn-secondary small hidden" type="button" id="reid-btn">Re-ID</button>
           <button class="btn btn-danger small" type="button" id="release-btn">Release</button>
@@ -721,6 +745,9 @@
   <script>
     const QUEUE_DB_NAME = 'wildex-offline';
     const QUEUE_STORE = 'capture_queue';
+    const TERMINAL_STATUSES = new Set(['complete', 'failed', 'needs_review']);
+    const JOB_NOTICE_STORE = 'wildex_capture_notices_v1';
+    const pendingCardOpen = Number(new URLSearchParams(location.search).get('card') || 0) || null;
     const REGION_LABELS = { AU: 'Australia', NA: 'North America', SA: 'South America', EU: 'Europe', AF: 'Africa', AS: 'Asia' };
     const state = {
       user: null,
@@ -730,6 +757,8 @@
       selectedCategory: null,
       selectedFamily: null,
       activeEntry: null,
+      captureJobs: [],
+      highlightedJob: null,
     };
 
     function escapeHtml(value) {
@@ -764,6 +793,20 @@
       });
     }
 
+    function seenNoticeIds() {
+      try {
+        return JSON.parse(localStorage.getItem(JOB_NOTICE_STORE) || '[]');
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function markNoticeSeen(id) {
+      const seen = new Set(seenNoticeIds());
+      seen.add(id);
+      localStorage.setItem(JOB_NOTICE_STORE, JSON.stringify([...seen].slice(-200)));
+    }
+
     function taxonomy(entry) {
       return entry.taxonomy || { kingdom_root: 'Other', major_category: 'Other', family: entry.group_code || 'Group' };
     }
@@ -790,7 +833,7 @@
     }
 
     function unlockedRegions() {
-      return [...new Set(state.entries.filter(entry => entry.discovery_state !== 'UNKNOWN').map(entry => entry.region))];
+      return [...new Set(state.entries.filter(entry => entry.discovery_state === 'CAPTURED').map(entry => entry.region))];
     }
 
     function setHeroBackground() {
@@ -811,11 +854,13 @@
       const seen = state.entries.filter(entry => entry.discovery_state === 'SEEN').length;
       const unknown = state.entries.filter(entry => entry.discovery_state === 'UNKNOWN').length;
       const regions = unlockedRegions();
+      const activeJobs = state.captureJobs.filter(job => !job.is_grouped_secondary && (job.status === 'queued' || job.status === 'processing')).length;
       document.getElementById('captures-count').textContent = captured;
       document.getElementById('captured-total').textContent = captured;
       document.getElementById('seen-total').textContent = seen;
       document.getElementById('unknown-total').textContent = unknown;
       document.getElementById('regions-count').textContent = regions.length;
+      document.getElementById('processing-count').textContent = activeJobs;
     }
 
     function renderMap() {
@@ -930,6 +975,107 @@
       state.activeEntry = null;
     }
 
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    async function shareApp() {
+      const shareUrl = `${location.origin}/wildex`;
+      const payload = {
+        title: 'WildEx',
+        text: 'Capture real wildlife, unlock regions, and build your WildEx.',
+        url: shareUrl,
+      };
+      if (navigator.share) {
+        try {
+          await navigator.share(payload);
+          return;
+        } catch (_) {}
+      }
+      const copied = await copyText(shareUrl);
+      if (copied) alert('App link copied');
+    }
+
+    async function shareActiveCard() {
+      const entry = state.activeEntry;
+      if (!entry?.card?.render_card) return;
+      const shareUrl = `${location.origin}/wildex?card=${entry.card.id}`;
+      const title = `${entry.card.species_name || entry.name} • ${entry.card.rarity_display || 'WildEx'}`;
+      const text = `${title}\nCaptured in WildEx.`;
+      if (navigator.share && navigator.canShare) {
+        try {
+          const blob = await WildExCardRenderer.exportFaceBlob(document.getElementById('detail-card-host'), 'front');
+          if (blob) {
+            const file = new File([blob], `${(entry.card.dex_id || 'wildex-card').toLowerCase()}-front.png`, { type: 'image/png' });
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({ title, text, url: shareUrl, files: [file] });
+              return;
+            }
+          }
+        } catch (_) {}
+      }
+      if (navigator.share) {
+        try {
+          await navigator.share({ title, text, url: shareUrl });
+          return;
+        } catch (_) {}
+      }
+      const copied = await copyText(shareUrl);
+      if (copied) alert('Card link copied');
+    }
+
+    function repeatLabel(job) {
+      if (job.repeat_state === 'repeat_capture') return 'Previously caught species found again';
+      if (job.repeat_state === 'first_capture_after_seen') return 'Seen before, now captured';
+      return 'New species captured';
+    }
+
+    function showJobBanner(job) {
+      const banner = document.getElementById('job-banner');
+      document.getElementById('job-banner-title').textContent = job.status === 'complete'
+        ? repeatLabel(job)
+        : job.status === 'needs_review'
+          ? 'Capture needs review'
+          : 'Capture failed';
+      document.getElementById('job-banner-body').textContent = job.status === 'complete'
+        ? `${job.species_name || 'Capture ready'}${job.grouped_count > 1 ? ` • ${job.grouped_count} nearby shots grouped` : ''}${job.region_unlocked ? ' • region unlocked' : ''}`
+        : (job.review_reason || job.error_message || 'Processing finished with an issue.');
+      document.getElementById('job-banner-action').textContent = job.card_id ? 'Open card' : 'Dismiss';
+      banner.classList.add('visible');
+      state.highlightedJob = job;
+    }
+
+    function maybeOpenPendingCard() {
+      if (!pendingCardOpen) return;
+      const entry = state.entries.find(item => item.card && item.card.id === pendingCardOpen);
+      if (entry) {
+        openEntry(entry.id);
+        history.replaceState({}, '', '/wildex');
+      }
+    }
+
+    async function refreshCaptureJobs() {
+      try {
+        const resp = await fetch('/capture/jobs', { credentials: 'same-origin' });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        state.captureJobs = data.items || [];
+        renderCounts();
+        const seen = new Set(seenNoticeIds());
+        const latest = state.captureJobs.find(job => !job.is_grouped_secondary && TERMINAL_STATUSES.has(job.status) && !seen.has(`${job.id}:${job.status}:${job.completed_at || ''}`));
+        if (latest) {
+          markNoticeSeen(`${latest.id}:${latest.status}:${latest.completed_at || ''}`);
+          showJobBanner(latest);
+          await loadHub(false);
+        }
+      } catch (_) {}
+    }
+
     async function setFavoriteCard() {
       const entry = state.activeEntry;
       if (!entry?.card?.id) return;
@@ -962,7 +1108,7 @@
       await loadHub();
     }
 
-    async function loadHub() {
+    async function loadHub(refreshJobs = true) {
       const me = await fetch('/auth/me', { credentials: 'same-origin' });
       if (me.status === 401) {
         document.getElementById('signin-line').innerHTML = 'Not signed in';
@@ -990,6 +1136,8 @@
       setHeroBackground();
       document.getElementById('mini-status').textContent = state.selectedRegion ? `${REGION_LABELS[state.selectedRegion]} active` : 'No regions unlocked yet';
       document.getElementById('open-first-unlocked').disabled = !state.selectedRegion;
+      maybeOpenPendingCard();
+      if (refreshJobs) await refreshCaptureJobs();
     }
 
     document.addEventListener('click', (event) => {
@@ -1062,10 +1210,19 @@
       if (!sound) return;
       new Audio(sound).play().catch(() => {});
     });
+    document.getElementById('share-app-btn').addEventListener('click', () => shareApp().catch(() => {}));
+    document.getElementById('share-card-btn').addEventListener('click', () => shareActiveCard().catch(() => {}));
     document.getElementById('close-btn').addEventListener('click', closeModal);
     document.getElementById('favorite-btn').addEventListener('click', () => setFavoriteCard().catch(() => {}));
     document.getElementById('reid-btn').addEventListener('click', () => reidentifyActive().catch(() => {}));
     document.getElementById('release-btn').addEventListener('click', () => releaseActive().catch(() => {}));
+    document.getElementById('job-banner-action').addEventListener('click', () => {
+      const job = state.highlightedJob;
+      document.getElementById('job-banner').classList.remove('visible');
+      if (!job?.card_id) return;
+      const entry = state.entries.find(item => item.card && item.card.id === job.card_id);
+      if (entry) openEntry(entry.id);
+    });
     document.getElementById('logout-link').addEventListener('click', async () => {
       await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
       location.href = '/login';
@@ -1075,6 +1232,7 @@
     });
 
     queuedCount().then(count => { document.getElementById('queue-count').textContent = count; }).catch(() => {});
+    window.setInterval(() => { refreshCaptureJobs().catch(() => {}); }, 5000);
     loadHub().catch(() => {});
   </script>
 </body>

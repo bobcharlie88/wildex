@@ -10,6 +10,7 @@
     390px,
     calc((100svh - var(--wx-card-viewport-offset, 0px)) * 0.7159)
   );
+  max-height: calc(100svh - var(--wx-card-viewport-offset, 0px));
   aspect-ratio: 63 / 88;
   perspective: 1600px;
   margin: 0 auto;
@@ -49,6 +50,12 @@
 .wx-face.theme-bird { border-color: #7b8694; }
 .wx-face.theme-insect { border-color: #8a7731; }
 .wx-face.theme-plant { border-color: #47744a; }
+
+.wx-face svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 
 .wx-actions {
   display: flex;

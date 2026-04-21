@@ -12,6 +12,7 @@ just won't have a rarity tier or invasive flag.
 """
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 
@@ -23,6 +24,7 @@ from app.pipeline.species_id import SpeciesResult
 from app.pipeline.species_data import SpeciesData
 
 GEMINI_MODEL = "gemini-2.5-flash"
+log = logging.getLogger("wildex.card_generator")
 
 STAT_PROMPT_ANIMAL = """\
 You are the game designer of WildEx, a real-world wildlife discovery game.
@@ -262,6 +264,79 @@ def _call_gemini(prompt: str) -> dict:
     return json.loads(text)
 
 
+def _deterministic_stats(species: SpeciesResult, gbif: SpeciesData | None) -> dict:
+    category = (species.category or "animal").lower()
+    iconic = (species.iconic_taxon or "").lower()
+    observations = int(species.observations_count or 0)
+    confidence = float(species.confidence or 0.5)
+    obs_band = min(24, int(observations and len(str(max(observations, 1))) * 4))
+    rarity_bonus = {
+        "common": 0,
+        "uncommon": 4,
+        "rare": 9,
+        "very_rare": 15,
+        "legendary": 18,
+        "mythic": 20,
+        "cryptic": 14,
+        "extinct": 22,
+    }.get((gbif.rarity_tier if gbif else "unknown") or "unknown", 6)
+
+    if category == "plant":
+        return {
+            "speed": min(92, 18 + obs_band + rarity_bonus),
+            "attack": min(88, 10 + rarity_bonus + (8 if gbif and gbif.invasive_at_location else 0)),
+            "defence": min(94, 40 + rarity_bonus + int(confidence * 20)),
+            "hp": min(96, 34 + obs_band + rarity_bonus),
+            "stamina_regen": min(90, 26 + obs_band + int(confidence * 24)),
+        }
+    if category == "terrain":
+        return {
+            "speed": min(82, 8 + rarity_bonus + int(confidence * 18)),
+            "attack": min(86, 14 + rarity_bonus + (8 if "volcano" in species.common_name.lower() else 0)),
+            "defence": min(98, 52 + rarity_bonus),
+            "hp": min(99, 60 + rarity_bonus),
+            "stamina_regen": min(88, 18 + obs_band + int(confidence * 18)),
+        }
+    mobility = {
+        "aves": 82,
+        "actinopterygii": 68,
+        "reptilia": 44,
+        "mammalia": 58,
+        "insecta": 60,
+        "arachnida": 48,
+        "amphibia": 38,
+    }.get(iconic, 50)
+    threat = 18 + rarity_bonus + (10 if gbif and gbif.invasive_at_location else 0)
+    return {
+        "speed": min(96, mobility + int(confidence * 10)),
+        "attack": min(94, threat + obs_band + (8 if "shark" in species.common_name.lower() else 0)),
+        "defence": min(90, 24 + rarity_bonus + int(confidence * 22)),
+        "hp": min(96, 26 + obs_band + rarity_bonus + int(confidence * 18)),
+        "stamina_regen": min(95, 24 + obs_band + int(confidence * 26)),
+    }
+
+
+def _fallback_generated_data(species: SpeciesResult, gbif: SpeciesData | None) -> dict:
+    display_name = species.inat_common_name or species.common_name or species.scientific_name
+    rarity_label = RARITY_DISPLAY.get((gbif.rarity_tier if gbif else "unknown") or "unknown", "Unknown")
+    locality = f" in {gbif.query_country}" if gbif and gbif.query_country else ""
+    invasive_line = " It is flagged as invasive at this capture location." if gbif and gbif.invasive_at_location else ""
+    observation_line = (
+        f" Field data currently links it to {int(species.observations_count):,} recorded observations."
+        if species.observations_count else
+        " Field data is still being expanded for this species."
+    )
+    stats = _deterministic_stats(species, gbif)
+    return {
+        "blurb": (
+            f"{display_name} is logged by WildEx as a {rarity_label.lower()} field encounter{locality}. "
+            f"Its entry is built from observed taxonomy and known ecology rather than a live generated lore pass."
+            f"{invasive_line}{observation_line}"
+        ),
+        **stats,
+    }
+
+
 def generate_card(
     species: SpeciesResult,
     gbif: SpeciesData | None = None,
@@ -278,7 +353,11 @@ def generate_card(
         WildCard with blurb, stats, and all aggregated species data.
     """
     prompt = _build_prompt(species, gbif)
-    data   = _call_gemini(prompt)
+    try:
+        data = _call_gemini(prompt)
+    except Exception as exc:
+        log.warning("Card generation fell back to deterministic mode for %s: %s", species.scientific_name, exc)
+        data = _fallback_generated_data(species, gbif)
 
     # Prefer the breed/variety name (from Gemini Vision) when it is more
     # specific than the iNat species-level name (e.g. "Australian Kelpie"

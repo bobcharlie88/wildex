@@ -2,240 +2,209 @@
 
 ## Current System Summary
 
-WildEx is a FastAPI-based mobile web app for capturing wildlife or plant observations, identifying them with a multi-provider vision pipeline, generating collectible cards, and storing them in a per-user WildDex.
+WildEx is a FastAPI-based mobile web app for capturing wildlife observations, processing them through a background capture job pipeline, generating code-rendered collectible cards, and storing them in a per-user WildEx collection plus regional Dex.
 
-Current major capabilities in the repo:
+Current major capabilities in local source:
 - user registration/login with signed session cookies
-- authenticated capture flow
-- per-user card ownership and per-user WildDex browsing
-- image upload persistence to Cloudflare R2 with `image_url` stored in the database
-- multi-step species identification with fallback providers
-- provisional "Pending identification" saves when identification is temporarily unavailable
-- offline capture queue in the browser using IndexedDB, with later sync when reception returns
+- authenticated capture flow with background processing jobs
+- per-user card ownership and per-user WildEx/Dex browsing
+- image upload persistence to Cloudflare R2 with local `/uploads` fallback
+- multi-provider species identification with retry and degraded handling
+- code-rendered front/back cards in-app with download/export
+- regional map unlocks and structured Dex navigation
+- client-side offline queue in IndexedDB with later sync
+- in-app background job notifications, repeat-state messaging, and favorite card background
+- app/card sharing via native share when available, copy-link fallback otherwise
 
-This file is intended as the handoff point for the next context window. It reflects local source state, not guaranteed live deployment state.
+Live deployment target:
+- Render
+- live URL: `https://wildex-fsou.onrender.com`
+
+This file reflects local source state. Live behavior depends on Render deployment freshness and environment configuration.
 
 ## Architecture And Stack
 
 Backend:
 - FastAPI app entrypoint in `main.py`
 - SQLAlchemy models in `app/models.py`
-- capture, cards, auth, and WildDex routers under `app/routers/`
-- identification and enrichment pipeline under `app/pipeline/`
-- Cloudflare R2 upload helper in `app/utils/storage.py`
+- routers under `app/routers/`
+- pipeline modules under `app/pipeline/`
+- gameplay services under `app/services/`
+- R2/local upload helper in `app/utils/storage.py`
 
 Frontend:
 - static HTML/JS pages under `app/static/`
-- `home.html` for landing/account state
+- `home.html` for hub/map/index/card modal
 - `login.html` for auth
-- `index.html` for capture/upload/offline queue
-- `wildex.html` for browsing saved cards
+- `index.html` for capture and job queue UI
+- shared card renderer in `card_renderer.js` and `card_renderer.css`
 
 Persistence:
-- database schema is managed by startup-time additive migrations in `main.py`
-- images are uploaded to R2 and persisted by URL
-- browser-side offline queue uses IndexedDB
+- schema managed through startup-time additive migrations in `main.py`
+- cards, Dex entries, discoveries, and capture jobs in PostgreSQL
+- image persistence through R2 or local upload fallback
+- browser-side offline queue through IndexedDB
 
 ## Key Routes
 
 Page routes:
-- `/` -> home page
+- `/` -> landing hub
 - `/login` -> login/register page
 - `/capture` -> capture page, requires auth
-- `/wildex` -> WildDex page, requires auth
+- `/wildex` -> landing hub / collection flow, requires auth
 
 API routes:
-- `POST /capture` -> upload image/video, identify, generate/store card
-- `POST /identify` -> direct identify endpoint, now returns `503` for temporary provider outages
-- `GET /cards` -> current user's cards
-- `GET /cards/{id}` -> current user's card detail
-- `GET /auth/me` -> current session state
+- `POST /capture` -> queue capture job
+- `GET /capture/jobs` -> background job state for current user
+- `POST /identify` -> direct identify endpoint
+- `GET /cards`
+- `GET /cards/{id}`
+- `DELETE /cards/{id}`
+- `POST /cards/{id}/favorite`
+- `POST /cards/{id}/reidentify`
+- `GET /wilddex/entries`
+- `POST /wilddex/seen`
+- `GET /auth/me`
 - `POST /auth/register`
 - `POST /auth/login`
 - `POST /auth/logout`
 
 ## Capture Flow
 
-Authenticated happy-path flow:
+Happy path:
 1. User opens `/capture`.
-2. Frontend captures or uploads media.
-3. Frontend posts to `POST /capture`.
-4. Backend uploads the asset to R2.
-5. Backend runs species identification with provider fallbacks.
-6. Backend enriches data and generates a card payload.
-7. Card is saved with `owner_id` and `image_url`.
-8. Frontend renders the result and prefers persisted `image_url` over a temporary local blob.
+2. Frontend uploads media to `POST /capture`.
+3. Backend persists the uploaded asset to R2 or local fallback and creates a `CaptureJob`.
+4. Worker claims queued jobs, groups nearby shots into an encounter where appropriate, identifies species, generates card data, saves a `Card`, syncs to Dex, and updates job state.
+5. Frontend polls `/capture/jobs`, shows queue state, and notifies when the card is ready.
 
-Temporary-outage flow:
-1. Identification providers fail with temporary outage/rate-limit style errors.
-2. Backend retries temporary failures.
-3. If still unavailable, backend saves a provisional "Pending identification" card instead of losing the capture.
-4. The saved card still carries the persisted image URL if upload succeeded.
+Temporary outage path:
+1. Upload still creates a job and preserves the media.
+2. If identification providers are temporarily unavailable, the job becomes `needs_review` rather than silently failing.
+3. If card-writing generation fails, deterministic fallback card data is used so save can still complete.
 
-Offline flow:
-1. If the browser is offline or upload fails due to reception drop, the capture is stored in IndexedDB.
-2. The app retries queued captures when connectivity returns, on focus, and on a timed interval.
-3. Queued media is normalized back into a `File` before re-upload.
+Offline path:
+1. Browser stores media in IndexedDB when offline.
+2. App retries queued uploads on reconnect/focus/interval.
+3. Synced captures are converted into normal background jobs after upload.
 
-## Card Generation Flow
+## Capture Job State Model
 
-Identification and card creation are split across pipeline modules:
-- `app/pipeline/species_id.py` handles species/provider identification, confidence handling, and fallback logic.
-- `app/pipeline/species_data.py` enriches with species metadata.
-- `app/pipeline/card_generator.py` builds the final card fields/stat presentation.
+`CaptureJob` states:
+- `queued`
+- `processing`
+- `complete`
+- `failed`
+- `needs_review`
 
-Important current identification order:
-1. Gemini
-2. iNaturalist CV
-3. Google Vision label/object path
-4. Google Vision web detection
-5. If all usable providers are temporarily unavailable, save pending for later follow-up instead of hard-failing
+Important stored fields:
+- uploaded image URL
+- grouped encounter metadata
+- resolved species/confidence
+- `repeat_state` (`new_capture`, `first_capture_after_seen`, `repeat_capture`)
+- linked `card_id`
+- resolved region
+- `region_unlocked`
+- failure/review text
 
-Plant ID has been tightened compared with earlier repo state:
-- stronger plant-specific prompt guidance
-- generic labels like "plant" / "weed" are treated as weak
-- plant enrichment uses more plant-aware lookup constraints
-- plant subcategory inference is improved
+## Card System
 
-## Database And Storage Flow
+Card rendering remains code-based, not generated bitmap layouts:
+- shared renderer in `app/static/card_renderer.js`
+- shared sizing/layout rules in `app/static/card_renderer.css`
+- render metadata prepared in `app/services/card_render.py`
 
-Database:
-- `cards` table stores generated captures
-- `users` table stores account records
-- `cards.owner_id` links cards to a specific user
-- `cards.image_url` stores the persisted R2 image URL
-- additive schema checks for `owner_id` and `image_url` happen at startup in `main.py`
+Recent renderer-related behavior:
+- in-app flip view remains primary
+- export/download still supported
+- card SVG now scales to fit the viewport shell more safely on mobile
+- share flow can export the front face to PNG blob for native share when supported
 
-Storage:
-- captured assets are uploaded to Cloudflare R2 through `app/utils/storage.py`
-- previously, frontend display depended on local preview blobs
-- current code persists the remote image URL and surfaces it back through the API/UI
+## Dex / Region Progression
 
-## Frontend Pages And How They Connect
+Dex behavior:
+- regional entries use `[REGION]-[KINGDOM]-[GROUP]-[NUMBER]`
+- states remain `UNKNOWN`, `SEEN`, `CAPTURED`
+- map unlock now keys off `CAPTURED`, not merely `SEEN`
+- country codes are normalized into the six world regions: `AU`, `NA`, `SA`, `EU`, `AF`, `AS`
+- older invalid region values are repaired through backfill
 
-`app/static/home.html`
-- entry page
-- checks auth state
-- surfaces queue status
-- links authenticated users into capture and WildDex
-- also participates in processing the offline queue
+Repeat-state behavior:
+- first capture of unseen species -> `new_capture`
+- seen entry captured later -> `first_capture_after_seen`
+- already captured species found again -> `repeat_capture`
 
-`app/static/login.html`
-- login/register UI
-- talks to `/auth/login` and `/auth/register`
-- redirects into the main app after success
+## Storage
 
-`app/static/index.html`
-- capture page
-- handles media upload
-- handles offline queueing and queue replay
-- calls backend capture flow
-- renders result cards
-- prefers persisted `image_url` when present
+Upload persistence:
+- primary target: Cloudflare R2
+- fallback: local `/uploads`
 
-`app/static/wildex.html`
-- WildDex browser
-- fetches current user's cards only
-- uses `image_url` for rendered card media
+Current behavior:
+- capture save path stores `image_url`
+- cards also store `supporting_image_urls` for grouped encounter evidence
+- UI/API return persisted URLs instead of depending on temporary preview blobs
 
 ## What Was Implemented Most Recently
 
-Most recent repo direction is not battle systems or redesign work. It is resilience and persistence:
-- Cloudflare R2 image persistence integration completed through capture save/display path
-- identification fallback chain expanded to four providers before pending-save fallback
-- temporary provider outage handling hardened
-- per-user auth and card ownership added
-- plant-ID quality improvements added
-- offline capture queue added and then tightened so it retries from more than one page
-
-## Cloudflare R2 Image Persistence Status
-
-Previous save behavior:
-- frontend could rely on local blob previews
-- persistence of image URLs through the DB/UI path was incomplete or not fully wired through the result screen
-
-Files changed for R2-related persistence:
-- `app/utils/storage.py`
-- `app/routers/capture.py`
-- `app/models.py`
-- `app/routers/cards.py`
-- `app/static/index.html`
-- `app/static/wildex.html`
-- `main.py`
-
-Current status checks:
-- `boto3` is present in `requirements.txt`
-- `image_url` is written to the database from capture flow
-- `image_url` exists on the model and startup migration path
-- frontend WildDex uses `image_url`
-- capture result page now prefers `image_url` and falls back to local preview if needed
-
-Remaining risks:
-- not runtime-verified in this shell because there is no callable `python` or `py` on PATH
-- live deployment may still be behind local code
-- if R2 env/config is missing in deployment, upload can still fail independently of identification
+Most recent local work focused on restoring stable gameplay flow:
+- background capture job system added
+- grouped encounter processing added
+- Dex sync and repeat-state tracking added
+- stricter region unlock normalization/fixups added
+- deterministic card fallback added for generation outages
+- in-app queue/notification UI added
+- share actions added
+- favorite-card background behavior preserved
 
 ## What Is Working
 
-Based on current source:
-- auth routes and login page exist
-- user-specific card separation is implemented
-- capture flow writes `owner_id`
-- image persistence path to R2 is wired through capture, DB, API, and frontend
-- result screen and WildDex both support persisted `image_url`
-- offline queue exists and retries queued uploads
-- temporary identification outages are classified and handled more safely
-- four-provider fallback order exists before pending-save fallback
-- plant identification heuristics are improved over earlier generic behavior
+Based on current source and local verification:
+- auth routes and login flow exist
+- capture creates background jobs instead of blocking the request
+- successful jobs save cards and persist image URLs
+- cards appear through `/cards` and `/wilddex/entries`
+- repeat-state classification is stored and surfaced
+- first capture in a supported region can unlock that region
+- hub map/index consume normalized region data
+- offline queue exists and syncs into the background job flow
+- card sharing and app sharing UI exist with fallbacks
 
 ## What Is Incomplete Or Unverified
 
-Still incomplete or not yet proven end-to-end here:
-- no test execution in this shell because `python`/`py` is unavailable
-- no live deployment verification from this environment
-- pending-identification cards are saved, but there is not yet a dedicated later reprocessing worker for them
-- offline queue exists client-side, but broader operational UX around queue inspection/management is still thin
-- provider fallbacks depend on deployment env keys and external service availability
-
-## Unfinished Work / TODO / Partial Integration To Watch
-
-Known partial areas:
-- deployment validation is still needed for auth cookies, R2 env vars, and provider keys
-- pending identification is persisted, but automatic server-side later re-identification is not built
-- offline queue currently focuses on sync/retry, not a full queue management page
-- older prototype or experimental logic may still exist around legacy capture/display assumptions
-
-The main risk is not missing code wiring inside the repo. The main risk is mismatched live config or undeployed local changes.
+Still incomplete or not fully signed off:
+- true multi-organism separation inside a single image/frame is not complete
+- full manual browser/mobile verification pass on the live Render deployment is still required
+- background worker is in-process, not an external queue worker
+- R2 depends on live Render env configuration; local fallback works when R2 is unavailable
+- live Render deployment may still be behind local source until pushed/deployed
 
 ## Immediate Next Priority
 
-Highest-priority safe next step:
-1. Deploy and verify the current persistence/redundancy build end-to-end.
-2. Confirm R2 uploads succeed in the live environment.
-3. Confirm a temporary ID outage results in a saved pending card rather than a fatal red failure screen.
-4. Confirm queued offline captures eventually upload and retain their image in the saved card.
-
-If more code work is needed after that, the next tightly scoped storage-related task should be:
-- add a safe server-side reprocessing path for pending identification records so captures saved during outages can be completed later without user loss
+Highest-priority next step:
+1. Push current source to GitHub.
+2. Let Render deploy from `master`.
+3. Verify live capture/save/unlock/mobile UI against `https://wildex-fsou.onrender.com`.
+4. Fix any issues found during live mobile testing before calling the pass complete.
 
 ## Exact Files That Matter Most Right Now
 
 - `main.py`
-- `app/config.py`
 - `app/models.py`
-- `app/auth.py`
-- `app/routers/auth.py`
+- `app/pipeline/card_generator.py`
 - `app/routers/capture.py`
 - `app/routers/cards.py`
-- `app/routers/wildex.py`
-- `app/pipeline/species_id.py`
+- `app/routers/dex.py`
+- `app/services/capture_jobs.py`
+- `app/services/card_render.py`
+- `app/services/dex.py`
+- `app/services/taxonomy.py`
 - `app/utils/storage.py`
 - `app/static/home.html`
-- `app/static/login.html`
 - `app/static/index.html`
-- `app/static/wildex.html`
-- `tests/test_species_id.py`
+- `app/static/card_renderer.js`
+- `app/static/card_renderer.css`
 
 ## Verification Caveat
 
-This status reflects source inspection and implemented local changes. It is not the same thing as confirmed live behavior. The biggest unknowns are deployment freshness and environment configuration.
+This status reflects current local source and local verification work. It is not the same thing as confirmed live Render behavior until the current commit is deployed to `https://wildex-fsou.onrender.com`.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import json
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -78,6 +79,7 @@ def _card_dict(c: Card) -> dict:
         "longitude": c.longitude,
         "capture_country": c.capture_country,
         "image_url": c.image_url,
+        "supporting_image_urls": json.loads(c.supporting_image_urls) if c.supporting_image_urls else [],
         "dex_id": c.dex_id,
         "discovery_state": c.discovery_state,
         "region": c.region,
@@ -100,6 +102,7 @@ def list_wilddex_entries(current_user: User = Depends(require_user)):
 
         entries = (
             db.query(DexEntry)
+            .filter(DexEntry.region.in_(REGION_LABELS.keys()))
             .order_by(
                 DexEntry.region.asc(),
                 DexEntry.kingdom.asc(),

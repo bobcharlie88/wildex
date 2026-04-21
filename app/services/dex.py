@@ -61,6 +61,94 @@ MARSUPIAL_HINTS = {
     "wombat",
 }
 
+WORLD_REGIONS = {"AU", "NA", "SA", "EU", "AF", "AS"}
+
+COUNTRY_TO_REGION = {
+    "AU": "AU",
+    "NZ": "AU",
+    "US": "NA",
+    "CA": "NA",
+    "MX": "NA",
+    "GL": "NA",
+    "BR": "SA",
+    "AR": "SA",
+    "CL": "SA",
+    "PE": "SA",
+    "CO": "SA",
+    "VE": "SA",
+    "EC": "SA",
+    "BO": "SA",
+    "PY": "SA",
+    "UY": "SA",
+    "GY": "SA",
+    "SR": "SA",
+    "GF": "SA",
+    "GB": "EU",
+    "UK": "EU",
+    "IE": "EU",
+    "FR": "EU",
+    "DE": "EU",
+    "ES": "EU",
+    "PT": "EU",
+    "IT": "EU",
+    "NL": "EU",
+    "BE": "EU",
+    "LU": "EU",
+    "CH": "EU",
+    "AT": "EU",
+    "NO": "EU",
+    "SE": "EU",
+    "FI": "EU",
+    "DK": "EU",
+    "PL": "EU",
+    "CZ": "EU",
+    "SK": "EU",
+    "HU": "EU",
+    "RO": "EU",
+    "BG": "EU",
+    "GR": "EU",
+    "HR": "EU",
+    "SI": "EU",
+    "EE": "EU",
+    "LV": "EU",
+    "LT": "EU",
+    "IS": "EU",
+    "UA": "EU",
+    "ZA": "AF",
+    "NG": "AF",
+    "KE": "AF",
+    "TZ": "AF",
+    "UG": "AF",
+    "GH": "AF",
+    "MA": "AF",
+    "DZ": "AF",
+    "EG": "AF",
+    "ET": "AF",
+    "BW": "AF",
+    "NA": "AF",
+    "ZM": "AF",
+    "ZW": "AF",
+    "CN": "AS",
+    "JP": "AS",
+    "IN": "AS",
+    "ID": "AS",
+    "SG": "AS",
+    "TH": "AS",
+    "MY": "AS",
+    "PH": "AS",
+    "KR": "AS",
+    "VN": "AS",
+    "NP": "AS",
+    "PK": "AS",
+    "LK": "AS",
+    "BD": "AS",
+    "AE": "AS",
+    "SA": "AS",
+    "IR": "AS",
+    "TR": "AS",
+    "RU": "AS",
+}
+
 
 @dataclass
 class EvolutionProfile:
@@ -75,7 +163,11 @@ def normalize_text(value: str | None) -> str:
 
 def derive_region_code(capture_country: str | None, lat: float | None = None, lon: float | None = None) -> str:
     if capture_country:
-        return re.sub(r"[^A-Z]", "", capture_country.upper())[:4] or "UNK"
+        code = re.sub(r"[^A-Z]", "", capture_country.upper())[:4] or "UNK"
+        if code in WORLD_REGIONS:
+            return code
+        if code in COUNTRY_TO_REGION:
+            return COUNTRY_TO_REGION[code]
     if lat is None or lon is None:
         return "UNK"
 
@@ -524,7 +616,19 @@ def set_discovery_state(
     return discovery
 
 
-def sync_card_to_dex(db: Session, card: Card) -> DexEntry:
+def current_discovery_state(db: Session, *, user_id: int, dex_entry_id: int) -> str:
+    discovery = (
+        db.query(UserDexDiscovery)
+        .filter(
+            UserDexDiscovery.user_id == user_id,
+            UserDexDiscovery.dex_entry_id == dex_entry_id,
+        )
+        .first()
+    )
+    return discovery.discovery_state if discovery else DISCOVERY_UNKNOWN
+
+
+def sync_card_to_dex(db: Session, card: Card) -> tuple[DexEntry, str]:
     entry = resolve_or_create_dex_entry(
         db,
         common_name=card.species_name,
@@ -536,6 +640,7 @@ def sync_card_to_dex(db: Session, card: Card) -> DexEntry:
         lat=card.latitude,
         lon=card.longitude,
     )
+    previous_state = current_discovery_state(db, user_id=card.owner_id, dex_entry_id=entry.id) if card.owner_id else DISCOVERY_UNKNOWN
     card.dex_entry_id = entry.id
     card.dex_id = entry.dex_id
     card.discovery_state = DISCOVERY_CAPTURED
@@ -552,7 +657,7 @@ def sync_card_to_dex(db: Session, card: Card) -> DexEntry:
             state=DISCOVERY_CAPTURED,
             card_id=card.id,
         )
-    return entry
+    return entry, previous_state
 
 
 def backfill_user_cards(db: Session, user_id: int) -> None:
@@ -568,6 +673,10 @@ def backfill_user_cards(db: Session, user_id: int) -> None:
     for row in rows:
         if row.dex_entry_id is None:
             log.info("Backfilling missing dex link for card id=%s user_id=%s species=%s", row.id, user_id, row.species_name)
+            sync_card_to_dex(db, row)
+            changed = True
+        elif row.region not in WORLD_REGIONS:
+            log.info("Re-normalizing region for card id=%s user_id=%s species=%s old_region=%s", row.id, user_id, row.species_name, row.region)
             sync_card_to_dex(db, row)
             changed = True
         if any(

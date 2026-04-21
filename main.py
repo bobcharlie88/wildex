@@ -15,6 +15,7 @@ from app.routers.capture import router as capture_router
 from app.routers.cards import router as cards_router
 from app.routers.dex import router as dex_router
 from app.routers.wildex import router as wildex_router
+from app.services.capture_jobs import start_capture_worker, stop_capture_worker
 
 log = logging.getLogger("wildex")
 
@@ -46,6 +47,7 @@ def startup():
                     ("category",     "VARCHAR(50)"),
                     ("sub_category", "VARCHAR(100)"),
                     ("image_url",    "VARCHAR(1000)"),
+                    ("supporting_image_urls", "TEXT"),
                     ("rarity_display", "VARCHAR(50)"),
                     ("threat_level", "VARCHAR(32)"),
                     ("aggression", "VARCHAR(32)"),
@@ -75,6 +77,35 @@ def startup():
                     conn.commit()
                 except Exception:
                     conn.rollback()
+                for col, typedef in [
+                    ("media_type", "VARCHAR(32)"),
+                    ("image_url", "VARCHAR(1000)"),
+                    ("latitude", "FLOAT"),
+                    ("longitude", "FLOAT"),
+                    ("encounter_id", "VARCHAR(64)"),
+                    ("primary_job_id", "INTEGER"),
+                    ("grouped_job_ids", "TEXT"),
+                    ("grouped_count", "INTEGER DEFAULT 1"),
+                    ("species_name", "VARCHAR(200)"),
+                    ("scientific_name", "VARCHAR(200)"),
+                    ("confidence", "FLOAT"),
+                    ("provisional", "BOOLEAN DEFAULT FALSE"),
+                    ("repeat_state", "VARCHAR(32)"),
+                    ("card_id", "INTEGER"),
+                    ("region", "VARCHAR(8)"),
+                    ("region_unlocked", "BOOLEAN DEFAULT FALSE"),
+                    ("error_message", "TEXT"),
+                    ("review_reason", "TEXT"),
+                    ("supporting_image_urls", "TEXT"),
+                    ("started_at", "TIMESTAMP"),
+                    ("completed_at", "TIMESTAMP"),
+                    ("updated_at", "TIMESTAMP"),
+                ]:
+                    try:
+                        conn.execute(text(f"ALTER TABLE capture_jobs ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
         except Exception as e:
             log.warning(f"Could not create tables: {e}")
     else:
@@ -82,6 +113,14 @@ def startup():
             "Database not reachable — cards will not be saved. "
             "See README for PostgreSQL setup."
         )
+
+
+    start_capture_worker()
+
+
+@app.on_event("shutdown")
+def shutdown():
+    stop_capture_worker()
 
 
 @app.get("/")
