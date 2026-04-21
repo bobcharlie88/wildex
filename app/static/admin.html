@@ -516,7 +516,16 @@
     }
 
     async function fetchJson(url, options = {}) {
-      const resp = await fetch(url, { credentials: 'same-origin', ...options });
+      let resp;
+      try {
+        resp = await fetch(url, { credentials: 'same-origin', ...options });
+      } catch (_) {
+        throw new Error('Network connection lost or server unavailable. Try again in a few seconds.');
+      }
+      if (resp.status === 401 || resp.status === 403) {
+        location.href = '/admin/login';
+        throw new Error('Admin session expired. Sign in again.');
+      }
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ detail: resp.statusText || 'Request failed' }));
         throw new Error(err.detail || 'Request failed');
@@ -908,7 +917,15 @@
     });
     $('asset-search').addEventListener('input', renderAssets);
     $('asset-type-filter').addEventListener('change', renderAssets);
-    $('refresh-btn').addEventListener('click', () => boot().catch(error => alert(error.message || 'Refresh failed')));
+    $('refresh-btn').addEventListener('click', async () => {
+      try {
+        await boot();
+        showBox('template-status', 'Admin data refreshed');
+      } catch (error) {
+        $('template-error').textContent = error.message || 'Refresh failed';
+        $('template-error').classList.add('visible');
+      }
+    });
     $('open-hub-btn').addEventListener('click', () => { location.href = '/wildex'; });
     $('logout-btn').addEventListener('click', async () => {
       await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
@@ -916,8 +933,8 @@
     });
 
     boot().catch((error) => {
-      alert(error.message || 'Could not load admin dashboard');
-      location.href = '/admin/login';
+      $('template-error').textContent = error.message || 'Could not load admin dashboard';
+      $('template-error').classList.add('visible');
     });
   </script>
 </body>

@@ -39,6 +39,10 @@ def _sign(data: bytes) -> str:
     return base64.urlsafe_b64encode(signature).decode("ascii")
 
 
+def hash_one_time_token(token: str) -> str:
+    return hashlib.sha256(f"{SESSION_SECRET}:{token}".encode("utf-8")).hexdigest()
+
+
 def create_session_token(user_id: int) -> str:
     payload = {
         "user_id": user_id,

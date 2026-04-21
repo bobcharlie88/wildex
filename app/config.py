@@ -18,6 +18,14 @@ SESSION_SECRET = os.getenv("SESSION_SECRET") or os.getenv("SECRET_KEY") or "wild
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "wildex_session")
 SESSION_MAX_AGE_SECONDS = int(os.getenv("SESSION_MAX_AGE_SECONDS", "2592000"))
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "").lower() in {"1", "true", "yes", "on"}
+PASSWORD_RESET_TOKEN_TTL_SECONDS = int(os.getenv("PASSWORD_RESET_TOKEN_TTL_SECONDS", "3600"))
+SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
+EMAIL_FROM = os.getenv("EMAIL_FROM") or SMTP_USERNAME or "no-reply@wildex.local"
+APP_BASE_URL = (os.getenv("APP_BASE_URL") or "").rstrip("/")
 ADMIN_EMAILS = {
     email.strip().lower()
     for email in os.getenv("ADMIN_EMAILS", "").split(",")

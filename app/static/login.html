@@ -112,6 +112,35 @@
       font-size: 0.82rem;
       line-height: 1.5;
     }
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .link-btn {
+      border: none;
+      background: transparent;
+      color: var(--accent);
+      padding: 0;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .status {
+      display: none;
+      margin-top: 14px;
+      color: #b8ebc5;
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.18);
+      padding: 12px 14px;
+      border-radius: 14px;
+      line-height: 1.45;
+    }
+    .status.visible { display: block; }
 
     .error {
       display: none;
@@ -142,6 +171,11 @@
       <button type="submit" id="submit-btn">Sign In</button>
     </form>
 
+    <div class="actions">
+      <button type="button" class="link-btn" id="forgot-password-btn">Forgot password?</button>
+      <a class="link-btn" href="/admin/login">Admin login</a>
+    </div>
+    <div class="status" id="status-box"></div>
     <div class="error" id="error-box"></div>
     <div class="note">Passwords must be at least 8 characters. Session stays on this device unless you sign out.</div>
   </main>
@@ -151,6 +185,7 @@
     const subtitle = document.getElementById('subtitle');
     const submitBtn = document.getElementById('submit-btn');
     const errorBox = document.getElementById('error-box');
+    const statusBox = document.getElementById('status-box');
 
     async function boot() {
       const me = await fetch('/auth/me', { credentials: 'same-origin' }).catch(() => null);
@@ -167,6 +202,8 @@
         : 'Create a separate account so each user gets their own WildDex and capture history.';
       errorBox.classList.remove('visible');
       errorBox.textContent = '';
+      statusBox.classList.remove('visible');
+      statusBox.textContent = '';
     }
 
     document.getElementById('mode-login').addEventListener('click', () => setMode('login'));
@@ -176,6 +213,8 @@
       event.preventDefault();
       errorBox.classList.remove('visible');
       errorBox.textContent = '';
+      statusBox.classList.remove('visible');
+      statusBox.textContent = '';
 
       const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
       const payload = {
@@ -204,6 +243,38 @@
       }
 
       location.href = '/';
+    });
+
+    document.getElementById('forgot-password-btn').addEventListener('click', async () => {
+      const email = document.getElementById('email').value.trim();
+      errorBox.classList.remove('visible');
+      errorBox.textContent = '';
+      statusBox.classList.remove('visible');
+      statusBox.textContent = '';
+      if (!email) {
+        errorBox.textContent = 'Enter your email address first.';
+        errorBox.classList.add('visible');
+        return;
+      }
+      const response = await fetch('/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ email }),
+      }).catch(() => null);
+      if (!response) {
+        errorBox.textContent = 'Could not reach the server.';
+        errorBox.classList.add('visible');
+        return;
+      }
+      const payload = await response.json().catch(() => ({ detail: 'Request failed' }));
+      if (!response.ok) {
+        errorBox.textContent = payload.detail || 'Request failed';
+        errorBox.classList.add('visible');
+        return;
+      }
+      statusBox.textContent = payload.message || 'If that account exists, reset instructions have been sent.';
+      statusBox.classList.add('visible');
     });
 
     boot();
