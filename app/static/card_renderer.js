@@ -80,6 +80,13 @@
       ${markers}`;
   }
 
+  function mapSvg(data) {
+    return `
+      <svg xmlns="${SVG_NS}" viewBox="0 0 220 140" width="220" height="140">
+        ${mapInnerSvg(data)}
+      </svg>`;
+  }
+
   async function assetToDataUrl(url) {
     if (!url) return '';
     const resp = await fetch(url, { credentials: 'same-origin' });
@@ -182,44 +189,99 @@
     target.innerHTML = svgMarkup;
   }
 
-  function buildCard(target, data) {
-    const frontTemplateUrl = data.front_template?.asset_url || '';
-    const backTemplateUrl = data.back_template?.asset_url || '';
+  function infoRowsHtml(data) {
+    const rows = [
+      ['Common Name', data.common_name || data.species_name],
+      ['Scientific Name', data.scientific_name],
+      ['Length', data.length_text],
+      ['Habitat', data.habitat_text],
+      ['Diet', data.diet_text],
+    ];
+    return rows.map(([label, value]) => `
+      <div class="wx-info-row">
+        <div class="wx-info-label">${esc(label)}</div>
+        <div class="wx-info-value">${esc(value || '')}</div>
+      </div>
+    `).join('');
+  }
 
+  function listHtml(items) {
+    return (items || []).slice(0, 3).map((item) => `<div class="wx-list-line">&#8226; ${esc(item)}</div>`).join('');
+  }
+
+  function triggerHtml(items) {
+    return (items || []).slice(0, 2).map((item) => `<div class="wx-trigger-line">${esc(item)}</div>`).join('');
+  }
+
+  function frontFaceHtml(data) {
+    return `
+      <div class="wx-template-frame">
+        <img class="wx-template-image" src="${esc(data.front_template?.asset_url || '')}" alt="">
+        <div class="wx-front-number">${esc(data.card_number)}</div>
+        <div class="wx-front-wordmark">WILDEX</div>
+        <div class="wx-front-banner">${esc(data.banner_text)}</div>
+        <div class="wx-front-name">${esc(data.species_name)}</div>
+        <div class="wx-front-scientific">${esc(data.scientific_name)}</div>
+        <div class="wx-front-info">${infoRowsHtml(data)}</div>
+        <div class="wx-front-photo">
+          ${data.image_url ? `<img class="wx-photo-image" src="${esc(data.image_url)}" alt="">` : `<div class="wx-photo-missing">No image</div>`}
+        </div>
+        <div class="wx-front-info-tag">INFO</div>
+        <div class="wx-front-info-text">${esc(data.info_text || '')}</div>
+        <div class="wx-front-fact-tag">FACT</div>
+        <div class="wx-front-fact-text">${esc(data.fact_text || '')}</div>
+      </div>`;
+  }
+
+  function backFaceHtml(data) {
+    return `
+      <div class="wx-template-frame">
+        <img class="wx-template-image" src="${esc(data.back_template?.asset_url || '')}" alt="">
+        <div class="wx-back-number">${esc(data.card_number)}</div>
+        <div class="wx-back-dex">${esc(data.dex_id || 'WILDEX')}</div>
+        <div class="wx-back-badge">${esc(data.banner_text)}</div>
+        <div class="wx-back-name">${esc(data.species_name)}</div>
+        <div class="wx-back-scientific">${esc(data.scientific_name)}</div>
+        <div class="wx-back-status">
+          <div><strong>Rarity</strong><span>${esc(data.rarity)}</span></div>
+          <div><strong>Threat</strong><span>${esc(data.threat_level)}</span></div>
+          <div><strong>Aggression</strong><span>${esc(data.aggression)}</span></div>
+        </div>
+        <div class="wx-back-map">${mapSvg(data)}</div>
+        <div class="wx-back-strength"><strong>STRENGTH</strong><span>${esc(data.strength_name)}</span><em>${esc(data.strength_effect)}</em></div>
+        <div class="wx-back-weakness"><strong>WEAKNESS</strong><span>${esc(data.weakness_name)}</span><em>${esc(data.weakness_effect)}</em></div>
+        <div class="wx-back-stats">
+          <div><strong>HP</strong><span>${esc(data.hp)}</span></div>
+          <div><strong>ATK</strong><span>${esc(data.atk)}</span></div>
+          <div><strong>DEF</strong><span>${esc(data.def)}</span></div>
+          <div><strong>SPD</strong><span>${esc(data.spd)}</span></div>
+        </div>
+        <div class="wx-back-type"><strong>TYPE</strong><span>${esc(data.type_label)}</span><em>${esc(data.biome_bonus)}</em></div>
+        <div class="wx-back-abilities"><strong>ABILITIES</strong>${listHtml(data.abilities)}</div>
+        <div class="wx-back-triggers"><strong>ENVIRONMENT TRIGGERS</strong>${triggerHtml(data.environment_triggers)}</div>
+        <div class="wx-back-call ${data.sound_url ? '' : 'is-hidden'}">Play Call</div>
+        <div class="wx-back-footer">
+          <span>Rarity: ${esc(data.rarity)}</span>
+          <span>Threat Level: ${esc(data.threat_level)}</span>
+          <span>Aggression: ${esc(data.aggression)}</span>
+        </div>
+      </div>`;
+  }
+
+  function buildCard(target, data) {
     target.innerHTML = `
       <div class="wx-card-shell">
         <div class="wx-flip-card">
           <div class="wx-flip-inner">
-            <div class="wx-face front ${esc(data.theme_class)}"></div>
-            <div class="wx-face back ${esc(data.theme_class)}"></div>
+            <div class="wx-face front ${esc(data.theme_class)}">${frontFaceHtml(data)}</div>
+            <div class="wx-face back ${esc(data.theme_class)}">${backFaceHtml(data)}</div>
           </div>
         </div>
       </div>`;
-
-    const front = target.querySelector('.wx-face.front');
-    const back = target.querySelector('.wx-face.back');
-    mountSvgFace(front, frontSvg(data, frontTemplateUrl, data.image_url || ''), data.theme_class, 'front');
-    mountSvgFace(back, backSvg(data, backTemplateUrl), data.theme_class, 'back');
     target.__wxData = data;
-
-    Promise.allSettled([
-      assetToDataUrl(frontTemplateUrl),
-      assetToDataUrl(backTemplateUrl),
-      data.image_url ? assetToDataUrl(data.image_url) : Promise.resolve(''),
-    ]).then(([frontTemplate, backTemplate, photo]) => {
-      if (target.__wxData !== data) return;
-      const frontHref = frontTemplate.status === 'fulfilled' ? (frontTemplate.value || frontTemplateUrl) : frontTemplateUrl;
-      const backHref = backTemplate.status === 'fulfilled' ? (backTemplate.value || backTemplateUrl) : backTemplateUrl;
-      const photoHref = photo.status === 'fulfilled' ? (photo.value || data.image_url || '') : (data.image_url || '');
-      if (!photoHref) {
-        console.warn('WildEx card render missing image', { dexId: data.dex_id, species: data.species_name });
-      }
-      mountSvgFace(front, frontSvg(data, frontHref, photoHref), data.theme_class, 'front');
-      mountSvgFace(back, backSvg(data, backHref), data.theme_class, 'back');
-    }).catch((err) => {
-      console.warn('WildEx card renderer asset fallback', err);
-    });
-
+    if (!data.image_url) {
+      console.warn('WildEx card render missing image', { dexId: data.dex_id, species: data.species_name });
+    }
     return target;
   }
 
