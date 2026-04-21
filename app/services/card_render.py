@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
 
+from app.services.card_assets import select_context_asset
 from app.services.card_templates import select_template
 
 RARITY_VALUES = {
@@ -293,6 +294,41 @@ def build_render_card(source) -> dict:
     strength_effect = _stored_or(theme["strength_effect"], source, "strength_effect")
     weakness_name = _stored_or(theme["weakness_name"], source, "weakness_name")
     weakness_effect = _stored_or(theme["weakness_effect"], source, "weakness_effect")
+    family_key = (_value(source, "sub_category") or "").strip().lower() or None
+    environment_key = str(biome or "").strip().lower() or None
+
+    def merge_template_parts(selection, side_name: str) -> list[dict]:
+        parts = [dict(item) for item in (selection.parts or [])]
+        assigned_slots = {item.get("slot_name") for item in parts}
+        for slot_name in ("family_icon", "species_icon", "special_badge", "map_frame"):
+            if slot_name in assigned_slots:
+                continue
+            dynamic_asset = select_context_asset(
+                asset_type="icon" if "icon" in slot_name or "badge" in slot_name else "map_asset",
+                template_part=slot_name,
+                side=side_name,
+                kingdom=kingdom_key,
+                family=family_key,
+                environment=environment_key,
+            )
+            if dynamic_asset is None:
+                continue
+            parts.append({
+                "id": dynamic_asset.id,
+                "asset_id": dynamic_asset.id,
+                "slot_name": slot_name,
+                "asset_url": dynamic_asset.asset_url,
+                "asset_type": dynamic_asset.asset_type,
+                "template_part": dynamic_asset.template_part,
+                "mime_type": dynamic_asset.mime_type,
+                "name": dynamic_asset.name,
+                "slug": dynamic_asset.slug,
+                "version": dynamic_asset.version,
+                "sort_order": dynamic_asset.sort_order,
+                "active": dynamic_asset.active,
+            })
+        return sorted(parts, key=lambda item: (int(item.get("sort_order") or 100), item.get("slot_name") or ""))
+
     return {
         "species_name": species_name,
         "scientific_name": scientific_name,
@@ -346,12 +382,18 @@ def build_render_card(source) -> dict:
             "version": front_template.version,
             "asset_url": front_template.asset_url,
             "label": front_template.label,
+            "slug": front_template.slug,
+            "layout_key": front_template.layout_key,
+            "parts": merge_template_parts(front_template, "front"),
         },
         "back_template": {
             "name": back_template.name,
             "version": back_template.version,
             "asset_url": back_template.asset_url,
             "label": back_template.label,
+            "slug": back_template.slug,
+            "layout_key": back_template.layout_key,
+            "parts": merge_template_parts(back_template, "back"),
         },
         "confidence": _value(source, "confidence"),
         "provisional": _value(source, "provisional"),

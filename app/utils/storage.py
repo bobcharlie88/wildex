@@ -1,6 +1,7 @@
 import io
 import logging
 import mimetypes
+import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -61,6 +62,11 @@ def _local_url(filename: str) -> str:
     return f"/uploads/{filename}"
 
 
+def slugify_filename(value: str) -> str:
+    base = re.sub(r"[^a-zA-Z0-9]+", "-", (value or "").strip().lower()).strip("-")
+    return base or uuid4().hex[:12]
+
+
 def _write_local_bytes(data: bytes, suffix: str | None = None) -> str:
     ext = (suffix or ".bin").lower()
     if not ext.startswith("."):
@@ -70,6 +76,17 @@ def _write_local_bytes(data: bytes, suffix: str | None = None) -> str:
     path = LOCAL_UPLOADS_DIR / filename
     path.write_bytes(data)
     return _local_url(filename)
+
+
+def _write_local_bytes_in_dir(data: bytes, directory: str, filename: str) -> str:
+    safe_dir = Path(*[slugify_filename(part) for part in str(directory or "").split("/") if part])
+    safe_name = Path(filename).name
+    root = LOCAL_UPLOADS_DIR / safe_dir
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / safe_name
+    path.write_bytes(data)
+    public_parts = "/".join(["uploads", *(part for part in safe_dir.parts), safe_name])
+    return f"/{public_parts}"
 
 
 def _write_local_file(image_path: str) -> str:
@@ -85,6 +102,30 @@ def upload_bytes(data: bytes, content_type: str | None, suffix: str | None = Non
     _r2_client().upload_fileobj(fileobj, R2_BUCKET_NAME, key, ExtraArgs=extra)
     url = _public_url(key)
     log.info("Uploaded capture asset to R2: %s", url)
+    return url
+
+
+def upload_named_bytes(
+    *,
+    data: bytes,
+    content_type: str | None,
+    directory: str,
+    filename: str,
+) -> str:
+    suffix = Path(filename).suffix or mimetypes.guess_extension(content_type or "") or ".bin"
+    safe_filename = f"{slugify_filename(Path(filename).stem)}-{uuid4().hex[:8]}{suffix.lower()}"
+    key = "/".join(
+        ["admin-assets", *(slugify_filename(part) for part in str(directory or "").split("/") if part), safe_filename]
+    )
+    if r2_enabled():
+        fileobj = io.BytesIO(data)
+        extra = {"ContentType": content_type or "application/octet-stream"}
+        _r2_client().upload_fileobj(fileobj, R2_BUCKET_NAME, key, ExtraArgs=extra)
+        url = _public_url(key)
+        log.info("Uploaded admin asset to R2: %s", url)
+        return url
+    url = _write_local_bytes_in_dir(data, f"admin/{directory}", safe_filename)
+    log.info("Stored admin asset locally: %s", url)
     return url
 
 

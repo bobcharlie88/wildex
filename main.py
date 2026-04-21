@@ -121,6 +121,22 @@ def startup():
                         conn.commit()
                     except Exception:
                         conn.rollback()
+                for col, typedef in [
+                    ("slug", "VARCHAR(160)"),
+                    ("category", "VARCHAR(64)"),
+                    ("family", "VARCHAR(120)"),
+                    ("environment", "VARCHAR(120)"),
+                    ("layout_key", "VARCHAR(64)"),
+                    ("config_json", "TEXT"),
+                    ("preview_card_id", "INTEGER"),
+                    ("created_by_id", "INTEGER"),
+                    ("updated_at", "TIMESTAMP"),
+                ]:
+                    try:
+                        conn.execute(text(f"ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
             db = SessionLocal()
             try:
                 ensure_builtin_templates(db)

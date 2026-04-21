@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WildEx Admin</title>
+  <link rel="stylesheet" href="/static/card_renderer.css">
+  <style>
+    :root {
+      --bg: #0a1219;
+      --panel: #12202b;
+      --panel-2: #172936;
+      --panel-3: rgba(255,255,255,.04);
+      --text: #edf6f0;
+      --muted: #8ba0a5;
+      --line: rgba(255,255,255,.08);
+      --accent: #d4b06a;
+      --accent-2: #7fc181;
+      --danger: #f2a1a1;
+      --radius: 22px;
+      --shadow: 0 26px 60px rgba(0,0,0,.28);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top, rgba(212,176,106,.12), transparent 24%),
+        linear-gradient(180deg, #14222d, #0a1219 42%);
+    }
+    .shell {
+      width: min(1380px, 100%);
+      margin: 0 auto;
+      padding: 22px 16px 40px;
+      display: grid;
+      gap: 16px;
+    }
+    .hero, .panel {
+      background: rgba(18, 32, 43, 0.96);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+    }
+    .eyebrow {
+      font-size: .76rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    h1, h2, h3, h4, p { margin: 0; }
+    h1 { font-size: 2rem; margin-bottom: 8px; }
+    .hero p { max-width: 820px; color: var(--muted); line-height: 1.55; }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .stack { display: grid; gap: 16px; }
+    .panel { padding: 18px; }
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .panel-head p, .muted {
+      color: var(--muted);
+      font-size: .92rem;
+      line-height: 1.45;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: .86rem;
+      color: var(--muted);
+    }
+    input, select, textarea {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 12px 13px;
+      font: inherit;
+    }
+    textarea { min-height: 92px; resize: vertical; }
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      font-size: .9rem;
+    }
+    .checkbox input {
+      width: auto;
+      margin: 0;
+    }
+    .btn {
+      border: none;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn-primary { background: linear-gradient(180deg, #e6c47a, #c49d4b); color: #281a0b; }
+    .btn-secondary { background: var(--panel-3); color: var(--text); border: 1px solid var(--line); }
+    .btn-danger { background: rgba(145, 47, 47, .22); color: #ffd4d4; border: 1px solid rgba(255,160,160,.18); }
+    .dropzone {
+      border: 2px dashed rgba(212,176,106,.35);
+      background: rgba(255,255,255,.03);
+      border-radius: 18px;
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+      place-items: center;
+      text-align: center;
+      color: var(--muted);
+      min-height: 150px;
+    }
+    .dropzone.dragover { border-color: var(--accent-2); background: rgba(127,193,129,.08); }
+    .preview-box {
+      width: 100%;
+      min-height: 120px;
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(255,255,255,.04);
+      display: grid;
+      place-items: center;
+    }
+    .preview-box img {
+      width: 100%;
+      max-height: 220px;
+      object-fit: contain;
+      display: block;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .template-list, .asset-grid, .version-list {
+      display: grid;
+      gap: 10px;
+    }
+    .template-card, .asset-card, .version-card, .section-chip {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.03);
+    }
+    .template-card, .asset-card, .version-card { padding: 14px; }
+    .template-card.active, .version-card.active { border-color: rgba(127,193,129,.42); box-shadow: inset 0 0 0 1px rgba(127,193,129,.24); }
+    .template-card header, .asset-card header, .version-card header {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: start;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 4px 9px;
+      background: rgba(255,255,255,.08);
+      color: var(--muted);
+      font-size: .74rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .pill.active { color: #d8efdb; background: rgba(127,193,129,.18); }
+    .asset-grid {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .asset-thumb {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(255,255,255,.04);
+      display: grid;
+      place-items: center;
+      margin-bottom: 10px;
+    }
+    .asset-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: rgba(255,255,255,.02);
+    }
+    .section-row, .slot-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .section-row {
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      margin-bottom: 14px;
+    }
+    .section-chip {
+      padding: 12px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .slot-grid {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .status-box, .error-box {
+      display: none;
+      padding: 12px 14px;
+      border-radius: 14px;
+      margin-bottom: 14px;
+      line-height: 1.45;
+    }
+    .status-box.visible {
+      display: block;
+      background: rgba(127,193,129,.14);
+      border: 1px solid rgba(127,193,129,.18);
+      color: #d8efdb;
+    }
+    .error-box.visible {
+      display: block;
+      background: rgba(145, 47, 47, .18);
+      border: 1px solid rgba(255,160,160,.18);
+      color: #ffd0d0;
+    }
+    .search-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 220px;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    #admin-preview-host {
+      width: 100%;
+      display: grid;
+      justify-items: center;
+      --wx-card-viewport-offset: 240px;
+    }
+    @media (max-width: 1080px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .grid-2, .grid-3, .search-row { grid-template-columns: 1fr; }
+      .hero { align-items: start; }
+      .shell { padding: 14px 10px 28px; }
+      .panel { padding: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">WildEx Admin Console</div>
+        <h1>Templates, Art, and Preview Control</h1>
+        <p>Upload card art, icons, frame pieces, map assets, and template layers directly through the app. Assign assets to slots, preview the result against a real card, then activate the template version without changing the repo.</p>
+      </div>
+      <div class="actions">
+        <div class="pill" id="admin-user-pill">Loading…</div>
+        <button class="btn btn-secondary" id="refresh-btn" type="button">Refresh</button>
+        <button class="btn btn-secondary" id="open-hub-btn" type="button">Open Hub</button>
+        <button class="btn btn-danger" id="logout-btn" type="button">Sign Out</button>
+      </div>
+    </section>
+
+    <div class="layout">
+      <div class="stack">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Asset Import</h2>
+              <p>Upload SVG, PNG, WEBP, or JPEG art. Add metadata so templates and dynamic icon selection can find it later.</p>
+            </div>
+          </div>
+          <div class="status-box" id="upload-status"></div>
+          <div class="error-box" id="upload-error"></div>
+          <form id="upload-form">
+            <div class="grid-2">
+              <div class="dropzone" id="upload-dropzone">
+                <strong>Drop asset here</strong>
+                <span>or use the file picker below</span>
+                <input id="asset-file" name="file" type="file" accept=".svg,.png,.webp,.jpg,.jpeg" required>
+              </div>
+              <div class="preview-box" id="upload-preview-box"><span class="muted">Preview before save</span></div>
+            </div>
+            <div class="grid-3">
+              <label>Name<input name="name" id="asset-name" required></label>
+              <label>Asset Type
+                <select name="asset_type" id="asset-type">
+                  <option value="template">Card Templates</option>
+                  <option value="template_part">Template Parts</option>
+                  <option value="icon">Icons / Species Badges</option>
+                  <option value="frame_art">Frame Art</option>
+                  <option value="background_art">Background Art</option>
+                  <option value="banner_art">Banner Art</option>
+                  <option value="map_asset">Map Assets</option>
+                  <option value="animal_art">Uploaded Animal Art / Card Images</option>
+                </select>
+              </label>
+              <label>Category<input name="category" placeholder="default"></label>
+            </div>
+            <div class="grid-3">
+              <label>Kingdom<input name="kingdom" placeholder="reptile"></label>
+              <label>Family / Theme<input name="family" placeholder="gecko"></label>
+              <label>Environment<input name="environment" placeholder="desert"></label>
+            </div>
+            <div class="grid-3">
+              <label>Side
+                <select name="side">
+                  <option value="">Any</option>
+                  <option value="front">Front</option>
+                  <option value="back">Back</option>
+                </select>
+              </label>
+              <label>Template Part
+                <select name="template_part" id="asset-template-part"></select>
+              </label>
+              <label>Version<input name="version" value="1.0.0"></label>
+            </div>
+            <div class="grid-3">
+              <label>Sort Order<input name="sort_order" type="number" value="100"></label>
+              <label>Replace Existing Asset
+                <select name="replace_asset_id" id="replace-asset-select">
+                  <option value="">Create new asset</option>
+                </select>
+              </label>
+              <label>Tags<input name="tags" placeholder="reptile, icon, gold"></label>
+            </div>
+            <label>Notes<textarea name="notes" placeholder="Optional notes for this asset"></textarea></label>
+            <label class="checkbox"><input name="active" type="checkbox" checked> Mark active on save</label>
+            <div class="toolbar">
+              <button class="btn btn-primary" type="submit">Upload Asset</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Template Builder</h2>
+              <p>Pick a template version, assign art to slots, preview it against a sample card, then activate it.</p>
+            </div>
+          </div>
+          <div class="status-box" id="template-status"></div>
+          <div class="error-box" id="template-error"></div>
+          <form id="template-form">
+            <div class="grid-3">
+              <label>Template<select id="template-picker"></select></label>
+              <label>Name<input id="template-name"></label>
+              <label>Slug<input id="template-slug" placeholder="reptile-front-common"></label>
+            </div>
+            <div class="grid-3">
+              <label>Kingdom<input id="template-kingdom" placeholder="reptile"></label>
+              <label>Side
+                <select id="template-side">
+                  <option value="front">Front</option>
+                  <option value="back">Back</option>
+                </select>
+              </label>
+              <label>Version<input id="template-version" value="1.0.0"></label>
+            </div>
+            <div class="grid-3">
+              <label>Category<input id="template-category" placeholder="default"></label>
+              <label>Family<input id="template-family" placeholder="dragon"></label>
+              <label>Environment<input id="template-environment" placeholder="desert"></label>
+            </div>
+            <div class="grid-3">
+              <label>Base Asset Path<input id="template-asset-path" placeholder="/static/card_templates/..."></label>
+              <label>Layout Key<input id="template-layout-key" placeholder="master-front"></label>
+              <label>Preview Sample
+                <select id="preview-sample-select"></select>
+              </label>
+            </div>
+            <div class="grid-2">
+              <label>Label<input id="template-label"></label>
+              <label class="checkbox"><input id="template-active" type="checkbox"> Activate on save</label>
+            </div>
+            <label>Notes<textarea id="template-notes"></textarea></label>
+            <div class="toolbar">
+              <button class="btn btn-primary" type="submit">Save Template</button>
+              <button class="btn btn-secondary" type="button" id="new-template-btn">New Template</button>
+              <button class="btn btn-secondary" type="button" id="activate-template-btn">Activate Template</button>
+            </div>
+          </form>
+          <div class="panel-head" style="margin-top:18px">
+            <div>
+              <h3>Slot Assignments</h3>
+              <p>Assign uploaded parts such as top bar, photo frame, badges, overlays, icons, and map frames.</p>
+            </div>
+          </div>
+          <form id="slot-form" class="slot-grid"></form>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" id="save-slots-btn">Save Slot Assignments</button>
+            <button class="btn btn-secondary" type="button" id="preview-template-btn">Preview Template</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Asset Library</h2>
+              <p>Search and filter the uploaded registry across template art, frame parts, icons, banners, backgrounds, map visuals, and animal art.</p>
+            </div>
+          </div>
+          <div class="section-row" id="asset-section-summary"></div>
+          <div class="search-row">
+            <input id="asset-search" placeholder="Search assets by name, slug, type, kingdom, family, or tags">
+            <select id="asset-type-filter">
+              <option value="">All asset types</option>
+              <option value="template">Card Templates</option>
+              <option value="template_part">Template Parts</option>
+              <option value="icon">Icons / Species Badges</option>
+              <option value="frame_art">Frame Art</option>
+              <option value="background_art">Background Art</option>
+              <option value="banner_art">Banner Art</option>
+              <option value="map_asset">Map Assets</option>
+              <option value="animal_art">Uploaded Animal Art / Card Images</option>
+            </select>
+          </div>
+          <div class="asset-grid" id="asset-grid"></div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Template Preview</h2>
+              <p>Use the same shared viewer path as the game to validate the final composed front/back card before activation.</p>
+            </div>
+          </div>
+          <div class="error-box" id="preview-error"></div>
+          <div id="admin-preview-host"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Template Versions</h2>
+              <p>Only one active version per kingdom / side / category should be live.</p>
+            </div>
+          </div>
+          <div class="version-list" id="version-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Template Configs</h2>
+              <p>Current stored templates and the slots they expose.</p>
+            </div>
+          </div>
+          <div class="template-list" id="template-list"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/card_renderer.js"></script>
+  <script>
+    const state = {
+      user: null,
+      templates: [],
+      assets: [],
+      samples: [],
+      templateSlots: [],
+      selectedTemplateId: null,
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function esc(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showBox(id, message, isError = false) {
+      const node = $(id);
+      node.textContent = message;
+      node.classList.add('visible');
+      if (!message) node.classList.remove('visible');
+      if (isError) return;
+      setTimeout(() => node.classList.remove('visible'), 2600);
+    }
+
+    async function fetchJson(url, options = {}) {
+      const resp = await fetch(url, { credentials: 'same-origin', ...options });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText || 'Request failed' }));
+        throw new Error(err.detail || 'Request failed');
+      }
+      return resp.json();
+    }
+
+    function currentTemplate() {
+      return state.templates.find(item => item.id === Number(state.selectedTemplateId)) || state.templates[0] || null;
+    }
+
+    function assetLabel(asset) {
+      return `${asset.name} · ${asset.version}${asset.template_part ? ` · ${asset.template_part}` : ''}`;
+    }
+
+    function populateSlotOptions() {
+      const slotForm = $('slot-form');
+      slotForm.innerHTML = state.templateSlots.map(slot => {
+        const selectedTemplate = currentTemplate();
+        const selectedPart = selectedTemplate?.parts?.find(item => item.slot_name === slot);
+        const options = ['<option value="">None</option>'].concat(
+          state.assets
+            .filter(asset => !asset.side || asset.side === selectedTemplate?.side || asset.template_part === slot || asset.asset_type === 'icon' || asset.asset_type === 'map_asset')
+            .map(asset => `<option value="${asset.id}" ${selectedPart && Number(selectedPart.asset_id || selectedPart.id) === asset.id ? 'selected' : ''}>${esc(assetLabel(asset))}</option>`)
+        );
+        return `<label>${esc(slot)}<select data-slot="${esc(slot)}">${options.join('')}</select></label>`;
+      }).join('');
+    }
+
+    function renderTemplatePicker() {
+      $('template-picker').innerHTML = state.templates.map(item => `
+        <option value="${item.id}" ${state.selectedTemplateId === item.id ? 'selected' : ''}>
+          ${esc(item.label || item.name)} · ${esc(item.kingdom)} · ${esc(item.side)} · ${esc(item.version)}
+        </option>`).join('');
+      const sampleOptions = ['<option value="">Fallback sample</option>'].concat(
+        state.samples.map(item => `<option value="${item.id}">${esc(item.species_name)}${item.dex_id ? ` · ${esc(item.dex_id)}` : ''}</option>`)
+      );
+      $('preview-sample-select').innerHTML = sampleOptions.join('');
+      const replaceOptions = ['<option value="">Create new asset</option>'].concat(
+        state.assets.map(item => `<option value="${item.id}">${esc(assetLabel(item))}</option>`)
+      );
+      $('replace-asset-select').innerHTML = replaceOptions.join('');
+    }
+
+    function fillTemplateForm(template) {
+      if (!template) return;
+      state.selectedTemplateId = template.id;
+      $('template-picker').value = String(template.id);
+      $('template-name').value = template.name || '';
+      $('template-slug').value = template.slug || '';
+      $('template-kingdom').value = template.kingdom || '';
+      $('template-side').value = template.side || 'front';
+      $('template-version').value = template.version || '1.0.0';
+      $('template-category').value = template.category || '';
+      $('template-family').value = template.family || '';
+      $('template-environment').value = template.environment || '';
+      $('template-asset-path').value = template.asset_path || '';
+      $('template-layout-key').value = template.layout_key || '';
+      $('template-label').value = template.label || '';
+      $('template-notes').value = template.notes || '';
+      $('template-active').checked = !!template.active;
+      populateSlotOptions();
+    }
+
+    function renderTemplateCards() {
+      $('template-list').innerHTML = state.templates.map(item => `
+        <article class="template-card ${item.active ? 'active' : ''}">
+          <header>
+            <div>
+              <strong>${esc(item.label || item.name)}</strong>
+              <div class="muted">${esc(item.slug || item.name)} · ${esc(item.side)} · ${esc(item.version)}</div>
+            </div>
+            <span class="pill ${item.active ? 'active' : ''}">${item.active ? 'Active' : 'Inactive'}</span>
+          </header>
+          <div class="muted">${esc(item.kingdom)}${item.category ? ` · ${esc(item.category)}` : ''}${item.family ? ` · ${esc(item.family)}` : ''}</div>
+          <div class="muted" style="margin-top:8px">${esc((item.parts || []).map(part => part.slot_name).join(', ') || 'No slot assignments yet')}</div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="selectTemplate(${item.id})">Edit</button>
+            <button class="btn btn-secondary" type="button" onclick="activateTemplate(${item.id})">Activate</button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderVersionCards() {
+      const grouped = new Map();
+      state.templates.forEach(item => {
+        const key = `${item.kingdom}/${item.side}/${item.category || 'default'}`;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(item);
+      });
+      $('version-list').innerHTML = Array.from(grouped.entries()).map(([key, items]) => `
+        <article class="version-card ${items.some(item => item.active) ? 'active' : ''}">
+          <header>
+            <strong>${esc(key)}</strong>
+            <span class="pill ${items.some(item => item.active) ? 'active' : ''}">${items.filter(item => item.active).length} active</span>
+          </header>
+          <div class="muted">${items.map(item => `${item.version}${item.active ? ' (live)' : ''}`).join(', ')}</div>
+        </article>
+      `).join('');
+    }
+
+    function renderAssetSections() {
+      const counts = {};
+      state.assets.forEach(asset => { counts[asset.asset_type] = (counts[asset.asset_type] || 0) + 1; });
+      const labels = {
+        template: 'Card Templates',
+        template_part: 'Template Parts',
+        icon: 'Icons / Species Badges',
+        frame_art: 'Frame Art',
+        background_art: 'Background Art',
+        banner_art: 'Banner Art',
+        map_asset: 'Map Assets',
+        animal_art: 'Uploaded Animal Art / Card Images',
+      };
+      $('asset-section-summary').innerHTML = Object.entries(labels).map(([key, label]) => `
+        <div class="section-chip"><strong>${counts[key] || 0}</strong><div>${esc(label)}</div></div>
+      `).join('');
+    }
+
+    function renderAssets() {
+      const query = $('asset-search').value.trim().toLowerCase();
+      const typeFilter = $('asset-type-filter').value;
+      const filtered = state.assets.filter(asset => {
+        if (typeFilter && asset.asset_type !== typeFilter) return false;
+        if (!query) return true;
+        const haystack = [
+          asset.name, asset.slug, asset.asset_type, asset.kingdom, asset.family,
+          asset.environment, asset.template_part, (asset.tags || []).join(' '), asset.version
+        ].join(' ').toLowerCase();
+        return haystack.includes(query);
+      });
+      $('asset-grid').innerHTML = filtered.map(asset => `
+        <article class="asset-card">
+          <div class="asset-thumb">${asset.asset_url ? `<img src="${esc(asset.asset_url)}" alt="">` : '<span class="muted">No preview</span>'}</div>
+          <header>
+            <div>
+              <strong>${esc(asset.name)}</strong>
+              <div class="muted">${esc(asset.slug)} · ${esc(asset.version)}</div>
+            </div>
+            <span class="pill ${asset.active ? 'active' : ''}">${asset.asset_type}</span>
+          </header>
+          <div class="muted">${[asset.kingdom, asset.family, asset.environment, asset.side, asset.template_part].filter(Boolean).map(esc).join(' · ') || 'General asset'}</div>
+          <div class="muted" style="margin-top:8px">${esc((asset.tags || []).join(', ') || asset.notes || '')}</div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="toggleAsset(${asset.id}, ${asset.active ? 'false' : 'true'})">${asset.active ? 'Deactivate' : 'Activate'}</button>
+          </div>
+        </article>
+      `).join('') || '<div class="muted">No assets match this filter.</div>';
+    }
+
+    async function previewTemplate() {
+      const template = currentTemplate();
+      if (!template) return;
+      const overrides = {};
+      const slotMapping = {};
+      $('slot-form').querySelectorAll('select[data-slot]').forEach(select => {
+        slotMapping[select.dataset.slot] = select.value ? Number(select.value) : null;
+      });
+      overrides[template.side] = slotMapping;
+      const payload = {
+        sample_card_id: $('preview-sample-select').value ? Number($('preview-sample-select').value) : null,
+        front_template_id: template.side === 'front' ? template.id : state.templates.find(item => item.kingdom === template.kingdom && item.side === 'front' && item.active)?.id,
+        back_template_id: template.side === 'back' ? template.id : state.templates.find(item => item.kingdom === template.kingdom && item.side === 'back' && item.active)?.id,
+        slot_overrides: overrides,
+      };
+      try {
+        $('preview-error').classList.remove('visible');
+        const data = await fetchJson('/admin/templates/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        WildExCardRenderer.buildCard($('admin-preview-host'), data.render_card);
+      } catch (error) {
+        $('preview-error').textContent = error.message || 'Preview failed';
+        $('preview-error').classList.add('visible');
+      }
+    }
+
+    async function saveSlots() {
+      const template = currentTemplate();
+      if (!template) return;
+      const slots = {};
+      $('slot-form').querySelectorAll('select[data-slot]').forEach(select => {
+        slots[select.dataset.slot] = select.value ? Number(select.value) : null;
+      });
+      try {
+        await fetchJson(`/admin/templates/${template.id}/parts`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slots }),
+        });
+        showBox('template-status', 'Template slots saved');
+        await boot();
+        const refreshed = state.templates.find(item => item.id === template.id) || state.templates[0];
+        fillTemplateForm(refreshed);
+        await previewTemplate();
+      } catch (error) {
+        $('template-error').textContent = error.message || 'Could not save slots';
+        $('template-error').classList.add('visible');
+      }
+    }
+
+    async function activateTemplate(templateId) {
+      try {
+        await fetchJson(`/admin/templates/${templateId}/activate`, { method: 'POST' });
+        await boot();
+        const active = state.templates.find(item => item.id === templateId) || state.templates[0];
+        fillTemplateForm(active);
+        showBox('template-status', 'Template activated');
+        await previewTemplate();
+      } catch (error) {
+        $('template-error').textContent = error.message || 'Could not activate template';
+        $('template-error').classList.add('visible');
+      }
+    }
+    window.activateTemplate = activateTemplate;
+    window.toggleAsset = async (id, active) => {
+      try {
+        await fetchJson(`/admin/assets/${id}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active }),
+        });
+        await boot();
+      } catch (error) {
+        alert(error.message || 'Could not update asset status');
+      }
+    };
+    window.selectTemplate = (id) => {
+      const template = state.templates.find(item => item.id === id);
+      if (!template) return;
+      fillTemplateForm(template);
+      previewTemplate().catch(() => {});
+    };
+
+    function readUploadPreview(file) {
+      const box = $('upload-preview-box');
+      if (!file) {
+        box.innerHTML = '<span class="muted">Preview before save</span>';
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      box.innerHTML = `<img src="${url}" alt="">`;
+    }
+
+    async function boot() {
+      const data = await fetchJson('/admin/bootstrap');
+      state.user = data.user;
+      state.templates = data.templates || [];
+      state.assets = data.assets || [];
+      state.samples = data.samples || [];
+      state.templateSlots = data.template_slots || [];
+      if (!state.selectedTemplateId && state.templates[0]) state.selectedTemplateId = state.templates[0].id;
+      $('admin-user-pill').textContent = state.user.email;
+      renderTemplatePicker();
+      fillTemplateForm(currentTemplate());
+      renderTemplateCards();
+      renderVersionCards();
+      renderAssetSections();
+      renderAssets();
+      $('asset-template-part').innerHTML = ['<option value="">None</option>'].concat(
+        state.templateSlots.map(slot => `<option value="${slot}">${slot}</option>`)
+      ).join('');
+      await previewTemplate();
+    }
+
+    $('asset-file').addEventListener('change', (event) => {
+      const file = event.target.files?.[0];
+      readUploadPreview(file);
+      if (file && !$('asset-name').value) $('asset-name').value = file.name.replace(/\.[^.]+$/, '');
+    });
+    $('upload-dropzone').addEventListener('dragover', (event) => {
+      event.preventDefault();
+      $('upload-dropzone').classList.add('dragover');
+    });
+    $('upload-dropzone').addEventListener('dragleave', () => $('upload-dropzone').classList.remove('dragover'));
+    $('upload-dropzone').addEventListener('drop', (event) => {
+      event.preventDefault();
+      $('upload-dropzone').classList.remove('dragover');
+      const file = event.dataTransfer.files?.[0];
+      if (!file) return;
+      const input = $('asset-file');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      readUploadPreview(file);
+      if (!$('asset-name').value) $('asset-name').value = file.name.replace(/\.[^.]+$/, '');
+    });
+
+    $('upload-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      $('upload-error').classList.remove('visible');
+      const formData = new FormData(event.target);
+      try {
+        await fetchJson('/admin/assets/upload', { method: 'POST', body: formData });
+        showBox('upload-status', 'Asset uploaded');
+        event.target.reset();
+        readUploadPreview(null);
+        await boot();
+      } catch (error) {
+        $('upload-error').textContent = error.message || 'Asset upload failed';
+        $('upload-error').classList.add('visible');
+      }
+    });
+
+    $('template-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      $('template-error').classList.remove('visible');
+      const payload = {
+        id: state.selectedTemplateId,
+        name: $('template-name').value.trim(),
+        slug: $('template-slug').value.trim(),
+        kingdom: $('template-kingdom').value.trim(),
+        side: $('template-side').value,
+        version: $('template-version').value.trim(),
+        category: $('template-category').value.trim(),
+        family: $('template-family').value.trim(),
+        environment: $('template-environment').value.trim(),
+        asset_path: $('template-asset-path').value.trim(),
+        layout_key: $('template-layout-key').value.trim(),
+        preview_card_id: $('preview-sample-select').value ? Number($('preview-sample-select').value) : null,
+        label: $('template-label').value.trim(),
+        notes: $('template-notes').value.trim(),
+        active: $('template-active').checked,
+        config: { layout_key: $('template-layout-key').value.trim() },
+      };
+      try {
+        const result = await fetchJson('/admin/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        state.selectedTemplateId = result.template_id;
+        showBox('template-status', 'Template saved');
+        await boot();
+        const refreshed = state.templates.find(item => item.id === state.selectedTemplateId) || state.templates[0];
+        fillTemplateForm(refreshed);
+      } catch (error) {
+        $('template-error').textContent = error.message || 'Template save failed';
+        $('template-error').classList.add('visible');
+      }
+    });
+
+    $('template-picker').addEventListener('change', () => {
+      state.selectedTemplateId = Number($('template-picker').value);
+      fillTemplateForm(currentTemplate());
+      previewTemplate().catch(() => {});
+    });
+    $('save-slots-btn').addEventListener('click', () => { saveSlots().catch(() => {}); });
+    $('preview-template-btn').addEventListener('click', () => { previewTemplate().catch(() => {}); });
+    $('activate-template-btn').addEventListener('click', () => {
+      const template = currentTemplate();
+      if (template) activateTemplate(template.id);
+    });
+    $('new-template-btn').addEventListener('click', () => {
+      state.selectedTemplateId = null;
+      $('template-form').reset();
+      populateSlotOptions();
+    });
+    $('asset-search').addEventListener('input', renderAssets);
+    $('asset-type-filter').addEventListener('change', renderAssets);
+    $('refresh-btn').addEventListener('click', () => boot().catch(error => alert(error.message || 'Refresh failed')));
+    $('open-hub-btn').addEventListener('click', () => { location.href = '/wildex'; });
+    $('logout-btn').addEventListener('click', async () => {
+      await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+      location.href = '/admin/login';
+    });
+
+    boot().catch((error) => {
+      alert(error.message || 'Could not load admin dashboard');
+      location.href = '/admin/login';
+    });
+  </script>
+</body>
+</html>

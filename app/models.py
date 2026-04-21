@@ -170,10 +170,76 @@ class CardTemplate(Base):
     side: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
     asset_path: Mapped[str] = mapped_column(String(1000), nullable=False)
     version: Mapped[str] = mapped_column(String(32), nullable=False)
+    slug: Mapped[str | None] = mapped_column(String(160), index=True)
+    category: Mapped[str | None] = mapped_column(String(64), index=True)
+    family: Mapped[str | None] = mapped_column(String(120), index=True)
+    environment: Mapped[str | None] = mapped_column(String(120), index=True)
+    layout_key: Mapped[str | None] = mapped_column(String(64))
+    config_json: Mapped[str | None] = mapped_column(Text)
+    preview_card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"))
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     label: Mapped[str | None] = mapped_column(String(120))
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    preview_card: Mapped[Card | None] = relationship(foreign_keys=[preview_card_id])
+    created_by: Mapped[User | None] = relationship(foreign_keys=[created_by_id])
+    part_assignments: Mapped[list["TemplatePartAssignment"]] = relationship(
+        back_populates="template",
+        cascade="all, delete-orphan",
+    )
+
+
+class CardAsset(Base):
+    __tablename__ = "card_assets"
+    __table_args__ = (
+        UniqueConstraint("slug", "version", name="uq_card_assets_slug_version"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    slug: Mapped[str] = mapped_column(String(200), index=True, nullable=False)
+    asset_type: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    file_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    mime_type: Mapped[str | None] = mapped_column(String(120))
+    kingdom: Mapped[str | None] = mapped_column(String(32), index=True)
+    family: Mapped[str | None] = mapped_column(String(120), index=True)
+    environment: Mapped[str | None] = mapped_column(String(120), index=True)
+    side: Mapped[str | None] = mapped_column(String(16), index=True)
+    template_part: Mapped[str | None] = mapped_column(String(64), index=True)
+    version: Mapped[str] = mapped_column(String(32), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=100)
+    tags: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    uploaded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    uploader: Mapped[User | None] = relationship(foreign_keys=[uploaded_by])
+    template_assignments: Mapped[list["TemplatePartAssignment"]] = relationship(
+        back_populates="asset",
+        cascade="all, delete-orphan",
+    )
+
+
+class TemplatePartAssignment(Base):
+    __tablename__ = "template_part_assignments"
+    __table_args__ = (
+        UniqueConstraint("template_id", "slot_name", name="uq_template_part_assignments_template_slot"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    template_id: Mapped[int] = mapped_column(ForeignKey("card_templates.id"), index=True, nullable=False)
+    slot_name: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("card_assets.id"), index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    template: Mapped[CardTemplate] = relationship(back_populates="part_assignments")
+    asset: Mapped[CardAsset] = relationship(back_populates="template_assignments")
 
 
 class UserDexDiscovery(Base):

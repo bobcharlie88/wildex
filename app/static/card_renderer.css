@@ -69,6 +69,7 @@
   min-height: inherit;
   color: #2c1d13;
   font-family: Georgia, serif;
+  overflow: hidden;
 }
 
 .wx-render-error {
@@ -99,13 +100,32 @@
   word-break: break-word;
 }
 
-.wx-template-image {
+.wx-template-image,
+.wx-asset-layer {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  object-fit: fill;
   display: block;
+  pointer-events: none;
+}
+
+.wx-asset-layer.slot-base_frame,
+.wx-asset-layer.slot-background_texture,
+.wx-asset-layer.slot-top_bar,
+.wx-asset-layer.slot-bottom_strip,
+.wx-asset-layer.slot-status_panel,
+.wx-asset-layer.slot-map_frame,
+.wx-asset-layer.slot-number_badge,
+.wx-asset-layer.slot-title_banner,
+.wx-asset-layer.slot-kingdom_badge,
+.wx-asset-layer.slot-photo_frame,
+.wx-asset-layer.slot-info_banner,
+.wx-asset-layer.slot-fact_banner,
+.wx-asset-layer.slot-rarity_overlay,
+.wx-asset-layer.slot-special_badge,
+.wx-asset-layer.slot-family_icon,
+.wx-asset-layer.slot-species_icon,
+.wx-asset-layer.slot-frame_overlay {
+  object-fit: contain;
 }
 
 .wx-front-number,

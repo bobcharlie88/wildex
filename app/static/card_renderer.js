@@ -2,6 +2,42 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const CARD_W = 744;
   const CARD_H = 1039;
+  const SLOT_LAYOUTS = {
+    front: {
+      base_frame: { x: 0, y: 0, w: 744, h: 1039 },
+      background_texture: { x: 12, y: 12, w: 720, h: 1015 },
+      top_bar: { x: 24, y: 40, w: 680, h: 92 },
+      number_badge: { x: 24, y: 46, w: 150, h: 88 },
+      title_banner: { x: 184, y: 48, w: 366, h: 84 },
+      kingdom_badge: { x: 552, y: 46, w: 152, h: 88 },
+      photo_frame: { x: 372, y: 238, w: 324, h: 412 },
+      info_banner: { x: 52, y: 658, w: 198, h: 58 },
+      fact_banner: { x: 52, y: 932, w: 640, h: 64 },
+      bottom_strip: { x: 40, y: 928, w: 654, h: 74 },
+      frame_overlay: { x: 0, y: 0, w: 744, h: 1039 },
+      rarity_overlay: { x: 536, y: 846, w: 140, h: 92 },
+      family_icon: { x: 592, y: 64, w: 70, h: 54 },
+      species_icon: { x: 60, y: 944, w: 74, h: 40 },
+      special_badge: { x: 534, y: 148, w: 132, h: 60 },
+    },
+    back: {
+      base_frame: { x: 0, y: 0, w: 744, h: 1039 },
+      background_texture: { x: 12, y: 12, w: 720, h: 1015 },
+      top_bar: { x: 24, y: 40, w: 680, h: 92 },
+      number_badge: { x: 24, y: 46, w: 150, h: 88 },
+      title_banner: { x: 184, y: 48, w: 366, h: 84 },
+      kingdom_badge: { x: 594, y: 44, w: 108, h: 92 },
+      map_frame: { x: 304, y: 240, w: 392, h: 232 },
+      status_panel: { x: 50, y: 236, w: 252, h: 120 },
+      bottom_strip: { x: 40, y: 978, w: 654, h: 40 },
+      frame_overlay: { x: 0, y: 0, w: 744, h: 1039 },
+      rarity_overlay: { x: 186, y: 928, w: 380, h: 62 },
+      family_icon: { x: 612, y: 62, w: 72, h: 56 },
+      species_icon: { x: 604, y: 942, w: 72, h: 46 },
+      special_badge: { x: 70, y: 930, w: 106, h: 60 },
+    },
+  };
+  const OVERLAY_SLOTS = new Set(['photo_frame', 'frame_overlay', 'rarity_overlay', 'family_icon', 'species_icon', 'special_badge']);
 
   function esc(value) {
     return String(value ?? '')
@@ -87,6 +123,62 @@
       </svg>`;
   }
 
+  function templateParts(template) {
+    const parts = Array.isArray(template?.parts) ? template.parts.filter(Boolean) : [];
+    if (parts.length) return parts.slice().sort((a, b) => Number(a?.sort_order || 100) - Number(b?.sort_order || 100));
+    if (template?.asset_url) {
+      return [{
+        slot_name: 'base_frame',
+        asset_url: template.asset_url,
+        asset_type: 'template',
+        sort_order: 0,
+      }];
+    }
+    return [];
+  }
+
+  function slotBox(side, slotName) {
+    return SLOT_LAYOUTS[side]?.[slotName] || SLOT_LAYOUTS[side]?.base_frame || { x: 0, y: 0, w: CARD_W, h: CARD_H };
+  }
+
+  function slotZIndex(slotName) {
+    if (slotName === 'frame_overlay') return 5;
+    if (slotName === 'photo_frame') return 4;
+    if (OVERLAY_SLOTS.has(slotName)) return 3;
+    return 0;
+  }
+
+  function htmlPartLayers(template, side) {
+    return templateParts(template).map((part) => {
+      const box = slotBox(side, part.slot_name);
+      const style = [
+        `left:${(box.x / CARD_W) * 100}%`,
+        `top:${(box.y / CARD_H) * 100}%`,
+        `width:${(box.w / CARD_W) * 100}%`,
+        `height:${(box.h / CARD_H) * 100}%`,
+        `z-index:${slotZIndex(part.slot_name || 'base_frame')}`,
+      ].join(';');
+      return `
+        <img
+          class="wx-asset-layer slot-${esc(part.slot_name || 'base_frame')}"
+          src="${esc(part.asset_url || '')}"
+          alt=""
+          style="${style}"
+          data-slot="${esc(part.slot_name || 'base_frame')}"
+        >`;
+    }).join('');
+  }
+
+  function svgPartLayers(template, side, phase = 'underlay') {
+    return templateParts(template).filter((part) => {
+      const isOverlay = OVERLAY_SLOTS.has(part.slot_name || '');
+      return phase === 'overlay' ? isOverlay : !isOverlay;
+    }).map((part) => {
+      const box = slotBox(side, part.slot_name);
+      return `<image href="${esc(part.asset_url || '')}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="none"></image>`;
+    }).join('');
+  }
+
   async function assetToDataUrl(url) {
     if (!url) return '';
     const resp = await fetch(url, { credentials: 'same-origin' });
@@ -100,7 +192,7 @@
     });
   }
 
-  function frontSvg(data, templateHref, imageHref) {
+  function frontSvg(data, templateTemplate, imageHref) {
     const infoY = [0, 80, 160, 250, 340];
     const infoRows = [
       ['Common Name', data.common_name || data.species_name],
@@ -123,7 +215,7 @@
         <defs>
           <clipPath id="photoClip"><rect x="380" y="260" width="292" height="370" rx="14"></rect></clipPath>
         </defs>
-        ${templateHref ? `<image href="${templateHref}" x="0" y="0" width="${CARD_W}" height="${CARD_H}" preserveAspectRatio="none"></image>` : ''}
+        ${svgPartLayers(templateTemplate, 'front', 'underlay')}
         <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(data.card_number)}</text>
         <text x="208" y="101" font-size="42" font-weight="800" fill="#f7eedb" letter-spacing="5">WILDEX</text>
         <text x="630" y="100" text-anchor="middle" font-size="28" font-weight="700" fill="#f7eedb">${esc(data.banner_text)}</text>
@@ -131,6 +223,7 @@
         <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="#5a3d2a">${esc(data.scientific_name)}</text>
         ${infoContent}
         ${imageHref ? `<image href="${imageHref}" x="380" y="260" width="292" height="370" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"></image>` : ''}
+        ${svgPartLayers(templateTemplate, 'front', 'overlay')}
         <text x="148" y="696" text-anchor="middle" font-size="28" font-weight="800" fill="#f7eedb" letter-spacing="2">INFO</text>
         ${textLines(infoLines, 64, 748, 28, 24, 'fill="#2c1d13" font-family="Georgia, serif"')}
         <text x="88" y="972" font-size="26" font-weight="800" fill="#f7eedb" letter-spacing="2">FACT</text>
@@ -138,12 +231,12 @@
       </svg>`;
   }
 
-  function backSvg(data, templateHref) {
+  function backSvg(data, templateTemplate) {
     const abilities = (data.abilities || []).slice(0, 3);
     const triggers = (data.environment_triggers || []).slice(0, 2);
     return `
       <svg xmlns="${SVG_NS}" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}">
-        ${templateHref ? `<image href="${templateHref}" x="0" y="0" width="${CARD_W}" height="${CARD_H}" preserveAspectRatio="none"></image>` : ''}
+        ${svgPartLayers(templateTemplate, 'back', 'underlay')}
         <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(data.card_number)}</text>
         <text x="208" y="100" font-size="30" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(data.dex_id || 'WILDEX')}</text>
         <text x="650" y="101" text-anchor="middle" font-size="20" font-weight="700" fill="#f7eedb">${esc(data.banner_text)}</text>
@@ -178,6 +271,7 @@
         <text x="78" y="862" font-size="20" font-weight="800" fill="#5a3d2a">ENVIRONMENT TRIGGERS</text>
         ${triggers.map((line, idx) => `<text x="78" y="${892 + idx * 22}" font-size="22" fill="#2c1d13">${esc(line)}</text>`).join('')}
         ${data.sound_url ? '<text x="372" y="966" text-anchor="middle" font-size="36" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">Play Call</text>' : ''}
+        ${svgPartLayers(templateTemplate, 'back', 'overlay')}
         <text x="76" y="1007" font-size="15" fill="#f7eedb">Rarity: ${esc(data.rarity)}</text>
         <text x="290" y="1007" font-size="15" fill="#f7eedb">Threat Level: ${esc(data.threat_level)}</text>
         <text x="532" y="1007" font-size="15" fill="#f7eedb">Aggression: ${esc(data.aggression)}</text>
@@ -216,7 +310,7 @@
   function frontFaceHtml(data) {
     return `
       <div class="wx-template-frame">
-        <img class="wx-template-image" src="${esc(data.front_template?.asset_url || '')}" alt="">
+        ${htmlPartLayers(data.front_template, 'front')}
         <div class="wx-front-number">${esc(data.card_number)}</div>
         <div class="wx-front-wordmark">WILDEX</div>
         <div class="wx-front-banner">${esc(data.banner_text)}</div>
@@ -236,7 +330,7 @@
   function backFaceHtml(data) {
     return `
       <div class="wx-template-frame">
-        <img class="wx-template-image" src="${esc(data.back_template?.asset_url || '')}" alt="">
+        ${htmlPartLayers(data.back_template, 'back')}
         <div class="wx-back-number">${esc(data.card_number)}</div>
         <div class="wx-back-dex">${esc(data.dex_id || 'WILDEX')}</div>
         <div class="wx-back-badge">${esc(data.banner_text)}</div>
@@ -283,7 +377,7 @@
     if (!target) return null;
     try {
       if (!data) throw new Error('Card data missing');
-      if (!data.front_template?.asset_url || !data.back_template?.asset_url) {
+      if (!templateParts(data.front_template).length || !templateParts(data.back_template).length) {
         throw new Error('Template asset missing');
       }
       target.innerHTML = `
@@ -366,10 +460,15 @@
 
   async function exportFace(target, side, nameBase) {
     const data = target.__wxData;
-    const templateUrl = (side === 'front' ? data.front_template?.asset_url : data.back_template?.asset_url) || '';
-    const templateHref = await assetToDataUrl(templateUrl);
+    const templateSource = side === 'front' ? data.front_template : data.back_template;
+    const convertedParts = await Promise.all(templateParts(templateSource).map(async (part) => ({
+      ...part,
+      asset_url: await assetToDataUrl(part.asset_url || ''),
+    })));
     const imageHref = side === 'front' ? await assetToDataUrl(data.image_url || '') : '';
-    const svgMarkup = side === 'front' ? frontSvg(data, templateHref, imageHref) : backSvg(data, templateHref);
+    const svgMarkup = side === 'front'
+      ? frontSvg(data, { ...templateSource, parts: convertedParts }, imageHref)
+      : backSvg(data, { ...templateSource, parts: convertedParts });
     const temp = document.createElement('div');
     temp.innerHTML = svgMarkup.trim();
     await exportSvgToPng(temp.firstElementChild, `${nameBase}-${side}.png`);
@@ -382,10 +481,15 @@
 
   async function exportFaceBlob(target, side) {
     const data = target.__wxData;
-    const templateUrl = (side === 'front' ? data.front_template?.asset_url : data.back_template?.asset_url) || '';
-    const templateHref = await assetToDataUrl(templateUrl);
+    const templateSource = side === 'front' ? data.front_template : data.back_template;
+    const convertedParts = await Promise.all(templateParts(templateSource).map(async (part) => ({
+      ...part,
+      asset_url: await assetToDataUrl(part.asset_url || ''),
+    })));
     const imageHref = side === 'front' ? await assetToDataUrl(data.image_url || '') : '';
-    const svgMarkup = side === 'front' ? frontSvg(data, templateHref, imageHref) : backSvg(data, templateHref);
+    const svgMarkup = side === 'front'
+      ? frontSvg(data, { ...templateSource, parts: convertedParts }, imageHref)
+      : backSvg(data, { ...templateSource, parts: convertedParts });
     const temp = document.createElement('div');
     temp.innerHTML = svgMarkup.trim();
     return svgToPngBlob(temp.firstElementChild);

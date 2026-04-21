@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WildEx Admin Login</title>
+  <style>
+    :root {
+      --bg: #0b1117;
+      --panel: rgba(16, 24, 32, 0.96);
+      --panel-2: #141f29;
+      --text: #edf6f2;
+      --muted: #8ca0a1;
+      --accent: #d5b46e;
+      --accent-2: #7bbd82;
+      --danger: #ff9e9e;
+      --line: rgba(255,255,255,.08);
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(213,180,110,.16), transparent 30%),
+        linear-gradient(180deg, #13202a, #0b1117 42%);
+    }
+    .shell {
+      width: min(100%, 420px);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      box-shadow: 0 30px 70px rgba(0,0,0,.35);
+    }
+    .eyebrow {
+      color: var(--accent);
+      font-size: .8rem;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 2rem;
+    }
+    p {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    form { display: grid; gap: 12px; }
+    input {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 14px 15px;
+      font: inherit;
+    }
+    button {
+      border: none;
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: linear-gradient(180deg, #e6c47a, #c49d4b);
+      color: #24170b;
+      font: inherit;
+      font-weight: 800;
+    }
+    .error, .status {
+      display: none;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      line-height: 1.45;
+    }
+    .error.visible {
+      display: block;
+      color: var(--danger);
+      background: rgba(145, 47, 47, .18);
+      border: 1px solid rgba(255, 158, 158, .22);
+    }
+    .status.visible {
+      display: block;
+      color: #d8efdb;
+      background: rgba(76, 135, 80, .16);
+      border: 1px solid rgba(123, 189, 130, .2);
+    }
+    .links {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 18px;
+      font-size: .92rem;
+    }
+    a { color: var(--accent-2); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="eyebrow">WildEx Admin</div>
+    <h1>Admin Sign In</h1>
+    <p>Use an approved WildEx admin account to manage card art, templates, icons, and preview compositions.</p>
+    <form id="admin-login-form">
+      <input id="email" type="email" autocomplete="email" placeholder="Admin email" required>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Password" minlength="8" required>
+      <button type="submit">Open Admin</button>
+    </form>
+    <div class="status" id="status-box"></div>
+    <div class="error" id="error-box"></div>
+    <div class="links">
+      <a href="/login">Regular login</a>
+      <a href="/wildex">Back to hub</a>
+    </div>
+  </main>
+  <script>
+    const errorBox = document.getElementById('error-box');
+    const statusBox = document.getElementById('status-box');
+
+    function showError(message) {
+      statusBox.classList.remove('visible');
+      errorBox.textContent = message;
+      errorBox.classList.add('visible');
+    }
+
+    async function verifyAdminAndRedirect() {
+      const resp = await fetch('/admin/me', { credentials: 'same-origin' }).catch(() => null);
+      if (resp && resp.ok) {
+        location.href = '/admin';
+        return true;
+      }
+      return false;
+    }
+
+    document.getElementById('admin-login-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorBox.classList.remove('visible');
+      statusBox.classList.remove('visible');
+      const payload = {
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+      };
+      const resp = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      }).catch(() => null);
+      if (!resp) return showError('Could not reach the server.');
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: 'Login failed' }));
+        return showError(err.detail || 'Login failed');
+      }
+      statusBox.textContent = 'Checking admin access…';
+      statusBox.classList.add('visible');
+      const ok = await verifyAdminAndRedirect();
+      if (!ok) showError('That account is signed in, but it does not have WildEx admin access.');
+    });
+
+    verifyAdminAndRedirect().catch(() => {});
+  </script>
+</body>
+</html>
