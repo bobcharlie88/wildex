@@ -105,13 +105,16 @@ def admin_me(current_user: User = Depends(require_admin_user)):
 
 @router.get("/bootstrap")
 def admin_bootstrap(current_user: User = Depends(require_admin_user)):
-    items = [_template_to_dict(selection) for selection in list_templates()]
+    items: list[dict] = []
+    assets: list[dict] = list_assets()
     samples: list[dict] = []
     if db_available():
         db = SessionLocal()
         try:
             ensure_builtin_templates(db)
             db.commit()
+            items = [_template_to_dict(selection) for selection in list_templates()]
+            assets = list_assets()
             rows = (
                 db.query(Card)
                 .order_by(Card.captured_at.desc(), Card.id.desc())
@@ -126,10 +129,12 @@ def admin_bootstrap(current_user: User = Depends(require_admin_user)):
             } for row in rows]
         finally:
             db.close()
+    if not items:
+        items = [_template_to_dict(selection) for selection in list_templates()]
     return {
         "user": {"id": current_user.id, "email": current_user.email},
         "templates": items,
-        "assets": list_assets(),
+        "assets": assets,
         "template_slots": list(TEMPLATE_PART_SLOTS),
         "samples": samples,
     }
