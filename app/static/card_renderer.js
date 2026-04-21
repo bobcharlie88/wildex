@@ -236,8 +236,8 @@
     });
   }
 
-  function mountSvgFace(target, svgMarkup, themeClass) {
-    target.className = `wx-face ${themeClass}`;
+  function mountSvgFace(target, svgMarkup, themeClass, sideClass) {
+    target.className = ['wx-face', sideClass, themeClass].filter(Boolean).join(' ');
     target.innerHTML = svgMarkup;
   }
 
@@ -253,9 +253,20 @@
       </div>`;
     const front = target.querySelector('.wx-face.front');
     const back = target.querySelector('.wx-face.back');
-    mountSvgFace(front, frontSvg(data, data.image_url || ''), data.theme_class);
-    mountSvgFace(back, backSvg(data), data.theme_class);
+    mountSvgFace(front, frontSvg(data, ''), data.theme_class, 'front');
+    mountSvgFace(back, backSvg(data), data.theme_class, 'back');
     target.__wxData = data;
+    if (data.image_url) {
+      imageToDataUrl(data.image_url)
+        .then((imageHref) => {
+          if (target.__wxData !== data) return;
+          mountSvgFace(front, frontSvg(data, imageHref || data.image_url), data.theme_class, 'front');
+        })
+        .catch(() => {
+          if (target.__wxData !== data) return;
+          mountSvgFace(front, frontSvg(data, data.image_url), data.theme_class, 'front');
+        });
+    }
     return target;
   }
 
