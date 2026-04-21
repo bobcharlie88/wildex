@@ -35,6 +35,8 @@ RARITY_DISPLAY = {
 
 
 def _card_dict(c: Card) -> dict:
+    primary_image_url = c.primary_card_image_url or c.image_url
+    original_image_url = c.original_image_url or primary_image_url
     return {
         "id":                   c.id,
         "species_name":         c.species_name,
@@ -73,8 +75,14 @@ def _card_dict(c: Card) -> dict:
         "latitude":        c.latitude,
         "longitude":       c.longitude,
         "capture_country": c.capture_country,
-        "image_url":       c.image_url,
+        "original_image_url": original_image_url,
+        "primary_card_image_url": primary_image_url,
+        "image_url":       primary_image_url,
         "supporting_image_urls": json.loads(c.supporting_image_urls) if c.supporting_image_urls else [],
+        "front_template_name": c.front_template_name,
+        "front_template_version": c.front_template_version,
+        "back_template_name": c.back_template_name,
+        "back_template_version": c.back_template_version,
         "dex_id":          c.dex_id,
         "discovery_state": c.discovery_state,
         "region":          c.region,
@@ -177,20 +185,21 @@ def reidentify_card(card_id: int, current_user: User = Depends(require_user)):
         row = db.query(Card).filter(Card.id == card_id, Card.owner_id == current_user.id).first()
         if not row:
             raise HTTPException(404, "Card not found")
-        if not row.image_url:
+        primary_image_url = row.primary_card_image_url or row.image_url
+        if not primary_image_url:
             raise HTTPException(400, "Card has no saved image to re-identify")
     finally:
         db.close()
 
     tmp_path = None
     try:
-        if row.image_url.startswith("/uploads/"):
-            local_path = UPLOADS_DIR / Path(row.image_url).name
+        if primary_image_url.startswith("/uploads/"):
+            local_path = UPLOADS_DIR / Path(primary_image_url).name
             if not local_path.exists():
                 raise HTTPException(404, "Saved image file is missing")
             tmp_path = str(local_path)
         else:
-            response = httpx.get(row.image_url, timeout=30.0, follow_redirects=True)
+            response = httpx.get(primary_image_url, timeout=30.0, follow_redirects=True)
             response.raise_for_status()
             content_type = response.headers.get("content-type", "").lower()
             suffix = ".png" if "png" in content_type else ".webp" if "webp" in content_type else ".jpg"
@@ -270,7 +279,9 @@ def reidentify_card(card_id: int, current_user: User = Depends(require_user)):
                 "category": species.category,
                 "sub_category": species.sub_category,
                 "capture_country": gbif.query_country if gbif else row.capture_country,
-                "image_url": row.image_url,
+                "original_image_url": row.original_image_url or row.primary_card_image_url or row.image_url,
+                "primary_card_image_url": row.primary_card_image_url or row.image_url,
+                "image_url": row.primary_card_image_url or row.image_url,
             }))
             sync_card_to_dex(db, row)
             row.discovery_state = DISCOVERY_CAPTURED

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 744 1039">
+  <defs><linearGradient id="bg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e7efe8"/><stop offset="1" stop-color="#cbdde0"/></linearGradient><linearGradient id="bar" x1="0" x2="1"><stop offset="0" stop-color="#3a7687"/><stop offset="1" stop-color="#244b57"/></linearGradient></defs>
+  <rect x="12" y="12" width="720" height="1015" rx="36" fill="url(#bg)" stroke="#244b57" stroke-width="10"/>
+  <rect x="34" y="34" width="676" height="971" rx="24" fill="none" stroke="#3d6470" stroke-width="3"/>
+  <polygon points="54,54 144,54 170,90 144,126 54,126 28,90" fill="#275a68" stroke="#f1fbff" stroke-width="4"/>
+  <rect x="186" y="54" width="360" height="72" rx="14" fill="url(#bar)"/>
+  <rect x="560" y="54" width="140" height="72" rx="22" fill="#244b57" stroke="#f1fbff" stroke-width="3"/>
+  <rect x="56" y="244" width="286" height="400" rx="18" fill="rgba(255,255,255,0.28)" stroke="#3d6470" stroke-width="3"/>
+  <rect x="364" y="244" width="324" height="402" rx="18" fill="#b5d6dc" stroke="#3d6470" stroke-width="3"/>
+  <rect x="58" y="664" width="180" height="48" rx="18" fill="url(#bar)"/>
+  <rect x="58" y="936" width="628" height="54" rx="20" fill="#244b57" stroke="#f1fbff" stroke-width="3"/>
+  <path d="M74 166 C144 130, 232 126, 320 160 C400 191, 516 194, 660 138" fill="none" stroke="#80c4d3" stroke-width="6" opacity=".38"/>
+</svg>

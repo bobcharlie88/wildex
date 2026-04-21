@@ -97,8 +97,14 @@ class Card(Base):
     latitude: Mapped[float | None] = mapped_column(Float)
     longitude: Mapped[float | None] = mapped_column(Float)
     capture_country: Mapped[str | None] = mapped_column(String(10))
+    original_image_url: Mapped[str | None] = mapped_column(String(1000))
+    primary_card_image_url: Mapped[str | None] = mapped_column(String(1000))
     image_url: Mapped[str | None] = mapped_column(String(1000))
     supporting_image_urls: Mapped[str | None] = mapped_column(Text)
+    front_template_name: Mapped[str | None] = mapped_column(String(120))
+    front_template_version: Mapped[str | None] = mapped_column(String(32))
+    back_template_name: Mapped[str | None] = mapped_column(String(120))
+    back_template_version: Mapped[str | None] = mapped_column(String(32))
     dex_entry_id: Mapped[int | None] = mapped_column(ForeignKey("dex_entries.id"), index=True)
     dex_id: Mapped[str | None] = mapped_column(String(32), index=True)
     discovery_state: Mapped[str | None] = mapped_column(String(20))
@@ -122,6 +128,8 @@ class CaptureJob(Base):
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="queued", index=True, nullable=False)
     media_type: Mapped[str | None] = mapped_column(String(32))
+    original_image_url: Mapped[str | None] = mapped_column(String(1000))
+    primary_image_url: Mapped[str | None] = mapped_column(String(1000))
     image_url: Mapped[str | None] = mapped_column(String(1000))
     latitude: Mapped[float | None] = mapped_column(Float)
     longitude: Mapped[float | None] = mapped_column(Float)
@@ -148,6 +156,24 @@ class CaptureJob(Base):
     owner: Mapped[User] = relationship()
     card: Mapped[Card | None] = relationship(foreign_keys=[card_id])
     primary_job: Mapped["CaptureJob | None"] = relationship(remote_side=[id], foreign_keys=[primary_job_id])
+
+
+class CardTemplate(Base):
+    __tablename__ = "card_templates"
+    __table_args__ = (
+        UniqueConstraint("name", "version", name="uq_card_templates_name_version"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), index=True, nullable=False)
+    kingdom: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    side: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    asset_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    version: Mapped[str] = mapped_column(String(32), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    label: Mapped[str | None] = mapped_column(String(120))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class UserDexDiscovery(Base):

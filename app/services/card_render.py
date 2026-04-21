@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
 
+from app.services.card_templates import select_template
 
 RARITY_VALUES = {
     "common": "Common",
@@ -142,6 +143,20 @@ def _stored_or(default, source, key):
     return value
 
 
+def _primary_image(source) -> str | None:
+    value = _value(source, "primary_card_image_url")
+    if not value:
+        value = _value(source, "primary_image_url")
+    if not value:
+        value = _value(source, "image_url")
+    return value
+
+
+def _original_image(source) -> str | None:
+    value = _value(source, "original_image_url")
+    return value or _primary_image(source)
+
+
 def _threat_level(attack: int, hp: int) -> str:
     score = attack * 0.65 + hp * 0.35
     if score >= 82:
@@ -251,6 +266,18 @@ def build_render_card(source) -> dict:
     scientific_name = _value(source, "scientific_name") or "Unknown"
     kingdom_key = _kingdom(_value(source, "category"), _value(source, "sub_category"), _value(source, "iconic_taxon"))
     theme = THEMES[kingdom_key]
+    front_template = select_template(
+        kingdom=kingdom_key,
+        side="front",
+        preferred_name=_value(source, "front_template_name"),
+        preferred_version=_value(source, "front_template_version"),
+    )
+    back_template = select_template(
+        kingdom=kingdom_key,
+        side="back",
+        preferred_name=_value(source, "back_template_name"),
+        preferred_version=_value(source, "back_template_version"),
+    )
     speed = int(stats.get("speed", 50) or 50)
     attack = int(stats.get("attack", 50) or 50)
     defence = int(stats.get("defence", 50) or 50)
@@ -286,7 +313,8 @@ def build_render_card(source) -> dict:
             if _value(source, "observations_count") else
             f"{species_name} has a confirmed WildEx entry."
         ),
-        "image_url": _value(source, "image_url"),
+        "image_url": _primary_image(source),
+        "original_image_url": _original_image(source),
         "sound_url": _value(source, "sound_url"),
         "hp": hp,
         "atk": attack,
@@ -313,6 +341,18 @@ def build_render_card(source) -> dict:
         "accent": theme["accent"],
         "accent_dark": theme["accent_dark"],
         "banner_text": theme["banner_text"],
+        "front_template": {
+            "name": front_template.name,
+            "version": front_template.version,
+            "asset_url": front_template.asset_url,
+            "label": front_template.label,
+        },
+        "back_template": {
+            "name": back_template.name,
+            "version": back_template.version,
+            "asset_url": back_template.asset_url,
+            "label": back_template.label,
+        },
         "confidence": _value(source, "confidence"),
         "provisional": _value(source, "provisional"),
         "rank": _value(source, "rank"),
@@ -329,5 +369,15 @@ def apply_render_fields(target, render_data: dict) -> None:
     target.strength_effect = render_data.get("strength_effect")
     target.weakness_name = render_data.get("weakness_name")
     target.weakness_effect = render_data.get("weakness_effect")
+    if getattr(target, "original_image_url", None) is None:
+        target.original_image_url = render_data.get("original_image_url")
+    if getattr(target, "primary_card_image_url", None) is None:
+        target.primary_card_image_url = render_data.get("image_url")
+    if getattr(target, "image_url", None) is None:
+        target.image_url = render_data.get("image_url")
+    target.front_template_name = render_data.get("front_template", {}).get("name")
+    target.front_template_version = render_data.get("front_template", {}).get("version")
+    target.back_template_name = render_data.get("back_template", {}).get("name")
+    target.back_template_version = render_data.get("back_template", {}).get("version")
     if getattr(target, "sound_url", None) is None:
         target.sound_url = render_data.get("sound_url")

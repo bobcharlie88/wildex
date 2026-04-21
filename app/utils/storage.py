@@ -83,7 +83,9 @@ def upload_bytes(data: bytes, content_type: str | None, suffix: str | None = Non
     fileobj = io.BytesIO(data)
     extra = {"ContentType": content_type or "application/octet-stream"}
     _r2_client().upload_fileobj(fileobj, R2_BUCKET_NAME, key, ExtraArgs=extra)
-    return _public_url(key)
+    url = _public_url(key)
+    log.info("Uploaded capture asset to R2: %s", url)
+    return url
 
 
 def upload_file(image_path: str, content_type: str | None = None) -> str:
@@ -93,7 +95,56 @@ def upload_file(image_path: str, content_type: str | None = None) -> str:
     extra = {"ContentType": guessed_type}
     with path.open("rb") as fh:
         _r2_client().upload_fileobj(fh, R2_BUCKET_NAME, key, ExtraArgs=extra)
-    return _public_url(key)
+    url = _public_url(key)
+    log.info("Uploaded derived capture asset to R2: %s", url)
+    return url
+
+
+def persist_capture_media(
+    *,
+    original_bytes: bytes,
+    original_content_type: str | None,
+    original_suffix: str,
+    extracted_frame_path: str | None = None,
+) -> dict[str, str | None]:
+    original_url = None
+    primary_url = None
+    errors: list[str] = []
+
+    try:
+        original_url = upload_bytes(
+            original_bytes,
+            content_type=original_content_type,
+            suffix=original_suffix,
+        )
+    except (BotoCoreError, ClientError, RuntimeError, OSError) as exc:
+        log.exception("Original upload failed: %s", exc)
+        try:
+            original_url = _write_local_bytes(original_bytes, suffix=original_suffix)
+            log.warning("Fell back to local upload storage for original asset: %s", original_url)
+        except OSError as local_exc:
+            log.exception("Local fallback failed for original upload: %s", local_exc)
+            errors.append(str(local_exc))
+
+    if extracted_frame_path:
+        try:
+            primary_url = upload_file(extracted_frame_path, content_type="image/jpeg")
+        except (BotoCoreError, ClientError, RuntimeError, OSError) as exc:
+            log.exception("Primary frame upload failed: %s", exc)
+            try:
+                primary_url = _write_local_file(extracted_frame_path)
+                log.warning("Fell back to local upload storage for primary frame: %s", primary_url)
+            except OSError as local_exc:
+                log.exception("Local fallback failed for primary frame upload: %s", local_exc)
+                errors.append(str(local_exc))
+    else:
+        primary_url = original_url
+
+    return {
+        "original_url": original_url,
+        "primary_url": primary_url,
+        "error": "; ".join(error for error in errors if error) or None,
+    }
 
 
 def upload_capture_asset(
@@ -103,23 +154,10 @@ def upload_capture_asset(
     original_suffix: str,
     extracted_frame_path: str | None = None,
 ) -> str | None:
-    try:
-        if extracted_frame_path:
-            return upload_file(extracted_frame_path, content_type="image/jpeg")
-        return upload_bytes(
-            original_bytes,
-            content_type=original_content_type,
-            suffix=original_suffix,
-        )
-    except (BotoCoreError, ClientError, RuntimeError, OSError) as exc:
-        log.exception("R2 upload failed: %s", exc)
-        try:
-            if extracted_frame_path:
-                local_url = _write_local_file(extracted_frame_path)
-            else:
-                local_url = _write_local_bytes(original_bytes, suffix=original_suffix)
-            log.warning("Fell back to local upload storage: %s", local_url)
-            return local_url
-        except OSError as local_exc:
-            log.exception("Local upload fallback failed: %s", local_exc)
-            return None
+    result = persist_capture_media(
+        original_bytes=original_bytes,
+        original_content_type=original_content_type,
+        original_suffix=original_suffix,
+        extracted_frame_path=extracted_frame_path,
+    )
+    return result["primary_url"]

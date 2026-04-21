@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, Request
 
 from app.config import (
+    ADMIN_EMAILS,
     SESSION_COOKIE_NAME,
     SESSION_COOKIE_SECURE,
     SESSION_MAX_AGE_SECONDS,
@@ -82,6 +83,13 @@ def require_user(request: Request) -> User:
     user = get_current_user(request)
     if user is None:
         raise HTTPException(401, "Authentication required")
+    return user
+
+
+def require_admin_user(request: Request) -> User:
+    user = require_user(request)
+    if user.email.lower() not in ADMIN_EMAILS:
+        raise HTTPException(403, "Admin access required")
     return user
 
 

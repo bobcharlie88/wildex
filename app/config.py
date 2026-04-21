@@ -18,3 +18,8 @@ SESSION_SECRET = os.getenv("SESSION_SECRET") or os.getenv("SECRET_KEY") or "wild
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "wildex_session")
 SESSION_MAX_AGE_SECONDS = int(os.getenv("SESSION_MAX_AGE_SECONDS", "2592000"))
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "").lower() in {"1", "true", "yes", "on"}
+ADMIN_EMAILS = {
+    email.strip().lower()
+    for email in os.getenv("ADMIN_EMAILS", "").split(",")
+    if email.strip()
+}

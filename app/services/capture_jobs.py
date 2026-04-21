@@ -32,7 +32,7 @@ from app.services.dex import (
     derive_region_code,
     sync_card_to_dex,
 )
-from app.utils.storage import upload_capture_asset
+from app.utils.storage import persist_capture_media
 
 log = logging.getLogger("wildex.capture_jobs")
 
@@ -79,6 +79,8 @@ def _job_payload(job: CaptureJob) -> dict:
         "id": job.id,
         "status": job.status,
         "media_type": job.media_type,
+        "original_image_url": job.original_image_url or job.image_url,
+        "primary_image_url": job.primary_image_url or job.image_url,
         "image_url": job.image_url,
         "latitude": job.latitude,
         "longitude": job.longitude,
@@ -180,14 +182,26 @@ def create_capture_job(*, owner_id: int, content: bytes, content_type: str | Non
             frame_path = frame_tmp.name
             save_frame(frame, frame_path)
 
-        image_url = upload_capture_asset(
+        persisted = persist_capture_media(
             original_bytes=content,
             original_content_type=content_type,
             original_suffix=suffix,
             extracted_frame_path=frame_path if is_video else None,
         )
-        status = "queued" if image_url else "failed"
-        error_message = None if image_url else "Capture upload failed before background processing could start."
+        original_image_url = persisted["original_url"]
+        primary_image_url = persisted["primary_url"]
+        image_url = primary_image_url
+        status = "queued" if primary_image_url else "failed"
+        error_message = persisted["error"] or (
+            None if primary_image_url else "Capture upload failed before background processing could start."
+        )
+        log.info(
+            "Capture upload persisted owner_id=%s media_type=%s original=%s primary=%s",
+            owner_id,
+            "video" if is_video else "image",
+            original_image_url,
+            primary_image_url,
+        )
 
         db = SessionLocal()
         try:
@@ -195,6 +209,8 @@ def create_capture_job(*, owner_id: int, content: bytes, content_type: str | Non
                 owner_id=owner_id,
                 status=status,
                 media_type="video" if is_video else "image",
+                original_image_url=original_image_url,
+                primary_image_url=primary_image_url,
                 image_url=image_url,
                 latitude=lat,
                 longitude=lon,
@@ -205,6 +221,14 @@ def create_capture_job(*, owner_id: int, content: bytes, content_type: str | Non
             db.commit()
             db.refresh(row)
             return serialize_capture_job(row)
+        except Exception:
+            log.exception(
+                "DB save failed after capture upload owner_id=%s original=%s primary=%s",
+                owner_id,
+                original_image_url,
+                primary_image_url,
+            )
+            raise
         finally:
             db.close()
     finally:
@@ -336,6 +360,7 @@ def _materialize_image(image_url: str) -> tuple[str, bool]:
     if image_url.startswith("/uploads/"):
         local_path = Path("uploads") / Path(image_url).name
         if not local_path.exists():
+            log.warning("Missing local image during processing: %s", image_url)
             raise FileNotFoundError("Saved capture image is missing")
         return str(local_path), False
     response = httpx.get(image_url, timeout=30.0, follow_redirects=True)
@@ -405,7 +430,7 @@ def _looks_temporary_failure(message: str) -> bool:
     return is_temporary_identification_error(RuntimeError(message))
 
 
-def _save_completed_card(db, *, owner_id: int, species: SpeciesResult, best_job: CaptureJob, supporting_urls: list[str]) -> tuple[Card, bool]:
+def _save_completed_card(db, *, owner_id: int, species: SpeciesResult, best_job: CaptureJob, supporting_urls: list[str]) -> tuple[Card, bool, str]:
     gbif = None
     if best_job.latitude is not None and best_job.longitude is not None:
         try:
@@ -443,6 +468,8 @@ def _save_completed_card(db, *, owner_id: int, species: SpeciesResult, best_job:
         latitude=best_job.latitude,
         longitude=best_job.longitude,
         capture_country=gbif.query_country if gbif else None,
+        original_image_url=best_job.original_image_url or best_job.primary_image_url or best_job.image_url,
+        primary_card_image_url=best_job.primary_image_url or best_job.image_url,
         image_url=best_job.image_url,
         supporting_image_urls=json.dumps(supporting_urls),
     )
@@ -469,12 +496,23 @@ def _save_completed_card(db, *, owner_id: int, species: SpeciesResult, best_job:
             "category": species.category,
             "sub_category": species.sub_category,
             "capture_country": gbif.query_country if gbif else None,
-            "image_url": best_job.image_url,
+            "original_image_url": best_job.original_image_url or best_job.image_url,
+            "primary_card_image_url": best_job.primary_image_url or best_job.image_url,
+            "image_url": best_job.primary_image_url or best_job.image_url,
         }
     )
     apply_render_fields(row, render_data)
     db.add(row)
     db.flush()
+    log.info(
+        "Saved completed card id=%s owner_id=%s species=%s original=%s primary=%s supporting=%s",
+        row.id,
+        owner_id,
+        row.species_name,
+        row.original_image_url,
+        row.primary_card_image_url,
+        len(supporting_urls),
+    )
     _, previous_state = sync_card_to_dex(db, row)
     row.discovery_state = DISCOVERY_CAPTURED
     db.flush()
@@ -568,6 +606,7 @@ def _process_seed_job(seed_id: int) -> None:
         failures: list[str] = []
         for job in working_set:
             if not job.image_url:
+                log.warning("Capture job missing primary image before identification job_id=%s original=%s", job.id, job.original_image_url)
                 failures.append(f"Capture #{job.id} has no stored image.")
                 continue
             try:
@@ -617,7 +656,18 @@ def _process_seed_job(seed_id: int) -> None:
 
         best_shot = max(best_cluster, key=lambda shot: shot.species.confidence)
         best_job = next(job for job in selected_jobs if job.id == best_shot.job_id)
-        supporting_urls = [job.image_url for job in selected_jobs if job.id != best_job.id and job.image_url]
+        supporting_urls = [
+            (job.primary_image_url or job.image_url)
+            for job in selected_jobs
+            if job.id != best_job.id and (job.primary_image_url or job.image_url)
+        ]
+        log.info(
+            "Selected primary card image job_id=%s image=%s encounter=%s grouped=%s",
+            best_job.id,
+            best_job.primary_image_url or best_job.image_url,
+            encounter_id,
+            len(selected_jobs),
+        )
 
         grouped_confidence = min(
             0.99,

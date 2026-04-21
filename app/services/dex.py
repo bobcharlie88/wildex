@@ -691,6 +691,12 @@ def backfill_user_cards(db: Session, user_id: int) -> None:
                 row.strength_effect,
                 row.weakness_name,
                 row.weakness_effect,
+                row.original_image_url,
+                row.primary_card_image_url,
+                row.front_template_name,
+                row.front_template_version,
+                row.back_template_name,
+                row.back_template_version,
             )
         ):
             apply_render_fields(row, build_render_card(row))

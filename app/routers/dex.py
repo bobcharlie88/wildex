@@ -40,6 +40,8 @@ class SeenEntryPayload(BaseModel):
 
 
 def _card_dict(c: Card) -> dict:
+    primary_image_url = c.primary_card_image_url or c.image_url
+    original_image_url = c.original_image_url or primary_image_url
     return {
         "id": c.id,
         "species_name": c.species_name,
@@ -78,8 +80,14 @@ def _card_dict(c: Card) -> dict:
         "latitude": c.latitude,
         "longitude": c.longitude,
         "capture_country": c.capture_country,
-        "image_url": c.image_url,
+        "original_image_url": original_image_url,
+        "primary_card_image_url": primary_image_url,
+        "image_url": primary_image_url,
         "supporting_image_urls": json.loads(c.supporting_image_urls) if c.supporting_image_urls else [],
+        "front_template_name": c.front_template_name,
+        "front_template_version": c.front_template_version,
+        "back_template_name": c.back_template_name,
+        "back_template_version": c.back_template_version,
         "dex_id": c.dex_id,
         "discovery_state": c.discovery_state,
         "region": c.region,

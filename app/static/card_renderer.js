@@ -36,18 +36,6 @@
     ).join('');
   }
 
-  function themePalette(data) {
-    return {
-      accent: data.accent || '#7a5238',
-      accentDark: data.accent_dark || '#533825',
-      parchment: '#efe0bf',
-      parchmentDark: '#dcc8a1',
-      ink: '#2c1d13',
-      soft: '#5a3d2a',
-      pale: '#f7eedb',
-    };
-  }
-
   function markerSvg(data) {
     const markers = Array.isArray(data.local_markers) ? data.local_markers : [];
     return markers.map((marker) => {
@@ -92,15 +80,20 @@
       ${markers}`;
   }
 
-  function mapSvg(data) {
-    return `
-      <svg xmlns="${SVG_NS}" viewBox="0 0 220 140" width="220" height="140">
-        ${mapInnerSvg(data)}
-      </svg>`;
+  async function assetToDataUrl(url) {
+    if (!url) return '';
+    const resp = await fetch(url, { credentials: 'same-origin' });
+    if (!resp.ok) throw new Error(`Asset fetch failed: ${url}`);
+    const blob = await resp.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
-  function frontSvg(data, imageHref) {
-    const t = themePalette(data);
+  function frontSvg(data, templateHref, imageHref) {
     const infoY = [0, 80, 160, 250, 340];
     const infoRows = [
       ['Common Name', data.common_name || data.species_name],
@@ -112,8 +105,8 @@
     const infoContent = infoRows.map((row, idx) => {
       const lines = chunkText(row[1], idx === 3 ? 28 : 22, idx === 3 ? 3 : 2);
       return `
-        <text x="82" y="${255 + infoY[idx]}" font-size="18" font-weight="700" fill="${t.soft}" letter-spacing="1.2">${esc(row[0].toUpperCase())}</text>
-        ${textLines(lines, 82, 282 + infoY[idx], 22, 22, `fill="${t.ink}" font-family="Georgia, serif"`)}
+        <text x="82" y="${255 + infoY[idx]}" font-size="18" font-weight="700" fill="#5a3d2a" letter-spacing="1.2">${esc(row[0].toUpperCase())}</text>
+        ${textLines(lines, 82, 282 + infoY[idx], 22, 22, 'fill="#2c1d13" font-family="Georgia, serif"')}
       `;
     }).join('');
     const infoLines = chunkText(data.info_text, 52, 6);
@@ -121,119 +114,67 @@
     return `
       <svg xmlns="${SVG_NS}" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}">
         <defs>
-          <linearGradient id="bgFront" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stop-color="${t.parchment}"></stop>
-            <stop offset="100%" stop-color="${t.parchmentDark}"></stop>
-          </linearGradient>
-          <linearGradient id="banner" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0%" stop-color="${t.accent}"></stop>
-            <stop offset="100%" stop-color="${t.accentDark}"></stop>
-          </linearGradient>
+          <clipPath id="photoClip"><rect x="380" y="260" width="292" height="370" rx="14"></rect></clipPath>
         </defs>
-        <rect x="12" y="12" width="720" height="1015" rx="36" fill="url(#bgFront)" stroke="${t.accentDark}" stroke-width="10"></rect>
-        <rect x="34" y="34" width="676" height="971" rx="24" fill="rgba(255,255,255,0.05)" stroke="${t.soft}" stroke-width="3"></rect>
-        <polygon points="54,54 144,54 170,90 144,126 54,126 28,90" fill="#2d5a38" stroke="${t.pale}" stroke-width="4"></polygon>
-        <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="${t.pale}">${esc(data.card_number)}</text>
-        <rect x="186" y="54" width="360" height="72" rx="14" fill="url(#banner)"></rect>
-        <text x="208" y="101" font-size="42" font-weight="800" fill="${t.pale}" letter-spacing="5">WILDEX</text>
-        <rect x="560" y="54" width="140" height="72" rx="22" fill="${t.accentDark}" stroke="${t.pale}" stroke-width="3"></rect>
-        <text x="630" y="100" text-anchor="middle" font-size="28" font-weight="700" fill="${t.pale}">${esc(data.banner_text)}</text>
-        <text x="372" y="176" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="${t.ink}">${esc(data.species_name)}</text>
-        <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="${t.soft}">${esc(data.scientific_name)}</text>
-        <rect x="56" y="244" width="286" height="400" rx="18" fill="rgba(255,255,255,0.22)" stroke="${t.soft}" stroke-width="3"></rect>
+        ${templateHref ? `<image href="${templateHref}" x="0" y="0" width="${CARD_W}" height="${CARD_H}" preserveAspectRatio="none"></image>` : ''}
+        <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(data.card_number)}</text>
+        <text x="208" y="101" font-size="42" font-weight="800" fill="#f7eedb" letter-spacing="5">WILDEX</text>
+        <text x="630" y="100" text-anchor="middle" font-size="28" font-weight="700" fill="#f7eedb">${esc(data.banner_text)}</text>
+        <text x="372" y="176" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(data.species_name)}</text>
+        <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="#5a3d2a">${esc(data.scientific_name)}</text>
         ${infoContent}
-        <rect x="364" y="244" width="324" height="402" rx="18" fill="#cfb187" stroke="${t.soft}" stroke-width="3"></rect>
-        ${imageHref ? `<image href="${imageHref}" x="380" y="260" width="292" height="370" preserveAspectRatio="xMidYMid slice"></image>` : ''}
-        <rect x="58" y="664" width="180" height="48" rx="18" fill="url(#banner)"></rect>
-        <text x="148" y="696" text-anchor="middle" font-size="28" font-weight="800" fill="${t.pale}" letter-spacing="2">INFO</text>
-        ${textLines(infoLines, 64, 748, 28, 24, `fill="${t.ink}" font-family="Georgia, serif"`)}
-        <rect x="58" y="936" width="628" height="54" rx="20" fill="${t.accentDark}" stroke="${t.pale}" stroke-width="3"></rect>
-        <text x="88" y="972" font-size="26" font-weight="800" fill="${t.pale}" letter-spacing="2">FACT</text>
-        ${textLines(factLines, 188, 971, 22, 20, `fill="${t.pale}" font-family="Georgia, serif" font-style="italic"`)}
+        ${imageHref ? `<image href="${imageHref}" x="380" y="260" width="292" height="370" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"></image>` : ''}
+        <text x="148" y="696" text-anchor="middle" font-size="28" font-weight="800" fill="#f7eedb" letter-spacing="2">INFO</text>
+        ${textLines(infoLines, 64, 748, 28, 24, 'fill="#2c1d13" font-family="Georgia, serif"')}
+        <text x="88" y="972" font-size="26" font-weight="800" fill="#f7eedb" letter-spacing="2">FACT</text>
+        ${textLines(factLines, 188, 971, 22, 20, 'fill="#f7eedb" font-family="Georgia, serif" font-style="italic"')}
       </svg>`;
   }
 
-  function backSvg(data) {
-    const t = themePalette(data);
+  function backSvg(data, templateHref) {
     const abilities = (data.abilities || []).slice(0, 3);
     const triggers = (data.environment_triggers || []).slice(0, 2);
     return `
       <svg xmlns="${SVG_NS}" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}">
-        <defs>
-          <linearGradient id="bgBack" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stop-color="${t.parchment}"></stop>
-            <stop offset="100%" stop-color="${t.parchmentDark}"></stop>
-          </linearGradient>
-          <linearGradient id="bannerBack" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0%" stop-color="${t.accent}"></stop>
-            <stop offset="100%" stop-color="${t.accentDark}"></stop>
-          </linearGradient>
-        </defs>
-        <rect x="12" y="12" width="720" height="1015" rx="36" fill="url(#bgBack)" stroke="${t.accentDark}" stroke-width="10"></rect>
-        <rect x="34" y="34" width="676" height="971" rx="24" fill="rgba(255,255,255,0.05)" stroke="${t.soft}" stroke-width="3"></rect>
-        <polygon points="54,54 144,54 170,90 144,126 54,126 28,90" fill="#2d5a38" stroke="${t.pale}" stroke-width="4"></polygon>
-        <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="${t.pale}">${esc(data.card_number)}</text>
-        <rect x="186" y="54" width="360" height="72" rx="14" fill="url(#bannerBack)"></rect>
-        <text x="208" y="100" font-size="30" font-weight="800" fill="${t.pale}" letter-spacing="2">${esc(data.dex_id || 'WILDEX')}</text>
-        <circle cx="650" cy="90" r="44" fill="${t.accentDark}" stroke="${t.pale}" stroke-width="4"></circle>
-        <text x="650" y="101" text-anchor="middle" font-size="20" font-weight="700" fill="${t.pale}">${esc(data.banner_text)}</text>
-        <text x="372" y="176" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="${t.ink}">${esc(data.species_name)}</text>
-        <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="${t.soft}">${esc(data.scientific_name)}</text>
-        <rect x="58" y="246" width="232" height="104" rx="18" fill="rgba(255,255,255,0.24)" stroke="${t.soft}" stroke-width="3"></rect>
-        <text x="78" y="280" font-size="20" font-weight="800" fill="${t.soft}">RARITY</text>
-        <text x="210" y="280" font-size="22" font-weight="700" fill="${t.ink}">${esc(data.rarity)}</text>
-        <text x="78" y="314" font-size="20" font-weight="800" fill="${t.soft}">THREAT LEVEL</text>
-        <text x="220" y="314" font-size="22" font-weight="700" fill="${t.ink}">${esc(data.threat_level)}</text>
-        <text x="78" y="348" font-size="20" font-weight="800" fill="${t.soft}">AGGRESSION</text>
-        <text x="210" y="348" font-size="22" font-weight="700" fill="${t.ink}">${esc(data.aggression)}</text>
-        <rect x="310" y="246" width="378" height="216" rx="18" fill="rgba(255,255,255,0.24)" stroke="${t.soft}" stroke-width="3"></rect>
+        ${templateHref ? `<image href="${templateHref}" x="0" y="0" width="${CARD_W}" height="${CARD_H}" preserveAspectRatio="none"></image>` : ''}
+        <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(data.card_number)}</text>
+        <text x="208" y="100" font-size="30" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(data.dex_id || 'WILDEX')}</text>
+        <text x="650" y="101" text-anchor="middle" font-size="20" font-weight="700" fill="#f7eedb">${esc(data.banner_text)}</text>
+        <text x="372" y="176" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(data.species_name)}</text>
+        <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="#5a3d2a">${esc(data.scientific_name)}</text>
+        <text x="78" y="280" font-size="20" font-weight="800" fill="#5a3d2a">RARITY</text>
+        <text x="210" y="280" font-size="22" font-weight="700" fill="#2c1d13">${esc(data.rarity)}</text>
+        <text x="78" y="314" font-size="20" font-weight="800" fill="#5a3d2a">THREAT LEVEL</text>
+        <text x="220" y="314" font-size="22" font-weight="700" fill="#2c1d13">${esc(data.threat_level)}</text>
+        <text x="78" y="348" font-size="20" font-weight="800" fill="#5a3d2a">AGGRESSION</text>
+        <text x="210" y="348" font-size="22" font-weight="700" fill="#2c1d13">${esc(data.aggression)}</text>
         <g transform="translate(347 284)">
           <g transform="scale(1.52 1.28)">
             ${mapInnerSvg(data)}
           </g>
         </g>
-        <rect x="58" y="380" width="630" height="104" rx="18" fill="rgba(255,255,255,0.24)" stroke="${t.soft}" stroke-width="3"></rect>
-        <text x="78" y="414" font-size="20" font-weight="800" fill="${t.soft}">STRENGTH</text>
-        <text x="78" y="448" font-size="34" font-family="Georgia, serif" font-weight="700" fill="${t.ink}">${esc(data.strength_name)}</text>
-        <text x="78" y="474" font-size="22" fill="${t.ink}">${esc(data.strength_effect)}</text>
-        <rect x="58" y="496" width="630" height="104" rx="18" fill="rgba(255,255,255,0.24)" stroke="${t.soft}" stroke-width="3"></rect>
-        <text x="78" y="530" font-size="20" font-weight="800" fill="${t.soft}">WEAKNESS</text>
-        <text x="78" y="564" font-size="34" font-family="Georgia, serif" font-weight="700" fill="${t.ink}">${esc(data.weakness_name)}</text>
-        <text x="78" y="590" font-size="22" fill="${t.ink}">${esc(data.weakness_effect)}</text>
-        <rect x="58" y="614" width="212" height="196" rx="18" fill="rgba(255,255,255,0.24)" stroke="${t.soft}" stroke-width="3"></rect>
-        <text x="78" y="648" font-size="24" font-weight="800" fill="${t.soft}">HP</text><text x="224" y="648" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="${t.ink}">${data.hp}</text>
-        <text x="78" y="696" font-size="24" font-weight="800" fill="${t.soft}">ATK</text><text x="224" y="696" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="${t.ink}">${data.atk}</text>
-        <text x="78" y="744" font-size="24" font-weight="800" fill="${t.soft}">DEF</text><text x="224" y="744" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="${t.ink}">${data.def}</text>
-        <text x="78" y="792" font-size="24" font-weight="800" fill="${t.soft}">SPD</text><text x="224" y="792" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="${t.ink}">${data.spd}</text>
-        <rect x="288" y="614" width="400" height="104" rx="18" fill="rgba(255,255,255,0.24)" stroke="${t.soft}" stroke-width="3"></rect>
-        <text x="308" y="648" font-size="20" font-weight="800" fill="${t.soft}">TYPE</text>
-        <text x="308" y="678" font-size="32" font-family="Georgia, serif" font-weight="700" fill="${t.ink}">${esc(data.type_label)}</text>
-        <text x="308" y="708" font-size="20" fill="${t.ink}">${esc(data.biome_bonus)}</text>
-        <rect x="288" y="730" width="400" height="132" rx="18" fill="rgba(255,255,255,0.24)" stroke="${t.soft}" stroke-width="3"></rect>
-        <text x="308" y="764" font-size="20" font-weight="800" fill="${t.soft}">ABILITIES</text>
-        ${abilities.map((line, idx) => `<text x="320" y="${798 + idx * 26}" font-size="22" fill="${t.ink}">• ${esc(line)}</text>`).join('')}
-        <rect x="58" y="830" width="630" height="86" rx="18" fill="rgba(255,255,255,0.24)" stroke="${t.soft}" stroke-width="3"></rect>
-        <text x="78" y="862" font-size="20" font-weight="800" fill="${t.soft}">ENVIRONMENT TRIGGERS</text>
-        ${triggers.map((line, idx) => `<text x="78" y="${892 + idx * 22}" font-size="22" fill="${t.ink}">${esc(line)}</text>`).join('')}
-        ${data.sound_url ? `<rect x="186" y="930" width="372" height="54" rx="20" fill="${t.accentDark}" stroke="${t.pale}" stroke-width="3"></rect>
-        <text x="372" y="966" text-anchor="middle" font-size="36" font-family="Georgia, serif" font-weight="700" fill="${t.pale}">Play Call</text>` : ''}
-        <rect x="58" y="988" width="630" height="26" rx="10" fill="${t.accentDark}" opacity="0.92"></rect>
-        <text x="76" y="1007" font-size="15" fill="${t.pale}">Rarity: ${esc(data.rarity)}</text>
-        <text x="290" y="1007" font-size="15" fill="${t.pale}">Threat Level: ${esc(data.threat_level)}</text>
-        <text x="532" y="1007" font-size="15" fill="${t.pale}">Aggression: ${esc(data.aggression)}</text>
+        <text x="78" y="414" font-size="20" font-weight="800" fill="#5a3d2a">STRENGTH</text>
+        <text x="78" y="448" font-size="34" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(data.strength_name)}</text>
+        <text x="78" y="474" font-size="22" fill="#2c1d13">${esc(data.strength_effect)}</text>
+        <text x="78" y="530" font-size="20" font-weight="800" fill="#5a3d2a">WEAKNESS</text>
+        <text x="78" y="564" font-size="34" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(data.weakness_name)}</text>
+        <text x="78" y="590" font-size="22" fill="#2c1d13">${esc(data.weakness_effect)}</text>
+        <text x="78" y="648" font-size="24" font-weight="800" fill="#5a3d2a">HP</text><text x="224" y="648" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${data.hp}</text>
+        <text x="78" y="696" font-size="24" font-weight="800" fill="#5a3d2a">ATK</text><text x="224" y="696" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${data.atk}</text>
+        <text x="78" y="744" font-size="24" font-weight="800" fill="#5a3d2a">DEF</text><text x="224" y="744" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${data.def}</text>
+        <text x="78" y="792" font-size="24" font-weight="800" fill="#5a3d2a">SPD</text><text x="224" y="792" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${data.spd}</text>
+        <text x="308" y="648" font-size="20" font-weight="800" fill="#5a3d2a">TYPE</text>
+        <text x="308" y="678" font-size="32" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(data.type_label)}</text>
+        <text x="308" y="708" font-size="20" fill="#2c1d13">${esc(data.biome_bonus)}</text>
+        <text x="308" y="764" font-size="20" font-weight="800" fill="#5a3d2a">ABILITIES</text>
+        ${abilities.map((line, idx) => `<text x="320" y="${798 + idx * 26}" font-size="22" fill="#2c1d13">&#8226; ${esc(line)}</text>`).join('')}
+        <text x="78" y="862" font-size="20" font-weight="800" fill="#5a3d2a">ENVIRONMENT TRIGGERS</text>
+        ${triggers.map((line, idx) => `<text x="78" y="${892 + idx * 22}" font-size="22" fill="#2c1d13">${esc(line)}</text>`).join('')}
+        ${data.sound_url ? '<text x="372" y="966" text-anchor="middle" font-size="36" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">Play Call</text>' : ''}
+        <text x="76" y="1007" font-size="15" fill="#f7eedb">Rarity: ${esc(data.rarity)}</text>
+        <text x="290" y="1007" font-size="15" fill="#f7eedb">Threat Level: ${esc(data.threat_level)}</text>
+        <text x="532" y="1007" font-size="15" fill="#f7eedb">Aggression: ${esc(data.aggression)}</text>
       </svg>`;
-  }
-
-  async function imageToDataUrl(url) {
-    if (!url) return '';
-    const resp = await fetch(url, { credentials: 'same-origin' });
-    const blob = await resp.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
   }
 
   function mountSvgFace(target, svgMarkup, themeClass, sideClass) {
@@ -242,6 +183,9 @@
   }
 
   function buildCard(target, data) {
+    const frontTemplateUrl = data.front_template?.asset_url || '';
+    const backTemplateUrl = data.back_template?.asset_url || '';
+
     target.innerHTML = `
       <div class="wx-card-shell">
         <div class="wx-flip-card">
@@ -251,22 +195,31 @@
           </div>
         </div>
       </div>`;
+
     const front = target.querySelector('.wx-face.front');
     const back = target.querySelector('.wx-face.back');
-    mountSvgFace(front, frontSvg(data, ''), data.theme_class, 'front');
-    mountSvgFace(back, backSvg(data), data.theme_class, 'back');
+    mountSvgFace(front, frontSvg(data, frontTemplateUrl, data.image_url || ''), data.theme_class, 'front');
+    mountSvgFace(back, backSvg(data, backTemplateUrl), data.theme_class, 'back');
     target.__wxData = data;
-    if (data.image_url) {
-      imageToDataUrl(data.image_url)
-        .then((imageHref) => {
-          if (target.__wxData !== data) return;
-          mountSvgFace(front, frontSvg(data, imageHref || data.image_url), data.theme_class, 'front');
-        })
-        .catch(() => {
-          if (target.__wxData !== data) return;
-          mountSvgFace(front, frontSvg(data, data.image_url), data.theme_class, 'front');
-        });
-    }
+
+    Promise.allSettled([
+      assetToDataUrl(frontTemplateUrl),
+      assetToDataUrl(backTemplateUrl),
+      data.image_url ? assetToDataUrl(data.image_url) : Promise.resolve(''),
+    ]).then(([frontTemplate, backTemplate, photo]) => {
+      if (target.__wxData !== data) return;
+      const frontHref = frontTemplate.status === 'fulfilled' ? (frontTemplate.value || frontTemplateUrl) : frontTemplateUrl;
+      const backHref = backTemplate.status === 'fulfilled' ? (backTemplate.value || backTemplateUrl) : backTemplateUrl;
+      const photoHref = photo.status === 'fulfilled' ? (photo.value || data.image_url || '') : (data.image_url || '');
+      if (!photoHref) {
+        console.warn('WildEx card render missing image', { dexId: data.dex_id, species: data.species_name });
+      }
+      mountSvgFace(front, frontSvg(data, frontHref, photoHref), data.theme_class, 'front');
+      mountSvgFace(back, backSvg(data, backHref), data.theme_class, 'back');
+    }).catch((err) => {
+      console.warn('WildEx card renderer asset fallback', err);
+    });
+
     return target;
   }
 
@@ -329,8 +282,10 @@
 
   async function exportFace(target, side, nameBase) {
     const data = target.__wxData;
-    const imageHref = side === 'front' ? await imageToDataUrl(data.image_url || '') : '';
-    const svgMarkup = side === 'front' ? frontSvg(data, imageHref) : backSvg(data);
+    const templateUrl = (side === 'front' ? data.front_template?.asset_url : data.back_template?.asset_url) || '';
+    const templateHref = await assetToDataUrl(templateUrl);
+    const imageHref = side === 'front' ? await assetToDataUrl(data.image_url || '') : '';
+    const svgMarkup = side === 'front' ? frontSvg(data, templateHref, imageHref) : backSvg(data, templateHref);
     const temp = document.createElement('div');
     temp.innerHTML = svgMarkup.trim();
     await exportSvgToPng(temp.firstElementChild, `${nameBase}-${side}.png`);
@@ -343,14 +298,29 @@
 
   async function exportFaceBlob(target, side) {
     const data = target.__wxData;
-    const imageHref = side === 'front' ? await imageToDataUrl(data.image_url || '') : '';
-    const svgMarkup = side === 'front' ? frontSvg(data, imageHref) : backSvg(data);
+    const templateUrl = (side === 'front' ? data.front_template?.asset_url : data.back_template?.asset_url) || '';
+    const templateHref = await assetToDataUrl(templateUrl);
+    const imageHref = side === 'front' ? await assetToDataUrl(data.image_url || '') : '';
+    const svgMarkup = side === 'front' ? frontSvg(data, templateHref, imageHref) : backSvg(data, templateHref);
     const temp = document.createElement('div');
     temp.innerHTML = svgMarkup.trim();
     return svgToPngBlob(temp.firstElementChild);
   }
 
   function sampleCards() {
+    const makeTemplates = (kingdom) => ({
+      front_template: {
+        name: `${kingdom}-front-master`,
+        version: '1.0.0',
+        asset_url: `/static/card_templates/${kingdom}/front-v1.svg`,
+      },
+      back_template: {
+        name: `${kingdom}-back-master`,
+        version: '1.0.0',
+        asset_url: `/static/card_templates/${kingdom}/back-v1.svg`,
+      },
+    });
+
     return [
       {
         species_name: 'Ring-tailed Dragon',
@@ -375,7 +345,8 @@
         abilities: ['Flatten Body', 'Band-tail Decoy'],
         environment_triggers: ['Gains advantage in rocky desert terrain', 'Vulnerable to cold rain conditions'],
         range_mode: 'region', range_regions: ['AU'], local_markers: [{ region: 'AU', x: 79, y: 60 }],
-        theme_class: 'theme-reptile', accent: '#8a4d2f', accent_dark: '#5c3321', banner_text: 'DRAGON',
+        theme_class: 'theme-reptile', banner_text: 'DRAGON',
+        ...makeTemplates('reptile'),
       },
       {
         species_name: 'Red Kangaroo', scientific_name: 'Macropus rufus', common_name: 'Red Kangaroo',
@@ -390,7 +361,8 @@
         abilities: ['Powerful Kick', 'Hop Away'],
         environment_triggers: ['Gains advantage in desert terrain', 'Vulnerable in heavy rain'],
         range_mode: 'region', range_regions: ['AU'], local_markers: [{ region: 'AU', x: 102, y: 84 }],
-        theme_class: 'theme-mammal', accent: '#6f5938', accent_dark: '#4d3c24', banner_text: 'PAW',
+        theme_class: 'theme-mammal', banner_text: 'PAW',
+        ...makeTemplates('mammal'),
       },
       {
         species_name: 'Great White Shark', scientific_name: 'Carcharodon carcharias', common_name: 'Great White Shark',
@@ -405,7 +377,8 @@
         abilities: ['Burst Rush', 'Ambush Bite'],
         environment_triggers: ['Gains advantage in marine terrain', 'Vulnerable to shallow heat conditions'],
         range_mode: 'ocean', range_regions: ['PACIFIC', 'INDIAN', 'ATLANTIC'], local_markers: [],
-        theme_class: 'theme-fish', accent: '#3a7687', accent_dark: '#244b57', banner_text: 'FISH',
+        theme_class: 'theme-fish', banner_text: 'FISH',
+        ...makeTemplates('fish'),
       },
       {
         species_name: 'Bald Eagle', scientific_name: 'Haliaeetus leucocephalus', common_name: 'Bald Eagle',
@@ -420,7 +393,8 @@
         abilities: ['High Scan', 'Dive Strike'],
         environment_triggers: ['Gains advantage in elevated terrain', 'Vulnerable to dense brush conditions'],
         range_mode: 'world', range_regions: ['NA'], local_markers: [{ region: 'NA', x: 34, y: 36 }],
-        theme_class: 'theme-bird', accent: '#7b8795', accent_dark: '#56606b', banner_text: 'WING',
+        theme_class: 'theme-bird', banner_text: 'WING',
+        ...makeTemplates('bird'),
       },
       {
         species_name: 'Giant Praying Mantis', scientific_name: 'Hierodula majuscula', common_name: 'Giant Praying Mantis',
@@ -435,7 +409,8 @@
         abilities: ['Ambush Grab', 'Leaf Stillness'],
         environment_triggers: ['Gains advantage in brushland terrain', 'Vulnerable to cold snap conditions'],
         range_mode: 'region', range_regions: ['AU'], local_markers: [{ region: 'AU', x: 94, y: 78 }],
-        theme_class: 'theme-insect', accent: '#8b7a34', accent_dark: '#625523', banner_text: 'INSECT',
+        theme_class: 'theme-insect', banner_text: 'INSECT',
+        ...makeTemplates('insect'),
       },
       {
         species_name: 'Pitcher Plant', scientific_name: 'Nepenthes rafflesiana', common_name: 'Pitcher Plant',
@@ -450,7 +425,8 @@
         abilities: ['Pitfall Trap', 'Digestive Pool'],
         environment_triggers: ['Gains advantage in humid terrain', 'Vulnerable to transplant shock conditions'],
         range_mode: 'world', range_regions: ['AS'], local_markers: [{ region: 'AS', x: 139, y: 48 }],
-        theme_class: 'theme-plant', accent: '#4c7f4f', accent_dark: '#305533', banner_text: 'LEAF',
+        theme_class: 'theme-plant', banner_text: 'LEAF',
+        ...makeTemplates('plant'),
       },
     ];
   }
