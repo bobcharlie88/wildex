@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
@@ -176,6 +177,10 @@ async def upload_asset(
         raise HTTPException(400, f"Unsupported file type: {guessed_mime}")
 
     asset_slug = slugify(name)
+    normalized_asset_type = (asset_type or "").strip().lower()
+    normalized_template_part = (template_part or "").strip().lower()
+    if normalized_asset_type == "map_asset" and not normalized_template_part:
+        normalized_template_part = "map_frame"
     folder = "/".join(part for part in [asset_type, category or "default"] if part)
     uploaded_url = upload_named_bytes(
         data=data,
@@ -203,14 +208,14 @@ async def upload_asset(
             db.add(row)
         row.name = name.strip()
         row.slug = asset_slug
-        row.asset_type = asset_type.strip()
+        row.asset_type = normalized_asset_type
         row.file_path = uploaded_url
         row.mime_type = guessed_mime
         row.kingdom = (kingdom or "").strip().lower() or None
         row.family = (family or "").strip().lower() or None
         row.environment = (environment or "").strip().lower() or None
         row.side = (side or "").strip().lower() or None
-        row.template_part = (template_part or "").strip().lower() or None
+        row.template_part = normalized_template_part or None
         row.version = (version or "1.0.0").strip()
         row.active = bool(active)
         row.sort_order = int(sort_order or 100)
