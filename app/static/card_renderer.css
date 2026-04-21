@@ -2,24 +2,29 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.wx-flip-card {
   width: min(
     100%,
     390px,
-    calc((100svh - var(--wx-card-viewport-offset, 0px)) * 0.7159)
+    calc((100dvh - var(--wx-card-viewport-offset, 0px)) * 0.7159)
   );
-  max-height: calc(100svh - var(--wx-card-viewport-offset, 0px));
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.wx-flip-card {
+  position: relative;
+  width: 100%;
+  max-height: calc(100dvh - var(--wx-card-viewport-offset, 0px));
+  min-height: clamp(420px, 72vw, 545px);
   aspect-ratio: 63 / 88;
   perspective: 1600px;
-  margin: 0 auto;
 }
 
 .wx-flip-inner {
   position: relative;
   width: 100%;
   height: 100%;
+  min-height: inherit;
   transform-style: preserve-3d;
   transition: transform 0.45s ease;
 }
@@ -61,8 +66,37 @@
   position: relative;
   width: 100%;
   height: 100%;
+  min-height: inherit;
   color: #2c1d13;
   font-family: Georgia, serif;
+}
+
+.wx-render-error {
+  width: min(100%, 420px);
+  margin: 0 auto;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(145, 62, 62, 0.5);
+  background: linear-gradient(180deg, rgba(64, 17, 17, 0.92), rgba(34, 10, 10, 0.98));
+  color: #ffe5e5;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.34);
+}
+
+.wx-render-error strong {
+  display: block;
+  font-family: "Segoe UI", sans-serif;
+  font-size: 0.92rem;
+  letter-spacing: 0.04rem;
+  text-transform: uppercase;
+}
+
+.wx-render-error code,
+.wx-render-error span {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .wx-template-image {

@@ -963,11 +963,14 @@
       if (!data) return;
       document.getElementById('modal-title').textContent = data.species_name;
       document.getElementById('modal-subtitle').textContent = `${entry.dex_id} · ${familyLabel(entry)}`;
-      WildExCardRenderer.buildCard(document.getElementById('detail-card-host'), data);
       document.getElementById('favorite-btn').textContent = state.user?.favorite_card_id === entry.card.id ? 'Favorite Selected' : 'Set Favorite';
       document.getElementById('reid-btn').classList.toggle('hidden', (entry.card.species_name || '') !== 'Pending identification');
       document.getElementById('play-call-btn').classList.toggle('hidden', !data.sound_url);
       document.getElementById('card-modal').classList.add('open');
+      requestAnimationFrame(() => {
+        if (state.activeEntry?.id !== entry.id) return;
+        WildExCardRenderer.buildCard(document.getElementById('detail-card-host'), data);
+      });
     }
 
     function closeModal() {

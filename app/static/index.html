@@ -1768,8 +1768,11 @@
         <a class="btn btn-secondary" href="/wildex" style="text-align:center;text-decoration:none;display:block;padding:15px">View WildDex</a>
       `;
       currentResultExportName = (c.render_card && c.render_card.dex_id) || c.dex_id || c.species_name || 'wildex-card';
-      WildExCardRenderer.buildCard($('result-card-host'), c.render_card);
       show('result-screen');
+      requestAnimationFrame(() => {
+        if (!$('result-card-host')) return;
+        WildExCardRenderer.buildCard($('result-card-host'), c.render_card);
+      });
     }
 
     function resetCapture() {

@@ -268,19 +268,41 @@
       </div>`;
   }
 
-  function buildCard(target, data) {
-    target.innerHTML = `
-      <div class="wx-card-shell">
-        <div class="wx-flip-card">
-          <div class="wx-flip-inner">
-            <div class="wx-face front ${esc(data.theme_class)}">${frontFaceHtml(data)}</div>
-            <div class="wx-face back ${esc(data.theme_class)}">${backFaceHtml(data)}</div>
-          </div>
-        </div>
+  function renderErrorHtml(reason, data = {}) {
+    const templatePath = data.front_template?.asset_url || data.back_template?.asset_url || 'missing';
+    return `
+      <div class="wx-render-error" role="alert">
+        <strong>Card preview unavailable</strong>
+        <span>${esc(reason || 'Unknown render failure')}</span>
+        <code>template: ${esc(templatePath)}</code>
+        <code>species: ${esc(data.species_name || 'Unknown')}</code>
       </div>`;
-    target.__wxData = data;
-    if (!data.image_url) {
-      console.warn('WildEx card render missing image', { dexId: data.dex_id, species: data.species_name });
+  }
+
+  function buildCard(target, data) {
+    if (!target) return null;
+    try {
+      if (!data) throw new Error('Card data missing');
+      if (!data.front_template?.asset_url || !data.back_template?.asset_url) {
+        throw new Error('Template asset missing');
+      }
+      target.innerHTML = `
+        <div class="wx-card-shell">
+          <div class="wx-flip-card">
+            <div class="wx-flip-inner">
+              <div class="wx-face front ${esc(data.theme_class)}">${frontFaceHtml(data)}</div>
+              <div class="wx-face back ${esc(data.theme_class)}">${backFaceHtml(data)}</div>
+            </div>
+          </div>
+        </div>`;
+      target.__wxData = data;
+      if (!data.image_url) {
+        console.warn('WildEx card render missing image', { dexId: data.dex_id, species: data.species_name });
+      }
+    } catch (error) {
+      console.error('WildEx card render failed', { error, data });
+      target.innerHTML = renderErrorHtml(error?.message || 'Card render failed', data);
+      target.__wxData = data || null;
     }
     return target;
   }
