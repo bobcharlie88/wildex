@@ -100,6 +100,7 @@ def parse_tags(value: str | None) -> list[str]:
 
 
 def asset_to_dict(row: CardAsset) -> dict:
+    template_part = row.template_part or ("map_frame" if row.asset_type == "map_asset" else None)
     return {
         "id": row.id,
         "name": row.name,
@@ -112,7 +113,7 @@ def asset_to_dict(row: CardAsset) -> dict:
         "family": row.family,
         "environment": row.environment,
         "side": row.side,
-        "template_part": row.template_part,
+        "template_part": template_part,
         "version": row.version,
         "active": bool(row.active),
         "sort_order": row.sort_order,
@@ -125,6 +126,7 @@ def asset_to_dict(row: CardAsset) -> dict:
 
 
 def selection_from_row(row: CardAsset) -> AssetSelection:
+    template_part = row.template_part or ("map_frame" if row.asset_type == "map_asset" else None)
     return AssetSelection(
         id=row.id,
         name=row.name,
@@ -136,7 +138,7 @@ def selection_from_row(row: CardAsset) -> AssetSelection:
         family=row.family,
         environment=row.environment,
         side=row.side,
-        template_part=row.template_part,
+        template_part=template_part,
         version=row.version,
         active=bool(row.active),
         sort_order=row.sort_order or 100,

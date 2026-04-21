@@ -112,6 +112,10 @@ def admin_bootstrap(current_user: User = Depends(require_admin_user)):
         db = SessionLocal()
         try:
             ensure_builtin_templates(db)
+            db.query(CardAsset).filter(
+                CardAsset.asset_type == "map_asset",
+                CardAsset.template_part.is_(None),
+            ).update({"template_part": "map_frame"}, synchronize_session=False)
             db.commit()
             items = [_template_to_dict(selection) for selection in list_templates()]
             assets = list_assets()
