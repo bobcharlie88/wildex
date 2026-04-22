@@ -14,6 +14,7 @@ logging.basicConfig(
 )
 
 from app.auth import get_current_user
+from app.routers.agents import router as agents_router
 from app.routers.admin import router as admin_router
 from app.routers.auth import router as auth_router
 from app.routers.capture import router as capture_router
@@ -25,6 +26,7 @@ from app.services.capture_jobs import start_capture_worker, stop_capture_worker
 log = logging.getLogger("wildex")
 
 app = FastAPI(title="WildEx API", version="0.1.0")
+app.include_router(agents_router)
 app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(capture_router)
@@ -55,6 +57,9 @@ def startup():
                     ("sub_category", "VARCHAR(100)"),
                     ("image_url",    "VARCHAR(1000)"),
                     ("supporting_image_urls", "TEXT"),
+                    ("card_payload_json", "TEXT"),
+                    ("card_payload_version", "VARCHAR(32)"),
+                    ("render_status", "VARCHAR(20)"),
                     ("rarity_display", "VARCHAR(50)"),
                     ("threat_level", "VARCHAR(32)"),
                     ("aggression", "VARCHAR(32)"),
@@ -79,6 +84,8 @@ def startup():
                     ("front_template_version", "VARCHAR(32)"),
                     ("back_template_name", "VARCHAR(120)"),
                     ("back_template_version", "VARCHAR(32)"),
+                    ("front_template_id", "INTEGER"),
+                    ("back_template_id", "INTEGER"),
                 ]:
                     try:
                         conn.execute(text(f"ALTER TABLE cards ADD COLUMN IF NOT EXISTS {col} {typedef}"))

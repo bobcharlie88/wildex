@@ -307,57 +307,101 @@
     return (items || []).slice(0, 2).map((item) => `<div class="wx-trigger-line">${esc(item)}</div>`).join('');
   }
 
+  function slotContent(data, key, fallback = {}) {
+    const slotMap = data.slot_content || {};
+    return slotMap[key] || fallback;
+  }
+
   function frontFaceHtml(data) {
+    const namePlate = slotContent(data, 'name_plate', { title: data.species_name, subtitle: data.scientific_name });
+    const infoPanel = slotContent(data, 'info_panel', {});
+    const infoRows = Array.isArray(infoPanel.rows) ? infoPanel.rows : [
+      { label: 'Common Name', value: data.common_name || data.species_name },
+      { label: 'Scientific Name', value: data.scientific_name },
+      { label: 'Length', value: data.length_text },
+      { label: 'Habitat', value: data.habitat_text },
+      { label: 'Diet', value: data.diet_text },
+    ];
+    const creatureArt = slotContent(data, 'creature_art', { image_url: data.image_url });
+    const numberBadge = slotContent(data, 'number_badge', { text: data.card_number });
+    const titleBanner = slotContent(data, 'title_banner', { text: 'WILDEX' });
+    const kingdomBadge = slotContent(data, 'kingdom_badge', { text: data.banner_text });
+    const infoBanner = slotContent(data, 'info_banner', { text: 'INFO' });
+    const infoText = slotContent(data, 'info_text', { text: data.info_text || '' });
+    const factBanner = slotContent(data, 'fact_banner', { text: 'FACT' });
+    const factText = slotContent(data, 'fact_text', { text: data.fact_text || '' });
     return `
       <div class="wx-template-frame">
         ${htmlPartLayers(data.front_template, 'front')}
-        <div class="wx-front-number">${esc(data.card_number)}</div>
-        <div class="wx-front-wordmark">WILDEX</div>
-        <div class="wx-front-banner">${esc(data.banner_text)}</div>
-        <div class="wx-front-name">${esc(data.species_name)}</div>
-        <div class="wx-front-scientific">${esc(data.scientific_name)}</div>
-        <div class="wx-front-info">${infoRowsHtml(data)}</div>
+        <div class="wx-front-number">${esc(numberBadge.text || data.card_number)}</div>
+        <div class="wx-front-wordmark">${esc(titleBanner.text || 'WILDEX')}</div>
+        <div class="wx-front-banner">${esc(kingdomBadge.text || data.banner_text)}</div>
+        <div class="wx-front-name">${esc(namePlate.title || data.species_name)}</div>
+        <div class="wx-front-scientific">${esc(namePlate.subtitle || data.scientific_name)}</div>
+        <div class="wx-front-info">${infoRows.map((row) => `
+          <div class="wx-info-row">
+            <div class="wx-info-label">${esc(row.label)}</div>
+            <div class="wx-info-value">${esc(row.value || '')}</div>
+          </div>
+        `).join('')}</div>
         <div class="wx-front-photo">
-          ${data.image_url ? `<img class="wx-photo-image" src="${esc(data.image_url)}" alt="">` : `<div class="wx-photo-missing">No image</div>`}
+          ${creatureArt.image_url || data.image_url ? `<img class="wx-photo-image" src="${esc(creatureArt.image_url || data.image_url)}" alt="">` : `<div class="wx-photo-missing">No image</div>`}
         </div>
-        <div class="wx-front-info-tag">INFO</div>
-        <div class="wx-front-info-text">${esc(data.info_text || '')}</div>
-        <div class="wx-front-fact-tag">FACT</div>
-        <div class="wx-front-fact-text">${esc(data.fact_text || '')}</div>
+        <div class="wx-front-info-tag">${esc(infoBanner.text || 'INFO')}</div>
+        <div class="wx-front-info-text">${esc(infoText.text || data.info_text || '')}</div>
+        <div class="wx-front-fact-tag">${esc(factBanner.text || 'FACT')}</div>
+        <div class="wx-front-fact-text">${esc(factText.text || data.fact_text || '')}</div>
       </div>`;
   }
 
   function backFaceHtml(data) {
+    const namePlate = slotContent(data, 'name_plate', { title: data.species_name, subtitle: data.scientific_name });
+    const statusPanel = slotContent(data, 'status_panel', {});
+    const strengthBox = slotContent(data, 'strength_box', { title: data.strength_name, text: data.strength_effect });
+    const weaknessBox = slotContent(data, 'weakness_box', { title: data.weakness_name, text: data.weakness_effect });
+    const statPanel = slotContent(data, 'stat_panel', {});
+    const typePanel = slotContent(data, 'type_panel', { title: data.type_label, text: data.biome_bonus });
+    const abilitiesPanel = slotContent(data, 'abilities_panel', { rows: data.abilities });
+    const environmentPanel = slotContent(data, 'environment_panel', { rows: data.environment_triggers });
+    const callButton = slotContent(data, 'call_button', { label: 'Play Call', enabled: !!data.sound_url });
+    const bottomStrip = slotContent(data, 'bottom_strip', { items: [`Rarity: ${data.rarity}`, `Threat Level: ${data.threat_level}`, `Aggression: ${data.aggression}`] });
+    const numberBadge = slotContent(data, 'number_badge', { text: data.card_number });
+    const titleBanner = slotContent(data, 'title_banner', { text: data.dex_id || 'WILDEX' });
+    const kingdomBadge = slotContent(data, 'kingdom_badge', { text: data.banner_text });
+    const statusRows = Array.isArray(statusPanel.rows) ? statusPanel.rows : [
+      { label: 'Rarity', value: data.rarity },
+      { label: 'Threat', value: data.threat_level },
+      { label: 'Aggression', value: data.aggression },
+    ];
+    const statRows = Array.isArray(statPanel.rows) ? statPanel.rows : [
+      { label: 'HP', value: data.hp },
+      { label: 'ATK', value: data.atk },
+      { label: 'DEF', value: data.def },
+      { label: 'SPD', value: data.spd },
+    ];
     return `
       <div class="wx-template-frame">
         ${htmlPartLayers(data.back_template, 'back')}
-        <div class="wx-back-number">${esc(data.card_number)}</div>
-        <div class="wx-back-dex">${esc(data.dex_id || 'WILDEX')}</div>
-        <div class="wx-back-badge">${esc(data.banner_text)}</div>
-        <div class="wx-back-name">${esc(data.species_name)}</div>
-        <div class="wx-back-scientific">${esc(data.scientific_name)}</div>
+        <div class="wx-back-number">${esc(numberBadge.text || data.card_number)}</div>
+        <div class="wx-back-dex">${esc(titleBanner.text || data.dex_id || 'WILDEX')}</div>
+        <div class="wx-back-badge">${esc(kingdomBadge.text || data.banner_text)}</div>
+        <div class="wx-back-name">${esc(namePlate.title || data.species_name)}</div>
+        <div class="wx-back-scientific">${esc(namePlate.subtitle || data.scientific_name)}</div>
         <div class="wx-back-status">
-          <div><strong>Rarity</strong><span>${esc(data.rarity)}</span></div>
-          <div><strong>Threat</strong><span>${esc(data.threat_level)}</span></div>
-          <div><strong>Aggression</strong><span>${esc(data.aggression)}</span></div>
+          ${statusRows.map((row) => `<div><strong>${esc(row.label)}</strong><span>${esc(row.value || '')}</span></div>`).join('')}
         </div>
         <div class="wx-back-map">${mapSvg(data)}</div>
-        <div class="wx-back-strength"><strong>STRENGTH</strong><span>${esc(data.strength_name)}</span><em>${esc(data.strength_effect)}</em></div>
-        <div class="wx-back-weakness"><strong>WEAKNESS</strong><span>${esc(data.weakness_name)}</span><em>${esc(data.weakness_effect)}</em></div>
+        <div class="wx-back-strength"><strong>STRENGTH</strong><span>${esc(strengthBox.title || data.strength_name)}</span><em>${esc(strengthBox.text || data.strength_effect)}</em></div>
+        <div class="wx-back-weakness"><strong>WEAKNESS</strong><span>${esc(weaknessBox.title || data.weakness_name)}</span><em>${esc(weaknessBox.text || data.weakness_effect)}</em></div>
         <div class="wx-back-stats">
-          <div><strong>HP</strong><span>${esc(data.hp)}</span></div>
-          <div><strong>ATK</strong><span>${esc(data.atk)}</span></div>
-          <div><strong>DEF</strong><span>${esc(data.def)}</span></div>
-          <div><strong>SPD</strong><span>${esc(data.spd)}</span></div>
+          ${statRows.map((row) => `<div><strong>${esc(row.label)}</strong><span>${esc(row.value)}</span></div>`).join('')}
         </div>
-        <div class="wx-back-type"><strong>TYPE</strong><span>${esc(data.type_label)}</span><em>${esc(data.biome_bonus)}</em></div>
-        <div class="wx-back-abilities"><strong>ABILITIES</strong>${listHtml(data.abilities)}</div>
-        <div class="wx-back-triggers"><strong>ENVIRONMENT TRIGGERS</strong>${triggerHtml(data.environment_triggers)}</div>
-        <div class="wx-back-call ${data.sound_url ? '' : 'is-hidden'}">Play Call</div>
+        <div class="wx-back-type"><strong>TYPE</strong><span>${esc(typePanel.title || data.type_label)}</span><em>${esc(typePanel.text || data.biome_bonus)}</em></div>
+        <div class="wx-back-abilities"><strong>ABILITIES</strong>${listHtml(abilitiesPanel.rows || data.abilities)}</div>
+        <div class="wx-back-triggers"><strong>ENVIRONMENT TRIGGERS</strong>${triggerHtml(environmentPanel.rows || data.environment_triggers)}</div>
+        <div class="wx-back-call ${(callButton.enabled || data.sound_url) ? '' : 'is-hidden'}">${esc(callButton.label || 'Play Call')}</div>
         <div class="wx-back-footer">
-          <span>Rarity: ${esc(data.rarity)}</span>
-          <span>Threat Level: ${esc(data.threat_level)}</span>
-          <span>Aggression: ${esc(data.aggression)}</span>
+          ${(bottomStrip.items || []).map((item) => `<span>${esc(item)}</span>`).join('')}
         </div>
       </div>`;
   }

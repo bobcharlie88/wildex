@@ -14,7 +14,7 @@ from pathlib import Path
 import httpx
 
 from app.database import SessionLocal, db_available
-from app.models import Card, CaptureJob
+from app.models import Card, CaptureJob, ReviewQueueItem, SpeciesResultRecord
 from app.pipeline.card_generator import generate_card
 from app.pipeline.frame_extractor import extract_best_frame, save_frame
 from app.pipeline.species_data import get_species_data
@@ -24,6 +24,7 @@ from app.pipeline.species_id import (
     identify_species,
     is_temporary_identification_error,
 )
+from app.services.agents.orchestrator import run_agent_task
 from app.services.card_render import apply_render_fields, build_render_card
 from app.services.dex import (
     DISCOVERY_CAPTURED,
@@ -430,6 +431,56 @@ def _looks_temporary_failure(message: str) -> bool:
     return is_temporary_identification_error(RuntimeError(message))
 
 
+def _persist_species_result(
+    db,
+    *,
+    capture_job_id: int | None,
+    card_id: int | None,
+    agent_result: dict,
+) -> SpeciesResultRecord:
+    payload = agent_result.get("payload") or {}
+    row = SpeciesResultRecord(
+        capture_job_id=capture_job_id,
+        card_id=card_id,
+        agent_task_id=agent_result.get("task_id"),
+        common_name=payload.get("common_name"),
+        scientific_name=payload.get("scientific_name"),
+        confidence=payload.get("confidence"),
+        needs_review=bool(payload.get("needs_review")),
+        review_reason=payload.get("review_reason"),
+        evidence_summary=payload.get("evidence_summary"),
+        candidate_list_json=json.dumps(payload.get("candidate_list") or []),
+        taxon_id=payload.get("taxon_id"),
+        iconic_taxon=payload.get("iconic_taxon"),
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def _create_review_queue_item(
+    db,
+    *,
+    capture_job_id: int | None,
+    card_id: int | None,
+    species_result_id: int | None,
+    agent_result: dict,
+) -> ReviewQueueItem:
+    payload = agent_result.get("payload") or {}
+    row = ReviewQueueItem(
+        capture_job_id=capture_job_id,
+        card_id=card_id,
+        species_result_id=species_result_id,
+        reason=payload.get("reason") or "Capture requires manual review.",
+        priority=payload.get("priority") or "medium",
+        status="open",
+        evidence_summary=payload.get("evidence_summary"),
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
 def _save_completed_card(db, *, owner_id: int, species: SpeciesResult, best_job: CaptureJob, supporting_urls: list[str]) -> tuple[Card, bool, str]:
     gbif = None
     if best_job.latitude is not None and best_job.longitude is not None:
@@ -473,35 +524,47 @@ def _save_completed_card(db, *, owner_id: int, species: SpeciesResult, best_job:
         image_url=best_job.image_url,
         supporting_image_urls=json.dumps(supporting_urls),
     )
-    render_data = build_render_card(
-        {
-            "species_name": card.common_name,
-            "scientific_name": card.scientific_name,
-            "rank": card.rank,
-            "confidence": card.confidence,
-            "provisional": card.provisional,
-            "rarity_tier": card.rarity_tier,
-            "rarity_display": card.rarity_display,
-            "iconic_taxon": card.iconic_taxon,
-            "conservation_status": card.conservation_status,
-            "observations_count": card.observations_count,
-            "blurb": card.blurb,
-            "stats": {
-                "speed": card.stats.speed,
-                "attack": card.stats.attack,
-                "defence": card.stats.defence,
-                "hp": card.stats.hp,
-                "stamina_regen": card.stats.stamina_regen,
-            },
-            "category": species.category,
-            "sub_category": species.sub_category,
-            "capture_country": gbif.query_country if gbif else None,
-            "original_image_url": best_job.original_image_url or best_job.image_url,
-            "primary_card_image_url": best_job.primary_image_url or best_job.image_url,
-            "image_url": best_job.primary_image_url or best_job.image_url,
-        }
+    builder_source = {
+        "species_name": card.common_name,
+        "scientific_name": card.scientific_name,
+        "rank": card.rank,
+        "confidence": card.confidence,
+        "provisional": card.provisional,
+        "rarity_tier": card.rarity_tier,
+        "rarity_display": card.rarity_display,
+        "iconic_taxon": card.iconic_taxon,
+        "conservation_status": card.conservation_status,
+        "observations_count": card.observations_count,
+        "blurb": card.blurb,
+        "stats": {
+            "speed": card.stats.speed,
+            "attack": card.stats.attack,
+            "defence": card.stats.defence,
+            "hp": card.stats.hp,
+            "stamina_regen": card.stats.stamina_regen,
+        },
+        "category": species.category,
+        "sub_category": species.sub_category,
+        "capture_country": gbif.query_country if gbif else None,
+        "original_image_url": best_job.original_image_url or best_job.image_url,
+        "primary_card_image_url": best_job.primary_image_url or best_job.image_url,
+        "image_url": best_job.primary_image_url or best_job.image_url,
+        "sound_url": None,
+    }
+    card_builder_result = run_agent_task(
+        agent_name="card_builder",
+        task_type="build_card_payload",
+        payload={"source": builder_source},
+        actor_user_id=owner_id,
+        capture_job_id=best_job.id,
     )
+    render_data = build_render_card(builder_source)
     apply_render_fields(row, render_data)
+    row.card_payload_json = json.dumps(card_builder_result.get("payload") or {})
+    row.card_payload_version = "1.0.0"
+    row.render_status = "ready"
+    row.front_template_id = render_data.get("front_template", {}).get("id")
+    row.back_template_id = render_data.get("back_template", {}).get("id")
     db.add(row)
     db.flush()
     log.info(
@@ -516,6 +579,19 @@ def _save_completed_card(db, *, owner_id: int, species: SpeciesResult, best_job:
     _, previous_state = sync_card_to_dex(db, row)
     row.discovery_state = DISCOVERY_CAPTURED
     db.flush()
+    run_agent_task(
+        agent_name="map",
+        task_type="sync_progress",
+        payload={
+            "user_id": owner_id,
+            "region": row.region,
+            "region_unlocked": not region_was_unlocked and bool(row.region),
+            "repeat_state": _repeat_state_from_previous(previous_state),
+        },
+        actor_user_id=owner_id,
+        card_id=row.id,
+        capture_job_id=best_job.id,
+    )
     return row, (not region_was_unlocked and bool(row.region)), _repeat_state_from_previous(previous_state)
 
 
@@ -682,6 +758,23 @@ def _process_seed_job(seed_id: int) -> None:
             provisional=grouped_confidence < REVIEW_CONFIDENCE_THRESHOLD,
             reasoning=grouped_reasoning,
         )
+        species_result = run_agent_task(
+            agent_name="species",
+            task_type="normalize_capture_species",
+            payload={
+                "species": grouped_species,
+                "needs_review": grouped_species.provisional or grouped_species.confidence < REVIEW_CONFIDENCE_THRESHOLD,
+                "review_reason": "Identification confidence was too low for an automatic save." if grouped_species.provisional or grouped_species.confidence < REVIEW_CONFIDENCE_THRESHOLD else None,
+            },
+            actor_user_id=seed.owner_id,
+            capture_job_id=best_job.id,
+        )
+        species_row = _persist_species_result(
+            db,
+            capture_job_id=best_job.id,
+            card_id=None,
+            agent_result=species_result,
+        )
 
         if not grouped_species.subject_visible or grouped_species.confidence < FAIL_CONFIDENCE_THRESHOLD:
             _set_jobs_terminal(
@@ -701,6 +794,25 @@ def _process_seed_job(seed_id: int) -> None:
             return
 
         if grouped_species.provisional or grouped_species.confidence < REVIEW_CONFIDENCE_THRESHOLD:
+            review_result = run_agent_task(
+                agent_name="review",
+                task_type="flag_capture_review",
+                payload={
+                    "needs_review": True,
+                    "confidence": grouped_species.confidence,
+                    "reason": "Identification confidence was too low for an automatic save.",
+                    "evidence_summary": grouped_species.reasoning,
+                },
+                actor_user_id=seed.owner_id,
+                capture_job_id=best_job.id,
+            )
+            _create_review_queue_item(
+                db,
+                capture_job_id=best_job.id,
+                card_id=None,
+                species_result_id=species_row.id,
+                agent_result=review_result,
+            )
             _set_jobs_terminal(
                 db,
                 selected_jobs,
@@ -724,6 +836,29 @@ def _process_seed_job(seed_id: int) -> None:
             best_job=best_job,
             supporting_urls=supporting_urls,
         )
+        species_row.card_id = card_row.id
+        if card_row.rarity_display in {"Legendary", "Mythic", "Cryptic", "Extinct"}:
+            review_result = run_agent_task(
+                agent_name="review",
+                task_type="flag_unusual_capture",
+                payload={
+                    "needs_review": True,
+                    "confidence": grouped_species.confidence,
+                    "reason": f"{card_row.rarity_display} capture flagged for admin review.",
+                    "evidence_summary": grouped_species.reasoning,
+                    "rarity": card_row.rarity_display,
+                },
+                actor_user_id=seed.owner_id,
+                capture_job_id=best_job.id,
+                card_id=card_row.id,
+            )
+            _create_review_queue_item(
+                db,
+                capture_job_id=best_job.id,
+                card_id=card_row.id,
+                species_result_id=species_row.id,
+                agent_result=review_result,
+            )
         _set_jobs_terminal(
             db,
             selected_jobs,

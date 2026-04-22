@@ -168,7 +168,7 @@
       gap: 10px;
       margin-top: 14px;
     }
-    .template-list, .asset-grid, .version-list {
+    .template-list, .asset-grid, .version-list, .agent-grid, .task-log, .review-list {
       display: grid;
       gap: 10px;
     }
@@ -178,6 +178,30 @@
       background: rgba(255,255,255,.03);
     }
     .template-card, .asset-card, .version-card { padding: 14px; }
+    .agent-card, .task-item, .review-item {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.03);
+    }
+    .agent-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .agent-meta {
+      color: var(--muted);
+      font-size: .84rem;
+      line-height: 1.45;
+      margin: 8px 0 10px;
+    }
+    .agent-response, .task-payload {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      font-size: .78rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
     .template-card.active, .version-card.active { border-color: rgba(127,193,129,.42); box-shadow: inset 0 0 0 1px rgba(127,193,129,.24); }
     .template-card header, .asset-card header, .version-card header {
       display: flex;
@@ -428,6 +452,16 @@
         <section class="panel">
           <div class="panel-head">
             <div>
+              <h2>Agent Control</h2>
+              <p>Run targeted tasks against The Dr and the hidden specialist agents. Every task is logged through the backend orchestrator.</p>
+            </div>
+          </div>
+          <div class="agent-grid" id="agent-grid"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
               <h2>Asset Library</h2>
               <p>Search and filter the uploaded registry across template art, frame parts, icons, banners, backgrounds, map visuals, and animal art.</p>
             </div>
@@ -455,6 +489,16 @@
         <section class="panel">
           <div class="panel-head">
             <div>
+              <h2>Review Queue</h2>
+              <p>Low-confidence and unusual captures land here for admin inspection.</p>
+            </div>
+          </div>
+          <div class="review-list" id="review-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
               <h2>Template Preview</h2>
               <p>Use the same shared viewer path as the game to validate the final composed front/back card before activation.</p>
             </div>
@@ -471,6 +515,16 @@
             </div>
           </div>
           <div class="version-list" id="version-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Agent Task History</h2>
+              <p>Recent task runs, summaries, and surfaced errors.</p>
+            </div>
+          </div>
+          <div class="task-log" id="agent-task-log"></div>
         </section>
 
         <section class="panel">
@@ -495,6 +549,7 @@
       samples: [],
       templateSlots: [],
       selectedTemplateId: null,
+      agentDashboard: { agents: [], recent_tasks: [], review_queue: [] },
     };
 
     function $(id) { return document.getElementById(id); }
@@ -650,6 +705,79 @@
       `).join('');
     }
 
+    function agentTaskType(agentName) {
+      return {
+        dr: 'player_help',
+        species: 'inspect_species_result',
+        card_builder: 'rebuild_card_payload',
+        map: 'inspect_region_progress',
+        review: 'inspect_review_queue',
+      }[agentName] || 'admin_request';
+    }
+
+    function renderAgents() {
+      $('agent-grid').innerHTML = (state.agentDashboard.agents || []).map(agent => `
+        <article class="agent-card">
+          <header>
+            <div>
+              <strong>${esc(agent.name)}</strong>
+              <div class="muted">${esc(agent.description || '')}</div>
+            </div>
+            <span class="pill active">${esc(agent.status || 'ready')}</span>
+          </header>
+          <div class="agent-meta">
+            Last task: ${esc(agent.last_task?.task_type || 'none')}${agent.last_task?.status ? ` · ${esc(agent.last_task.status)}` : ''}
+            ${agent.last_task?.summary ? `<div>${esc(agent.last_task.summary)}</div>` : ''}
+            ${(agent.recent_errors || []).slice(0, 1).map(item => `<div style="color:#ffd0d0">Recent error: ${esc(item.error)}</div>`).join('')}
+          </div>
+          <label>Context Card
+            <select id="agent-card-${esc(agent.name)}">
+              <option value="">No card context</option>
+              ${(state.samples || []).map(item => `<option value="${item.id}">${esc(item.species_name)}${item.dex_id ? ` · ${esc(item.dex_id)}` : ''}</option>`).join('')}
+            </select>
+          </label>
+          <label>Capture Job ID<input id="agent-capture-${esc(agent.name)}" placeholder="Optional capture job id"></label>
+          <label>Task prompt<textarea id="agent-prompt-${esc(agent.name)}" placeholder="Describe the task or question for ${esc(agent.name)}"></textarea></label>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="runAgentTask('${esc(agent.name)}')">Run ${esc(agent.name)}</button>
+          </div>
+          <div class="agent-response" id="agent-response-${esc(agent.name)}">No task run yet.</div>
+        </article>
+      `).join('') || '<div class="muted">No agents registered.</div>';
+    }
+
+    function renderTaskHistory() {
+      $('agent-task-log').innerHTML = (state.agentDashboard.recent_tasks || []).map(task => `
+        <article class="task-item">
+          <header>
+            <div>
+              <strong>${esc(task.agent_name)} · ${esc(task.task_type)}</strong>
+              <div class="muted">${esc(task.created_at || '')}</div>
+            </div>
+            <span class="pill ${task.status === 'complete' ? 'active' : ''}">${esc(task.status || 'unknown')}</span>
+          </header>
+          <div class="agent-meta">${esc(task.summary || task.error || 'No summary')}</div>
+          ${(task.error || task.output_payload) ? `<div class="task-payload">${esc(task.error || JSON.stringify(task.output_payload || {}, null, 2))}</div>` : ''}
+        </article>
+      `).join('') || '<div class="muted">No agent tasks recorded yet.</div>';
+    }
+
+    function renderReviewQueue() {
+      $('review-list').innerHTML = (state.agentDashboard.review_queue || []).map(item => `
+        <article class="review-item">
+          <header>
+            <div>
+              <strong>${esc(item.priority || 'medium')} priority</strong>
+              <div class="muted">${esc(item.created_at || '')}</div>
+            </div>
+            <span class="pill">${esc(item.status || 'open')}</span>
+          </header>
+          <div class="agent-meta">${esc(item.reason || '')}</div>
+          <div class="muted">Capture #${esc(item.capture_job_id || '')}${item.card_id ? ` · Card #${esc(item.card_id)}` : ''}</div>
+        </article>
+      `).join('') || '<div class="muted">No flagged captures right now.</div>';
+    }
+
     function renderAssetSections() {
       const counts = {};
       state.assets.forEach(asset => { counts[asset.asset_type] = (counts[asset.asset_type] || 0) + 1; });
@@ -784,6 +912,32 @@
       fillTemplateForm(template);
       previewTemplate().catch(() => {});
     };
+    window.runAgentTask = async (agentName) => {
+      const prompt = $(`agent-prompt-${agentName}`).value.trim();
+      const cardId = $(`agent-card-${agentName}`).value;
+      const captureJobId = $(`agent-capture-${agentName}`).value.trim();
+      try {
+        const data = await fetchJson('/admin/agents/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agent_name: agentName,
+            task_type: agentTaskType(agentName),
+            card_id: cardId ? Number(cardId) : null,
+            capture_job_id: captureJobId ? Number(captureJobId) : null,
+            payload: {
+              question: prompt,
+              summary: prompt,
+              region: prompt,
+            },
+          }),
+        });
+        $(`agent-response-${agentName}`).textContent = JSON.stringify(data.task.payload || {}, null, 2);
+        await boot();
+      } catch (error) {
+        $(`agent-response-${agentName}`).textContent = error.message || 'Agent task failed';
+      }
+    };
 
     function readUploadPreview(file) {
       const box = $('upload-preview-box');
@@ -802,10 +956,14 @@
       state.assets = data.assets || [];
       state.samples = data.samples || [];
       state.templateSlots = data.template_slots || [];
+      state.agentDashboard = data.agents || { agents: [], recent_tasks: [], review_queue: [] };
       if (!state.selectedTemplateId && state.templates[0]) state.selectedTemplateId = state.templates[0].id;
       $('admin-user-pill').textContent = state.user.email;
       renderTemplatePicker();
       fillTemplateForm(currentTemplate());
+      renderAgents();
+      renderTaskHistory();
+      renderReviewQueue();
       renderTemplateCards();
       renderVersionCards();
       renderAssetSections();

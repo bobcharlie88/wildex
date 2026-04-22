@@ -9,7 +9,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Card, DexEntry, UserDexDiscovery
-from app.services.card_render import apply_render_fields, build_render_card
+import json
+
+from app.services.card_render import apply_render_fields, build_card_payload, build_render_card
 
 log = logging.getLogger("wildex.dex")
 
@@ -693,13 +695,24 @@ def backfill_user_cards(db: Session, user_id: int) -> None:
                 row.weakness_effect,
                 row.original_image_url,
                 row.primary_card_image_url,
+                row.card_payload_json,
+                row.card_payload_version,
+                row.render_status,
                 row.front_template_name,
                 row.front_template_version,
+                row.front_template_id,
                 row.back_template_name,
                 row.back_template_version,
+                row.back_template_id,
             )
         ):
-            apply_render_fields(row, build_render_card(row))
+            render_data = build_render_card(row)
+            apply_render_fields(row, render_data)
+            row.card_payload_json = json.dumps(build_card_payload(row))
+            row.card_payload_version = "1.0.0"
+            row.render_status = "ready"
+            row.front_template_id = render_data.get("front_template", {}).get("id")
+            row.back_template_id = render_data.get("back_template", {}).get("id")
             changed = True
     if changed:
         db.commit()

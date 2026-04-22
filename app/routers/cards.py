@@ -13,7 +13,7 @@ from app.models import Card, User, UserDexDiscovery
 from app.pipeline.card_generator import generate_card
 from app.pipeline.species_data import get_species_data
 from app.pipeline.species_id import TemporaryIdentificationError, identify_species, is_temporary_identification_error
-from app.services.card_render import apply_render_fields, build_render_card
+from app.services.card_render import apply_render_fields, build_card_payload, build_render_card
 from app.services.dex import DISCOVERY_CAPTURED, DISCOVERY_SEEN, sync_card_to_dex
 
 router = APIRouter()
@@ -79,10 +79,15 @@ def _card_dict(c: Card) -> dict:
         "primary_card_image_url": primary_image_url,
         "image_url":       primary_image_url,
         "supporting_image_urls": json.loads(c.supporting_image_urls) if c.supporting_image_urls else [],
+        "card_payload": json.loads(c.card_payload_json) if c.card_payload_json else None,
+        "card_payload_version": c.card_payload_version,
+        "render_status": c.render_status,
         "front_template_name": c.front_template_name,
         "front_template_version": c.front_template_version,
+        "front_template_id": c.front_template_id,
         "back_template_name": c.back_template_name,
         "back_template_version": c.back_template_version,
+        "back_template_id": c.back_template_id,
         "dex_id":          c.dex_id,
         "discovery_state": c.discovery_state,
         "region":          c.region,
@@ -258,7 +263,7 @@ def reidentify_card(card_id: int, current_user: User = Depends(require_user)):
             row.stamina_regen = card.stats.stamina_regen
             row.capture_country = gbif.query_country if gbif else row.capture_country
             row.rarity_display = card.rarity_display
-            apply_render_fields(row, build_render_card({
+            render_source = {
                 "species_name": card.common_name,
                 "scientific_name": card.scientific_name,
                 "rank": card.rank,
@@ -282,7 +287,14 @@ def reidentify_card(card_id: int, current_user: User = Depends(require_user)):
                 "original_image_url": row.original_image_url or row.primary_card_image_url or row.image_url,
                 "primary_card_image_url": row.primary_card_image_url or row.image_url,
                 "image_url": row.primary_card_image_url or row.image_url,
-            }))
+            }
+            render_data = build_render_card(render_source)
+            apply_render_fields(row, render_data)
+            row.card_payload_json = json.dumps(build_card_payload(render_source))
+            row.render_status = "ready"
+            row.card_payload_version = "1.0.0"
+            row.front_template_id = render_data.get("front_template", {}).get("id")
+            row.back_template_id = render_data.get("back_template", {}).get("id")
             sync_card_to_dex(db, row)
             row.discovery_state = DISCOVERY_CAPTURED
             db.commit()

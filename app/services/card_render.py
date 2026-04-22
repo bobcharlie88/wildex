@@ -261,10 +261,113 @@ def _range_mode(name: str, kingdom: str, capture_country: str | None) -> tuple[s
     return "world", ([capture_country] if capture_country else ["GLOBAL"]), []
 
 
-def build_render_card(source) -> dict:
+def build_card_payload(source) -> dict:
     stats = _stats(source)
     species_name = _value(source, "species_name") or _value(source, "common_name") or _value(source, "scientific_name") or "Unknown"
     scientific_name = _value(source, "scientific_name") or "Unknown"
+    kingdom_key = _kingdom(_value(source, "category"), _value(source, "sub_category"), _value(source, "iconic_taxon"))
+    theme = THEMES[kingdom_key]
+    speed = int(stats.get("speed", 50) or 50)
+    attack = int(stats.get("attack", 50) or 50)
+    defence = int(stats.get("defence", 50) or 50)
+    hp = int(stats.get("hp", 50) or 50)
+    rarity = _rarity(source)
+    capture_country = _value(source, "capture_country")
+    threat_level = _stored_or(_threat_level(attack, hp), source, "threat_level")
+    aggression = _stored_or(_aggression(attack, speed), source, "aggression")
+    biome = _stored_or(theme["biome"], source, "biome")
+    biome_bonus = _stored_or(theme["biome_bonus"], source, "biome_bonus")
+    strength_name = _stored_or(theme["strength_name"], source, "strength_name")
+    strength_effect = _stored_or(theme["strength_effect"], source, "strength_effect")
+    weakness_name = _stored_or(theme["weakness_name"], source, "weakness_name")
+    weakness_effect = _stored_or(theme["weakness_effect"], source, "weakness_effect")
+    abilities = _abilities(species_name, kingdom_key)
+    fact_text = (_value(source, "wikipedia_summary") or "").strip() or (
+        f"{species_name} has {int(_value(source, 'observations_count') or 0):,} recorded observations."
+        if _value(source, "observations_count") else
+        f"{species_name} has a confirmed WildEx entry."
+    )
+    return {
+        "card_title": species_name,
+        "scientific_name": scientific_name,
+        "common_name": species_name,
+        "rarity": rarity,
+        "diet": _diet_text(species_name, kingdom_key),
+        "habitat_text": _habitat_text(species_name, kingdom_key, capture_country),
+        "flavor_text": _value(source, "blurb") or f"{species_name} is logged as a WildEx field record.",
+        "fact_snippets": [fact_text],
+        "stats": {
+            "hp": hp,
+            "atk": attack,
+            "def": defence,
+            "spd": speed,
+            "stamina_regen": int(stats.get("stamina_regen", 50) or 50),
+        },
+        "moves": abilities,
+        "threat_level": threat_level,
+        "aggression": aggression,
+        "biome": biome,
+        "biome_bonus": biome_bonus,
+        "strength_name": strength_name,
+        "strength_effect": strength_effect,
+        "weakness_name": weakness_name,
+        "weakness_effect": weakness_effect,
+        "type_label": theme["type_label"],
+        "banner_text": theme["banner_text"],
+        "length_text": _length_text(species_name, kingdom_key),
+        "original_image_url": _original_image(source),
+        "primary_image_url": _primary_image(source),
+        "sound_url": _value(source, "sound_url"),
+        "slot_content": {
+            "number_badge": {"text": str(_value(source, "dex_id") or "").split("-")[-1] or str(_value(source, "id") or "")},
+            "title_banner": {"text": "WILDEX"},
+            "kingdom_badge": {"text": theme["banner_text"]},
+            "name_plate": {"title": species_name, "subtitle": scientific_name},
+            "scientific_name_line": {"text": scientific_name},
+            "creature_art": {"image_url": _primary_image(source)},
+            "info_panel": {
+                "rows": [
+                    {"label": "Common Name", "value": species_name},
+                    {"label": "Scientific Name", "value": scientific_name},
+                    {"label": "Length", "value": _length_text(species_name, kingdom_key)},
+                    {"label": "Habitat", "value": _habitat_text(species_name, kingdom_key, capture_country)},
+                    {"label": "Diet", "value": _diet_text(species_name, kingdom_key)},
+                ]
+            },
+            "info_banner": {"text": "INFO"},
+            "info_text": {"text": _value(source, "blurb") or f"{species_name} is logged as a WildEx field record."},
+            "fact_banner": {"text": "FACT"},
+            "fact_text": {"text": fact_text},
+            "status_panel": {
+                "rows": [
+                    {"label": "Rarity", "value": rarity},
+                    {"label": "Threat", "value": threat_level},
+                    {"label": "Aggression", "value": aggression},
+                ]
+            },
+            "map_panel": {"mode": "range"},
+            "strength_box": {"title": strength_name, "text": strength_effect},
+            "weakness_box": {"title": weakness_name, "text": weakness_effect},
+            "stat_panel": {"rows": [{"label": "HP", "value": hp}, {"label": "ATK", "value": attack}, {"label": "DEF", "value": defence}, {"label": "SPD", "value": speed}]},
+            "type_panel": {"title": theme["type_label"], "text": biome_bonus},
+            "abilities_panel": {"rows": abilities},
+            "environment_panel": {"rows": [f"Gains advantage in {str(biome).lower()} terrain", f"Vulnerable to {str(weakness_name).lower()} conditions"]},
+            "call_button": {"label": "Play Call", "enabled": bool(_value(source, "sound_url"))},
+            "bottom_strip": {"items": [f"Rarity: {rarity}", f"Threat Level: {threat_level}", f"Aggression: {aggression}"]},
+        },
+        "render_hints": {
+            "theme": kingdom_key,
+            "icon_family": (_value(source, "sub_category") or kingdom_key or "").lower(),
+            "layout_variant": "master-front-back",
+        },
+    }
+
+
+def build_render_card(source) -> dict:
+    payload = build_card_payload(source)
+    stats = _stats(source)
+    species_name = payload["card_title"]
+    scientific_name = payload["scientific_name"]
     kingdom_key = _kingdom(_value(source, "category"), _value(source, "sub_category"), _value(source, "iconic_taxon"))
     theme = THEMES[kingdom_key]
     front_template = select_template(
@@ -279,21 +382,21 @@ def build_render_card(source) -> dict:
         preferred_name=_value(source, "back_template_name"),
         preferred_version=_value(source, "back_template_version"),
     )
-    speed = int(stats.get("speed", 50) or 50)
-    attack = int(stats.get("attack", 50) or 50)
-    defence = int(stats.get("defence", 50) or 50)
-    hp = int(stats.get("hp", 50) or 50)
-    rarity = _rarity(source)
+    speed = payload["stats"]["spd"]
+    attack = payload["stats"]["atk"]
+    defence = payload["stats"]["def"]
+    hp = payload["stats"]["hp"]
+    rarity = payload["rarity"]
     capture_country = _value(source, "capture_country")
     range_mode, range_regions, local_markers = _range_mode(species_name, kingdom_key, capture_country)
-    threat_level = _stored_or(_threat_level(attack, hp), source, "threat_level")
-    aggression = _stored_or(_aggression(attack, speed), source, "aggression")
-    biome = _stored_or(theme["biome"], source, "biome")
-    biome_bonus = _stored_or(theme["biome_bonus"], source, "biome_bonus")
-    strength_name = _stored_or(theme["strength_name"], source, "strength_name")
-    strength_effect = _stored_or(theme["strength_effect"], source, "strength_effect")
-    weakness_name = _stored_or(theme["weakness_name"], source, "weakness_name")
-    weakness_effect = _stored_or(theme["weakness_effect"], source, "weakness_effect")
+    threat_level = payload["threat_level"]
+    aggression = payload["aggression"]
+    biome = payload["biome"]
+    biome_bonus = payload["biome_bonus"]
+    strength_name = payload["strength_name"]
+    strength_effect = payload["strength_effect"]
+    weakness_name = payload["weakness_name"]
+    weakness_effect = payload["weakness_effect"]
     family_key = (_value(source, "sub_category") or "").strip().lower() or None
     environment_key = str(biome or "").strip().lower() or None
 
@@ -340,34 +443,27 @@ def build_render_card(source) -> dict:
         "rarity": rarity,
         "threat_level": threat_level,
         "aggression": aggression,
-        "length_text": _length_text(species_name, kingdom_key),
-        "habitat_text": _habitat_text(species_name, kingdom_key, capture_country),
-        "diet_text": _diet_text(species_name, kingdom_key),
-        "info_text": _value(source, "blurb") or f"{species_name} is logged as a WildEx field record.",
-        "fact_text": (_value(source, "wikipedia_summary") or "").strip() or (
-            f"{species_name} has {int(_value(source, 'observations_count') or 0):,} recorded observations."
-            if _value(source, "observations_count") else
-            f"{species_name} has a confirmed WildEx entry."
-        ),
+        "length_text": payload["length_text"],
+        "habitat_text": payload["habitat_text"],
+        "diet_text": payload["diet"],
+        "info_text": payload["flavor_text"],
+        "fact_text": payload["fact_snippets"][0] if payload["fact_snippets"] else "",
         "image_url": _primary_image(source),
         "original_image_url": _original_image(source),
-        "sound_url": _value(source, "sound_url"),
+        "sound_url": payload["sound_url"],
         "hp": hp,
         "atk": attack,
         "def": defence,
         "spd": speed,
-        "type_label": theme["type_label"],
+        "type_label": payload["type_label"],
         "biome": biome,
         "biome_bonus": biome_bonus,
         "strength_name": strength_name,
         "strength_effect": strength_effect,
         "weakness_name": weakness_name,
         "weakness_effect": weakness_effect,
-        "abilities": _abilities(species_name, kingdom_key),
-        "environment_triggers": [
-            f"Gains advantage in {str(biome).lower()} terrain",
-            f"Vulnerable to {str(weakness_name).lower()} conditions",
-        ],
+        "abilities": payload["moves"],
+        "environment_triggers": payload["slot_content"]["environment_panel"]["rows"],
         "range_mode": range_mode,
         "range_regions": range_regions,
         "local_markers": local_markers,
@@ -376,8 +472,11 @@ def build_render_card(source) -> dict:
         "theme_class": theme["theme_class"],
         "accent": theme["accent"],
         "accent_dark": theme["accent_dark"],
-        "banner_text": theme["banner_text"],
+        "banner_text": payload["banner_text"],
+        "slot_content": payload["slot_content"],
+        "render_hints": payload["render_hints"],
         "front_template": {
+            "id": front_template.id,
             "name": front_template.name,
             "version": front_template.version,
             "asset_url": front_template.asset_url,
@@ -387,6 +486,7 @@ def build_render_card(source) -> dict:
             "parts": merge_template_parts(front_template, "front"),
         },
         "back_template": {
+            "id": back_template.id,
             "name": back_template.name,
             "version": back_template.version,
             "asset_url": back_template.asset_url,

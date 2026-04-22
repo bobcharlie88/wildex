@@ -9,7 +9,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 
 from app.auth import get_current_user, require_admin_user
 from app.database import SessionLocal, db_available
-from app.models import Card, CardAsset, CardTemplate, TemplatePartAssignment, User
+from app.models import Card, CardAsset, CardTemplate, CaptureJob, TemplatePartAssignment, User
+from app.services.agents.orchestrator import get_agent_dashboard, run_agent_task
 from app.services.card_assets import (
     ALLOWED_ASSET_MIME_TYPES,
     TEMPLATE_PART_SLOTS,
@@ -85,6 +86,53 @@ def _fallback_sample(kingdom: str) -> dict:
     return base
 
 
+def _card_source(card: Card) -> dict:
+    return {
+        "id": card.id,
+        "species_name": card.species_name,
+        "scientific_name": card.scientific_name,
+        "rank": card.rank,
+        "confidence": card.confidence,
+        "provisional": card.provisional,
+        "rarity_tier": card.rarity_tier,
+        "rarity_display": card.rarity_display,
+        "iconic_taxon": card.iconic_taxon,
+        "conservation_status": card.conservation_status,
+        "observations_count": card.observations_count,
+        "blurb": card.blurb,
+        "stats": {
+            "speed": card.speed,
+            "attack": card.attack,
+            "defence": card.defence,
+            "hp": card.hp,
+            "stamina_regen": card.stamina_regen,
+        },
+        "category": card.category,
+        "sub_category": card.sub_category,
+        "capture_country": card.capture_country,
+        "original_image_url": card.original_image_url or card.primary_card_image_url or card.image_url,
+        "primary_card_image_url": card.primary_card_image_url or card.image_url,
+        "image_url": card.primary_card_image_url or card.image_url,
+        "front_template_name": card.front_template_name,
+        "front_template_version": card.front_template_version,
+        "back_template_name": card.back_template_name,
+        "back_template_version": card.back_template_version,
+        "dex_id": card.dex_id,
+        "group_code": card.group_code,
+        "evolution_chain_id": card.evolution_chain_id,
+        "evolution_stage": card.evolution_stage,
+        "sound_url": card.sound_url,
+        "threat_level": card.threat_level,
+        "aggression": card.aggression,
+        "biome": card.biome,
+        "biome_bonus": card.biome_bonus,
+        "strength_name": card.strength_name,
+        "strength_effect": card.strength_effect,
+        "weakness_name": card.weakness_name,
+        "weakness_effect": card.weakness_effect,
+    }
+
+
 @router.get("/login")
 def admin_login_page():
     return FileResponse("app/static/admin_login.html")
@@ -141,6 +189,7 @@ def admin_bootstrap(current_user: User = Depends(require_admin_user)):
         "assets": assets,
         "template_slots": list(TEMPLATE_PART_SLOTS),
         "samples": samples,
+        "agents": get_agent_dashboard(),
     }
 
 
@@ -454,3 +503,60 @@ def activate_template(template_id: int, current_user: User = Depends(require_adm
         return {"ok": True, "id": row.id, "kingdom": row.kingdom, "side": row.side, "version": row.version}
     finally:
         db.close()
+
+
+@router.get("/review-queue")
+def review_queue(current_user: User = Depends(require_admin_user)):
+    return {"items": get_agent_dashboard().get("review_queue", [])}
+
+
+@router.post("/agents/tasks")
+async def admin_agent_task(request: Request, current_user: User = Depends(require_admin_user)):
+    payload = await request.json()
+    agent_name = (payload.get("agent_name") or "").strip().lower()
+    task_type = (payload.get("task_type") or "admin_request").strip()
+    input_payload = dict(payload.get("payload") or {})
+    card_id = int(payload["card_id"]) if payload.get("card_id") else None
+    capture_job_id = int(payload["capture_job_id"]) if payload.get("capture_job_id") else None
+    if not agent_name:
+        raise HTTPException(400, "agent_name is required")
+
+    if db_available():
+        db = SessionLocal()
+        try:
+            if card_id:
+                row = db.query(Card).filter(Card.id == card_id).first()
+                if row is None:
+                    raise HTTPException(404, "Card not found")
+                input_payload.setdefault("card", build_render_card(row))
+                input_payload.setdefault("source", _card_source(row))
+                input_payload.setdefault("card_id", row.id)
+                input_payload.setdefault("user_id", row.owner_id)
+                input_payload.setdefault("region", row.region)
+            if capture_job_id:
+                job = db.query(CaptureJob).filter(CaptureJob.id == capture_job_id).first()
+                if job is None:
+                    raise HTTPException(404, "Capture job not found")
+                input_payload.setdefault("capture_job_id", job.id)
+                input_payload.setdefault("common_name", job.species_name)
+                input_payload.setdefault("species_name", job.species_name)
+                input_payload.setdefault("scientific_name", job.scientific_name)
+                input_payload.setdefault("confidence", job.confidence)
+                input_payload.setdefault("needs_review", job.status == "needs_review")
+                input_payload.setdefault("review_reason", job.review_reason)
+                input_payload.setdefault("evidence_summary", job.error_message or job.review_reason or "Capture job evidence inspected.")
+                input_payload.setdefault("provisional", job.provisional)
+                input_payload.setdefault("region", job.region)
+                input_payload.setdefault("user_id", job.owner_id)
+        finally:
+            db.close()
+
+    result = run_agent_task(
+        agent_name=agent_name,
+        task_type=task_type,
+        payload=input_payload,
+        actor_user_id=current_user.id,
+        card_id=card_id,
+        capture_job_id=capture_job_id,
+    )
+    return {"ok": True, "task": result}

@@ -101,10 +101,15 @@ class Card(Base):
     primary_card_image_url: Mapped[str | None] = mapped_column(String(1000))
     image_url: Mapped[str | None] = mapped_column(String(1000))
     supporting_image_urls: Mapped[str | None] = mapped_column(Text)
+    card_payload_json: Mapped[str | None] = mapped_column(Text)
+    card_payload_version: Mapped[str | None] = mapped_column(String(32))
+    render_status: Mapped[str | None] = mapped_column(String(20))
     front_template_name: Mapped[str | None] = mapped_column(String(120))
     front_template_version: Mapped[str | None] = mapped_column(String(32))
     back_template_name: Mapped[str | None] = mapped_column(String(120))
     back_template_version: Mapped[str | None] = mapped_column(String(32))
+    front_template_id: Mapped[int | None] = mapped_column(ForeignKey("card_templates.id"))
+    back_template_id: Mapped[int | None] = mapped_column(ForeignKey("card_templates.id"))
     dex_entry_id: Mapped[int | None] = mapped_column(ForeignKey("dex_entries.id"), index=True)
     dex_id: Mapped[str | None] = mapped_column(String(32), index=True)
     discovery_state: Mapped[str | None] = mapped_column(String(20))
@@ -277,3 +282,69 @@ class PasswordResetToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped[User] = relationship(foreign_keys=[user_id])
+
+
+class AgentTask(Base):
+    __tablename__ = "agent_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_name: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    task_type: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), index=True, nullable=False, default="queued")
+    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+    card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"), index=True)
+    capture_job_id: Mapped[int | None] = mapped_column(ForeignKey("capture_jobs.id"), index=True)
+    input_payload: Mapped[str | None] = mapped_column(Text)
+    output_payload: Mapped[str | None] = mapped_column(Text)
+    summary: Mapped[str | None] = mapped_column(String(255))
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    actor: Mapped[User | None] = relationship(foreign_keys=[actor_user_id])
+    card: Mapped[Card | None] = relationship(foreign_keys=[card_id])
+    capture_job: Mapped[CaptureJob | None] = relationship(foreign_keys=[capture_job_id])
+
+
+class SpeciesResultRecord(Base):
+    __tablename__ = "species_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    capture_job_id: Mapped[int | None] = mapped_column(ForeignKey("capture_jobs.id"), index=True)
+    card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"), index=True)
+    agent_task_id: Mapped[int | None] = mapped_column(ForeignKey("agent_tasks.id"), index=True)
+    common_name: Mapped[str | None] = mapped_column(String(200))
+    scientific_name: Mapped[str | None] = mapped_column(String(200))
+    confidence: Mapped[float | None] = mapped_column(Float)
+    needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    review_reason: Mapped[str | None] = mapped_column(Text)
+    evidence_summary: Mapped[str | None] = mapped_column(Text)
+    candidate_list_json: Mapped[str | None] = mapped_column(Text)
+    taxon_id: Mapped[int | None] = mapped_column(Integer)
+    iconic_taxon: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    capture_job: Mapped[CaptureJob | None] = relationship(foreign_keys=[capture_job_id])
+    card: Mapped[Card | None] = relationship(foreign_keys=[card_id])
+    agent_task: Mapped[AgentTask | None] = relationship(foreign_keys=[agent_task_id])
+
+
+class ReviewQueueItem(Base):
+    __tablename__ = "review_queue"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    capture_job_id: Mapped[int | None] = mapped_column(ForeignKey("capture_jobs.id"), index=True)
+    card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"), index=True)
+    species_result_id: Mapped[int | None] = mapped_column(ForeignKey("species_results.id"), index=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    priority: Mapped[str] = mapped_column(String(32), default="medium", index=True)
+    status: Mapped[str] = mapped_column(String(20), default="open", index=True)
+    evidence_summary: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    capture_job: Mapped[CaptureJob | None] = relationship(foreign_keys=[capture_job_id])
+    card: Mapped[Card | None] = relationship(foreign_keys=[card_id])
+    species_result: Mapped[SpeciesResultRecord | None] = relationship(foreign_keys=[species_result_id])

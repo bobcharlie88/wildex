@@ -538,6 +538,30 @@
     .job-banner.visible { display: flex; }
     .job-banner strong { display: block; font-size: 13px; }
     .job-banner span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .dr-panel {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+    .dr-panel textarea {
+      width: 100%;
+      min-height: 88px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      padding: 12px 14px;
+      font: inherit;
+      resize: vertical;
+    }
+    .dr-response {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      padding: 14px;
+      color: var(--text);
+      line-height: 1.5;
+    }
     .hidden { display: none !important; }
     @media (max-width: 920px) {
       .layout { grid-template-columns: 1fr; }
@@ -593,6 +617,20 @@
       </div>
       <button class="btn btn-secondary small" type="button" id="job-banner-action">Open</button>
     </div>
+
+    <section class="panel dr-panel">
+      <div class="panel-head" style="padding:0">
+        <div>
+          <h2>The Dr</h2>
+          <p>Ask about rarity, card meaning, or what to chase next. If a card is open, The Dr uses that card as context.</p>
+        </div>
+      </div>
+      <textarea id="dr-question" placeholder="Why is this rare? What should I do next? What does this card mean?"></textarea>
+      <div class="action-row">
+        <button class="btn btn-secondary" id="dr-ask-btn" type="button">Ask The Dr</button>
+      </div>
+      <div class="dr-response" id="dr-response">The Dr is ready.</div>
+    </section>
 
     <section class="layout">
       <section class="panel">
@@ -987,6 +1025,29 @@
       }
     }
 
+    async function askDr() {
+      const question = document.getElementById('dr-question').value.trim();
+      if (!question) return;
+      const responseNode = document.getElementById('dr-response');
+      responseNode.textContent = 'The Dr is thinking...';
+      try {
+        const resp = await fetch('/dr/ask', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question,
+            card_id: state.activeEntry?.card?.id || null,
+          }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data.detail || 'Could not reach The Dr');
+        responseNode.textContent = data.reply || 'The Dr has no answer right now.';
+      } catch (error) {
+        responseNode.textContent = error.message || 'Could not reach The Dr';
+      }
+    }
+
     async function shareApp() {
       const shareUrl = `${location.origin}/wildex`;
       const payload = {
@@ -1214,6 +1275,7 @@
       new Audio(sound).play().catch(() => {});
     });
     document.getElementById('share-app-btn').addEventListener('click', () => shareApp().catch(() => {}));
+    document.getElementById('dr-ask-btn').addEventListener('click', () => askDr().catch(() => {}));
     document.getElementById('share-card-btn').addEventListener('click', () => shareActiveCard().catch(() => {}));
     document.getElementById('close-btn').addEventListener('click', closeModal);
     document.getElementById('favorite-btn').addEventListener('click', () => setFavoriteCard().catch(() => {}));
