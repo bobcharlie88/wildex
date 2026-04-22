@@ -5,6 +5,12 @@ from datetime import datetime
 
 from app.models import SubmissionRequest
 
+ACTIVE_SUBMISSION_STATES = {"pending_verification", "processing"}
+CLEARED_SUBMISSION_STATES = {"cleared"}
+MANUAL_REVIEW_SUBMISSION_STATES = {"manual_review"}
+COMPLETED_SUBMISSION_STATES = {"approved", "rejected", "completed"}
+ARCHIVED_SUBMISSION_STATES = {"archived"}
+
 
 def _load_json(value, default):
     if not value:
@@ -60,3 +66,22 @@ def append_decision_history(row: SubmissionRequest, *, action: str, actor_email:
         }
     )
     row.decision_history_json = json.dumps(history)
+
+
+def submission_queue_snapshot(rows: list[SubmissionRequest]) -> dict:
+    items = [submission_to_dict(row) for row in rows]
+    grouped = {
+        "active": [item for item in items if item["status"] in ACTIVE_SUBMISSION_STATES],
+        "cleared": [item for item in items if item["status"] in CLEARED_SUBMISSION_STATES],
+        "manual_review": [item for item in items if item["status"] in MANUAL_REVIEW_SUBMISSION_STATES],
+        "completed": [item for item in items if item["status"] in COMPLETED_SUBMISSION_STATES],
+        "archived": [item for item in items if item["status"] in ARCHIVED_SUBMISSION_STATES],
+    }
+    grouped["counts"] = {
+        "active": len(grouped["active"]),
+        "cleared": len(grouped["cleared"]),
+        "manual_review": len(grouped["manual_review"]),
+        "completed": len(grouped["completed"]),
+        "archived": len(grouped["archived"]),
+    }
+    return grouped

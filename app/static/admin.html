@@ -542,6 +542,34 @@
         <section class="panel">
           <div class="panel-head">
             <div>
+              <h2>Submission Queue</h2>
+              <p>Only active or actionable submissions should stay visible here. Processed items can be archived out of the live queue safely.</p>
+            </div>
+            <div class="toolbar" style="margin-top:0">
+              <button class="btn btn-secondary" type="button" id="clear-processed-btn">Clear Processed</button>
+              <button class="btn btn-secondary" type="button" id="clear-cleared-btn">Clear Cleared</button>
+              <button class="btn btn-secondary" type="button" id="clear-manual-btn">Clear Manual Review</button>
+              <button class="btn btn-secondary" type="button" id="clear-all-completed-btn">Clear All Completed</button>
+            </div>
+          </div>
+          <div class="status-box" id="submission-queue-status"></div>
+          <div class="error-box" id="submission-queue-error"></div>
+          <div class="section-row" id="submission-count-summary"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Active Queue</h2>
+              <p>Pending or currently processing requests that still need system attention.</p>
+            </div>
+          </div>
+          <div class="review-list" id="submission-active-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
               <h2>Cleared Requests</h2>
               <p>Submission requests at or above the authenticity threshold.</p>
             </div>
@@ -568,6 +596,16 @@
           </div>
           <div class="error-box" id="submission-error"></div>
           <div class="task-log" id="submission-detail"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Completed / Archived</h2>
+              <p>Approved, rejected, completed, and archived request history stays here and out of the live queue.</p>
+            </div>
+          </div>
+          <div class="review-list" id="submission-archive-list"></div>
         </section>
 
         <section class="panel">
@@ -622,7 +660,7 @@
       assets: [],
       samples: [],
       slotRules: [],
-      submissions: { cleared: [], manual_review: [] },
+      submissions: { active: [], cleared: [], manual_review: [], completed: [], archived: [], counts: {} },
       selectedTemplateId: null,
       selectedBuilderCardId: null,
       selectedSubmissionId: null,
@@ -903,14 +941,50 @@
         </article>`;
     }
 
+    function submissionStateDefaults() {
+      return { active: [], cleared: [], manual_review: [], completed: [], archived: [], counts: {} };
+    }
+
+    function allSubmissionItems() {
+      return []
+        .concat(state.submissions.active || [])
+        .concat(state.submissions.cleared || [])
+        .concat(state.submissions.manual_review || [])
+        .concat(state.submissions.completed || [])
+        .concat(state.submissions.archived || []);
+    }
+
+    function renderSubmissionCounts() {
+      const counts = state.submissions.counts || {};
+      $('submission-count-summary').innerHTML = [
+        { key: 'active', label: 'Active Queue' },
+        { key: 'cleared', label: 'Cleared Requests' },
+        { key: 'manual_review', label: 'Manual Review' },
+        { key: 'completed', label: 'Completed' },
+        { key: 'archived', label: 'Archived' },
+      ].map(item => `
+        <div class="section-chip">
+          <strong>${counts[item.key] || 0}</strong>
+          <div>${esc(item.label)}</div>
+        </div>
+      `).join('');
+    }
+
     function renderSubmissionQueues() {
+      renderSubmissionCounts();
+      $('submission-active-list').innerHTML = (state.submissions.active || []).map(submissionCardHtml).join('') || '<div class="muted">No active verification items right now.</div>';
       $('submission-cleared-list').innerHTML = (state.submissions.cleared || []).map(submissionCardHtml).join('') || '<div class="muted">No cleared requests yet.</div>';
       $('submission-review-list').innerHTML = (state.submissions.manual_review || []).map(submissionCardHtml).join('') || '<div class="muted">No manual review requests right now.</div>';
+      $('submission-archive-list').innerHTML = []
+        .concat(state.submissions.completed || [])
+        .concat(state.submissions.archived || [])
+        .map(submissionCardHtml)
+        .join('') || '<div class="muted">No completed or archived request history yet.</div>';
     }
 
     function renderSubmissionDetail(item) {
       if (!item) {
-        $('submission-detail').innerHTML = '<div class="muted">Select a cleared or manual-review request to inspect the full verification report.</div>';
+        $('submission-detail').innerHTML = '<div class="muted">Select any request to inspect the verification report, decision history, and queue state.</div>';
         return;
       }
       $('submission-detail').innerHTML = `
@@ -945,6 +1019,36 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
             <button class="btn btn-secondary" type="button" onclick="decideSubmission(${item.id}, 'mark_suspicious')">Mark Suspicious</button>
           </div>
         </article>`;
+    }
+
+    async function clearSubmissionScope(scope, label) {
+      $('submission-queue-error').classList.remove('visible');
+      $('submission-queue-status').classList.remove('visible');
+      try {
+        const preview = await fetchJson('/admin/submissions/clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scope, dry_run: true, mode: 'archive' }),
+        });
+        const count = Number(preview.count || 0);
+        if (!count) {
+          showBox('submission-queue-status', `No ${label.toLowerCase()} items are ready to clear.`);
+          return;
+        }
+        const confirmed = window.confirm(`Archive ${count} ${label.toLowerCase()} item${count === 1 ? '' : 's'}? Active and processing items will be left alone.`);
+        if (!confirmed) return;
+        const result = await fetchJson('/admin/submissions/clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scope, dry_run: false, mode: 'archive' }),
+        });
+        const archived = Number(result.count || count);
+        showBox('submission-queue-status', `Archived ${archived} ${label.toLowerCase()} item${archived === 1 ? '' : 's'}.`);
+        await boot();
+      } catch (error) {
+        $('submission-queue-error').textContent = error.message || 'Could not clear queue items';
+        $('submission-queue-error').classList.add('visible');
+      }
     }
 
     function renderAssetSections() {
@@ -1155,12 +1259,16 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
       state.assets = data.assets || [];
       state.samples = data.samples || [];
       state.slotRules = data.slot_rules || [];
-      state.submissions = data.submissions || { cleared: [], manual_review: [] };
+      state.submissions = { ...submissionStateDefaults(), ...(data.submissions || {}) };
       state.agentDashboard = data.agents || { agents: [], recent_tasks: [], review_queue: [] };
       if (!state.selectedTemplateId && state.templates[0]) state.selectedTemplateId = state.templates[0].id;
       if (!state.selectedBuilderCardId && state.samples[0]) state.selectedBuilderCardId = state.samples[0].id;
-      if (!state.selectedSubmissionId) {
-        const firstSubmission = state.submissions.manual_review[0] || state.submissions.cleared[0];
+      if (!allSubmissionItems().some(item => item.id === state.selectedSubmissionId)) {
+        const firstSubmission = state.submissions.active[0]
+          || state.submissions.manual_review[0]
+          || state.submissions.cleared[0]
+          || state.submissions.completed[0]
+          || state.submissions.archived[0];
         state.selectedSubmissionId = firstSubmission ? firstSubmission.id : null;
       }
       $('admin-user-pill').textContent = state.user.email;
@@ -1282,6 +1390,10 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
     });
     $('builder-preview-btn').addEventListener('click', () => { loadBuilderCardPreview(false).catch(() => {}); });
     $('builder-rebuild-btn').addEventListener('click', () => { loadBuilderCardPreview(true).catch(() => {}); });
+    $('clear-processed-btn').addEventListener('click', () => { clearSubmissionScope('processed', 'Processed').catch(() => {}); });
+    $('clear-cleared-btn').addEventListener('click', () => { clearSubmissionScope('cleared', 'Cleared Requests').catch(() => {}); });
+    $('clear-manual-btn').addEventListener('click', () => { clearSubmissionScope('manual_review', 'Manual Review').catch(() => {}); });
+    $('clear-all-completed-btn').addEventListener('click', () => { clearSubmissionScope('all_completed', 'Completed').catch(() => {}); });
     $('activate-template-btn').addEventListener('click', () => {
       const template = currentTemplate();
       if (template) activateTemplate(template.id);

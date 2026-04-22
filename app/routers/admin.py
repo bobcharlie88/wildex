@@ -30,7 +30,13 @@ from app.services.cards import (
     validate_slot_assignments,
 )
 from app.services.card_templates import clear_template_cache, ensure_builtin_templates, list_templates, select_template
-from app.services.submissions import append_decision_history, submission_to_dict
+from app.services.submissions import (
+    ARCHIVED_SUBMISSION_STATES,
+    COMPLETED_SUBMISSION_STATES,
+    append_decision_history,
+    submission_queue_snapshot,
+    submission_to_dict,
+)
 from app.utils.storage import upload_named_bytes
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -89,11 +95,7 @@ def _submission_dashboard(db) -> dict:
         .limit(80)
         .all()
     )
-    items = [submission_to_dict(row) for row in rows]
-    return {
-        "cleared": [item for item in items if item["status"] in {"cleared", "approved"}],
-        "manual_review": [item for item in items if item["status"] in {"manual_review", "rejected"}],
-    }
+    return submission_queue_snapshot(rows)
 
 
 def _load_template_row(db, template_id: int) -> CardTemplate:
@@ -667,6 +669,68 @@ async def admin_submission_decision(submission_id: int, request: Request, curren
         db.commit()
         db.refresh(row)
         return {"ok": True, "item": submission_to_dict(row)}
+    finally:
+        db.close()
+
+
+@router.post("/submissions/clear")
+async def admin_clear_submissions(request: Request, current_user: User = Depends(require_admin_user)):
+    if not db_available():
+        raise HTTPException(503, "Database unavailable")
+    payload = await request.json()
+    scope = (payload.get("scope") or "").strip().lower()
+    dry_run = bool(payload.get("dry_run"))
+    archive_only = payload.get("mode", "archive") != "delete"
+
+    scope_map = {
+        "processed": {"cleared", *COMPLETED_SUBMISSION_STATES},
+        "cleared": {"cleared"},
+        "manual_review": {"manual_review"},
+        "completed": set(COMPLETED_SUBMISSION_STATES),
+        "archived": set(ARCHIVED_SUBMISSION_STATES),
+        "all_completed": {"cleared", "manual_review", *COMPLETED_SUBMISSION_STATES, *ARCHIVED_SUBMISSION_STATES},
+    }
+    target_states = scope_map.get(scope)
+    if not target_states:
+        raise HTTPException(400, "Unsupported clear scope")
+
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(SubmissionRequest)
+            .filter(SubmissionRequest.status.in_(list(target_states)))
+            .all()
+        )
+        count = len(rows)
+        if dry_run:
+            return {
+                "ok": True,
+                "dry_run": True,
+                "count": count,
+                "scope": scope,
+                "mode": "archive" if archive_only else "delete",
+            }
+        if archive_only:
+            for row in rows:
+                if row.status != "archived":
+                    row.status = "archived"
+                    append_decision_history(
+                        row,
+                        action=f"archive_{scope}",
+                        actor_email=current_user.email,
+                        notes=f"Archived via clear queue action ({scope}).",
+                    )
+        else:
+            for row in rows:
+                db.delete(row)
+        db.commit()
+        return {
+            "ok": True,
+            "count": count,
+            "scope": scope,
+            "mode": "archive" if archive_only else "delete",
+            "message": f"{count} submission item(s) {'archived' if archive_only else 'deleted'}.",
+        }
     finally:
         db.close()
 
