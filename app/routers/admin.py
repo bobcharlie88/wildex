@@ -228,7 +228,6 @@ def admin_bootstrap(current_user: User = Depends(require_admin_user)):
                 "id": row.id,
                 "species_name": row.species_name,
                 "dex_id": row.dex_id,
-                "render_card": build_render_card(row),
             } for row in rows]
             submissions = _submission_dashboard(db)
         finally:
