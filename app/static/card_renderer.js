@@ -193,14 +193,24 @@
   }
 
   function frontSvg(data, templateTemplate, imageHref) {
-    const infoY = [0, 80, 160, 250, 340];
-    const infoRows = [
+    const namePlate = slotContent(data, 'name_plate', { title: data.species_name, subtitle: data.scientific_name });
+    const infoPanel = slotContent(data, 'info_panel', {});
+    const infoRows = Array.isArray(infoPanel.rows) ? infoPanel.rows.map((row) => [row.label, row.value]) : [
       ['Common Name', data.common_name || data.species_name],
       ['Scientific Name', data.scientific_name],
       ['Length', data.length_text],
       ['Habitat', data.habitat_text],
       ['Diet', data.diet_text],
     ];
+    const numberBadge = slotContent(data, 'number_badge', { text: data.card_number });
+    const titleBanner = slotContent(data, 'title_banner', { text: 'WILDEX' });
+    const kingdomBadge = slotContent(data, 'kingdom_badge', { text: data.banner_text });
+    const infoBanner = slotContent(data, 'info_banner', { text: 'INFO' });
+    const flavorBlock = slotContent(data, 'flavor_text_block', { text: data.info_text || '' });
+    const factBanner = slotContent(data, 'fact_banner', { text: 'FACT' });
+    const factText = slotContent(data, 'fact_text', { text: data.fact_text || '' });
+    const creatureArt = slotContent(data, 'creature_art', { image_url: data.image_url });
+    const infoY = [0, 80, 160, 250, 340];
     const infoContent = infoRows.map((row, idx) => {
       const lines = chunkText(row[1], idx === 3 ? 28 : 22, idx === 3 ? 3 : 2);
       return `
@@ -208,73 +218,93 @@
         ${textLines(lines, 82, 282 + infoY[idx], 22, 22, 'fill="#2c1d13" font-family="Georgia, serif"')}
       `;
     }).join('');
-    const infoLines = chunkText(data.info_text, 52, 6);
-    const factLines = chunkText(data.fact_text, 56, 2);
+    const infoLines = chunkText(flavorBlock.text || data.info_text, 52, 6);
+    const factLines = chunkText(factText.text || data.fact_text, 56, 2);
+    const artHref = imageHref || creatureArt.image_url || data.image_url || '';
     return `
       <svg xmlns="${SVG_NS}" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}">
         <defs>
           <clipPath id="photoClip"><rect x="380" y="260" width="292" height="370" rx="14"></rect></clipPath>
         </defs>
         ${svgPartLayers(templateTemplate, 'front', 'underlay')}
-        <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(data.card_number)}</text>
-        <text x="208" y="101" font-size="42" font-weight="800" fill="#f7eedb" letter-spacing="5">WILDEX</text>
-        <text x="630" y="100" text-anchor="middle" font-size="28" font-weight="700" fill="#f7eedb">${esc(data.banner_text)}</text>
-        <text x="372" y="176" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(data.species_name)}</text>
-        <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="#5a3d2a">${esc(data.scientific_name)}</text>
+        <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(numberBadge.text || data.card_number)}</text>
+        <text x="208" y="101" font-size="42" font-weight="800" fill="#f7eedb" letter-spacing="5">${esc(titleBanner.text || 'WILDEX')}</text>
+        <text x="630" y="100" text-anchor="middle" font-size="28" font-weight="700" fill="#f7eedb">${esc(kingdomBadge.text || data.banner_text)}</text>
+        <text x="372" y="176" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(namePlate.title || data.species_name)}</text>
+        <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="#5a3d2a">${esc(namePlate.subtitle || data.scientific_name)}</text>
         ${infoContent}
-        ${imageHref ? `<image href="${imageHref}" x="380" y="260" width="292" height="370" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"></image>` : ''}
+        ${artHref ? `<image href="${artHref}" x="380" y="260" width="292" height="370" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"></image>` : ''}
         ${svgPartLayers(templateTemplate, 'front', 'overlay')}
-        <text x="148" y="696" text-anchor="middle" font-size="28" font-weight="800" fill="#f7eedb" letter-spacing="2">INFO</text>
+        <text x="148" y="696" text-anchor="middle" font-size="28" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(infoBanner.text || 'INFO')}</text>
         ${textLines(infoLines, 64, 748, 28, 24, 'fill="#2c1d13" font-family="Georgia, serif"')}
-        <text x="88" y="972" font-size="26" font-weight="800" fill="#f7eedb" letter-spacing="2">FACT</text>
+        <text x="88" y="972" font-size="26" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(factBanner.text || 'FACT')}</text>
         ${textLines(factLines, 188, 971, 22, 20, 'fill="#f7eedb" font-family="Georgia, serif" font-style="italic"')}
       </svg>`;
   }
 
   function backSvg(data, templateTemplate) {
-    const abilities = (data.abilities || []).slice(0, 3);
-    const triggers = (data.environment_triggers || []).slice(0, 2);
+    const namePlate = slotContent(data, 'name_plate', { title: data.species_name, subtitle: data.scientific_name });
+    const statusPanel = slotContent(data, 'status_panel', {});
+    const strengthBox = slotContent(data, 'strength_box', { title: data.strength_name, text: data.strength_effect });
+    const weaknessBox = slotContent(data, 'weakness_box', { title: data.weakness_name, text: data.weakness_effect });
+    const statPanel = slotContent(data, 'stat_panel', {});
+    const typePanel = slotContent(data, 'type_panel', { title: data.type_label, text: data.biome_bonus });
+    const abilitiesPanel = slotContent(data, 'abilities_panel', { rows: data.abilities });
+    const environmentPanel = slotContent(data, 'environment_panel', { rows: data.environment_triggers });
+    const callButton = slotContent(data, 'call_button', { label: 'Play Call', enabled: !!data.sound_url });
+    const bottomStrip = slotContent(data, 'bottom_strip', { items: [`Rarity: ${data.rarity}`, `Threat Level: ${data.threat_level}`, `Aggression: ${data.aggression}`] });
+    const numberBadge = slotContent(data, 'number_badge', { text: data.card_number });
+    const titleBanner = slotContent(data, 'title_banner', { text: data.dex_id || 'WILDEX' });
+    const kingdomBadge = slotContent(data, 'kingdom_badge', { text: data.banner_text });
+    const statusRows = Array.isArray(statusPanel.rows) ? statusPanel.rows : [
+      { label: 'Rarity', value: data.rarity },
+      { label: 'Threat', value: data.threat_level },
+      { label: 'Aggression', value: data.aggression },
+    ];
+    const statRows = Array.isArray(statPanel.rows) ? statPanel.rows : [
+      { label: 'HP', value: data.hp },
+      { label: 'ATK', value: data.atk },
+      { label: 'DEF', value: data.def },
+      { label: 'SPD', value: data.spd },
+    ];
+    const abilities = (abilitiesPanel.rows || data.abilities || []).slice(0, 3);
+    const triggers = (environmentPanel.rows || data.environment_triggers || []).slice(0, 2);
+    const footerItems = bottomStrip.items || [`Rarity: ${data.rarity}`, `Threat Level: ${data.threat_level}`, `Aggression: ${data.aggression}`];
     return `
       <svg xmlns="${SVG_NS}" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}">
         ${svgPartLayers(templateTemplate, 'back', 'underlay')}
-        <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(data.card_number)}</text>
-        <text x="208" y="100" font-size="30" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(data.dex_id || 'WILDEX')}</text>
-        <text x="650" y="101" text-anchor="middle" font-size="20" font-weight="700" fill="#f7eedb">${esc(data.banner_text)}</text>
-        <text x="372" y="176" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(data.species_name)}</text>
-        <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="#5a3d2a">${esc(data.scientific_name)}</text>
-        <text x="78" y="280" font-size="20" font-weight="800" fill="#5a3d2a">RARITY</text>
-        <text x="210" y="280" font-size="22" font-weight="700" fill="#2c1d13">${esc(data.rarity)}</text>
-        <text x="78" y="314" font-size="20" font-weight="800" fill="#5a3d2a">THREAT LEVEL</text>
-        <text x="220" y="314" font-size="22" font-weight="700" fill="#2c1d13">${esc(data.threat_level)}</text>
-        <text x="78" y="348" font-size="20" font-weight="800" fill="#5a3d2a">AGGRESSION</text>
-        <text x="210" y="348" font-size="22" font-weight="700" fill="#2c1d13">${esc(data.aggression)}</text>
+        <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(numberBadge.text || data.card_number)}</text>
+        <text x="208" y="100" font-size="30" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(data.dex_id || titleBanner.text || 'WILDEX')}</text>
+        <text x="650" y="101" text-anchor="middle" font-size="20" font-weight="700" fill="#f7eedb">${esc(kingdomBadge.text || data.banner_text)}</text>
+        <text x="372" y="176" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(namePlate.title || data.species_name)}</text>
+        <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="#5a3d2a">${esc(namePlate.subtitle || data.scientific_name)}</text>
+        ${statusRows.map((row, idx) => `
+        <text x="78" y="${280 + idx * 34}" font-size="20" font-weight="800" fill="#5a3d2a">${esc(String(row.label || '').toUpperCase())}</text>
+        <text x="${idx === 1 ? 220 : 210}" y="${280 + idx * 34}" font-size="22" font-weight="700" fill="#2c1d13">${esc(row.value || '')}</text>`).join('')}
         <g transform="translate(347 284)">
           <g transform="scale(1.52 1.28)">
             ${mapInnerSvg(data)}
           </g>
         </g>
         <text x="78" y="414" font-size="20" font-weight="800" fill="#5a3d2a">STRENGTH</text>
-        <text x="78" y="448" font-size="34" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(data.strength_name)}</text>
-        <text x="78" y="474" font-size="22" fill="#2c1d13">${esc(data.strength_effect)}</text>
+        <text x="78" y="448" font-size="34" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(strengthBox.title || data.strength_name)}</text>
+        <text x="78" y="474" font-size="22" fill="#2c1d13">${esc(strengthBox.text || data.strength_effect)}</text>
         <text x="78" y="530" font-size="20" font-weight="800" fill="#5a3d2a">WEAKNESS</text>
-        <text x="78" y="564" font-size="34" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(data.weakness_name)}</text>
-        <text x="78" y="590" font-size="22" fill="#2c1d13">${esc(data.weakness_effect)}</text>
-        <text x="78" y="648" font-size="24" font-weight="800" fill="#5a3d2a">HP</text><text x="224" y="648" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${data.hp}</text>
-        <text x="78" y="696" font-size="24" font-weight="800" fill="#5a3d2a">ATK</text><text x="224" y="696" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${data.atk}</text>
-        <text x="78" y="744" font-size="24" font-weight="800" fill="#5a3d2a">DEF</text><text x="224" y="744" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${data.def}</text>
-        <text x="78" y="792" font-size="24" font-weight="800" fill="#5a3d2a">SPD</text><text x="224" y="792" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${data.spd}</text>
+        <text x="78" y="564" font-size="34" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(weaknessBox.title || data.weakness_name)}</text>
+        <text x="78" y="590" font-size="22" fill="#2c1d13">${esc(weaknessBox.text || data.weakness_effect)}</text>
+        ${statRows.map((row, idx) => `
+        <text x="78" y="${648 + idx * 48}" font-size="24" font-weight="800" fill="#5a3d2a">${esc(row.label)}</text>
+        <text x="224" y="${648 + idx * 48}" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(row.value)}</text>`).join('')}
         <text x="308" y="648" font-size="20" font-weight="800" fill="#5a3d2a">TYPE</text>
-        <text x="308" y="678" font-size="32" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(data.type_label)}</text>
-        <text x="308" y="708" font-size="20" fill="#2c1d13">${esc(data.biome_bonus)}</text>
+        <text x="308" y="678" font-size="32" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(typePanel.title || data.type_label)}</text>
+        <text x="308" y="708" font-size="20" fill="#2c1d13">${esc(typePanel.text || data.biome_bonus)}</text>
         <text x="308" y="764" font-size="20" font-weight="800" fill="#5a3d2a">ABILITIES</text>
         ${abilities.map((line, idx) => `<text x="320" y="${798 + idx * 26}" font-size="22" fill="#2c1d13">&#8226; ${esc(line)}</text>`).join('')}
         <text x="78" y="862" font-size="20" font-weight="800" fill="#5a3d2a">ENVIRONMENT TRIGGERS</text>
         ${triggers.map((line, idx) => `<text x="78" y="${892 + idx * 22}" font-size="22" fill="#2c1d13">${esc(line)}</text>`).join('')}
-        ${data.sound_url ? '<text x="372" y="966" text-anchor="middle" font-size="36" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">Play Call</text>' : ''}
+        ${(callButton.enabled || data.sound_url) ? `<text x="372" y="966" text-anchor="middle" font-size="36" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(callButton.label || 'Play Call')}</text>` : ''}
         ${svgPartLayers(templateTemplate, 'back', 'overlay')}
-        <text x="76" y="1007" font-size="15" fill="#f7eedb">Rarity: ${esc(data.rarity)}</text>
-        <text x="290" y="1007" font-size="15" fill="#f7eedb">Threat Level: ${esc(data.threat_level)}</text>
-        <text x="532" y="1007" font-size="15" fill="#f7eedb">Aggression: ${esc(data.aggression)}</text>
+        ${(footerItems || []).slice(0, 3).map((item, idx) => `<text x="${[76, 290, 532][idx] || 76}" y="1007" font-size="15" fill="#f7eedb">${esc(item)}</text>`).join('')}
       </svg>`;
   }
 
@@ -327,7 +357,7 @@
     const titleBanner = slotContent(data, 'title_banner', { text: 'WILDEX' });
     const kingdomBadge = slotContent(data, 'kingdom_badge', { text: data.banner_text });
     const infoBanner = slotContent(data, 'info_banner', { text: 'INFO' });
-    const infoText = slotContent(data, 'info_text', { text: data.info_text || '' });
+    const infoText = slotContent(data, 'flavor_text_block', { text: data.info_text || '' });
     const factBanner = slotContent(data, 'fact_banner', { text: 'FACT' });
     const factText = slotContent(data, 'fact_text', { text: data.fact_text || '' });
     return `
@@ -383,7 +413,7 @@
       <div class="wx-template-frame">
         ${htmlPartLayers(data.back_template, 'back')}
         <div class="wx-back-number">${esc(numberBadge.text || data.card_number)}</div>
-        <div class="wx-back-dex">${esc(titleBanner.text || data.dex_id || 'WILDEX')}</div>
+        <div class="wx-back-dex">${esc(data.dex_id || titleBanner.text || 'WILDEX')}</div>
         <div class="wx-back-badge">${esc(kingdomBadge.text || data.banner_text)}</div>
         <div class="wx-back-name">${esc(namePlate.title || data.species_name)}</div>
         <div class="wx-back-scientific">${esc(namePlate.subtitle || data.scientific_name)}</div>

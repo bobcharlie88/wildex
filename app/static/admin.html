@@ -202,6 +202,26 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+    .code-box {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(0,0,0,.22);
+      border: 1px solid rgba(255,255,255,.08);
+      color: #d7e6df;
+      font-size: .76rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      overflow: auto;
+      max-height: 340px;
+    }
+    .slot-meta {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: .75rem;
+      line-height: 1.35;
+    }
     .template-card.active, .version-card.active { border-color: rgba(127,193,129,.42); box-shadow: inset 0 0 0 1px rgba(127,193,129,.24); }
     .template-card header, .asset-card header, .version-card header {
       display: flex;
@@ -452,6 +472,29 @@
         <section class="panel">
           <div class="panel-head">
             <div>
+              <h2>Card Builder</h2>
+              <p>Inspect the stored card payload, rebuild it through the clean backend builder, and preview the exact render result used in-app.</p>
+            </div>
+          </div>
+          <div class="status-box" id="builder-status"></div>
+          <div class="error-box" id="builder-error"></div>
+          <div class="grid-3">
+            <label>Saved Card
+              <select id="builder-card-select"></select>
+            </label>
+            <label>Payload Version<input id="builder-payload-version" readonly></label>
+            <label>Render Status<input id="builder-render-status" readonly></label>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" id="builder-preview-btn">Preview Card</button>
+            <button class="btn btn-primary" type="button" id="builder-rebuild-btn">Rebuild Payload</button>
+          </div>
+          <div class="code-box" id="builder-payload-box">Select a saved card to inspect its structured payload.</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
               <h2>Agent Control</h2>
               <p>Run targeted tasks against The Dr and the hidden specialist agents. Every task is logged through the backend orchestrator.</p>
             </div>
@@ -547,8 +590,9 @@
       templates: [],
       assets: [],
       samples: [],
-      templateSlots: [],
+      slotRules: [],
       selectedTemplateId: null,
+      selectedBuilderCardId: null,
       agentDashboard: { agents: [], recent_tasks: [], review_queue: [] },
     };
 
@@ -596,39 +640,38 @@
       return `${asset.name} · ${asset.version}${asset.template_part ? ` · ${asset.template_part}` : ''}`;
     }
 
+    function slotRule(slotName) {
+      return state.slotRules.find(item => item.name === slotName) || null;
+    }
+
     function allowedForSlot(asset, slot, selectedTemplate) {
+      const rule = slotRule(slot);
+      if (!rule) return false;
       const sideMatches = !asset.side || asset.side === selectedTemplate?.side;
       if (!sideMatches) return false;
-      if (asset.template_part === slot) return true;
-      if (!asset.template_part) {
-        if (asset.asset_type === 'map_asset') return slot === 'map_frame';
-        if (asset.asset_type === 'icon') return ['family_icon', 'species_icon', 'special_badge'].includes(slot);
-        return true;
-      }
-      if (asset.asset_type === 'map_asset') return slot === 'map_frame';
-      if (asset.asset_type === 'icon') return ['family_icon', 'species_icon', 'special_badge'].includes(slot);
-      return false;
+      if (!rule.allowed_asset_types.includes(asset.asset_type)) return false;
+      if (rule.map_only && !['map_asset', 'template_part', 'frame_art'].includes(asset.asset_type)) return false;
+      if (asset.template_part && !['base_frame', slot].includes(asset.template_part) && !['template', 'animal_art'].includes(asset.asset_type)) return false;
+      return true;
     }
 
     function slotsForTemplate(selectedTemplate) {
-      if (!selectedTemplate) return state.templateSlots;
-      if (selectedTemplate.side === 'front') {
-        return state.templateSlots.filter(slot => !['map_frame', 'status_panel'].includes(slot));
-      }
-      return state.templateSlots.filter(slot => slot !== 'photo_frame');
+      if (!selectedTemplate) return state.slotRules;
+      return state.slotRules.filter(rule => rule.side === 'both' || rule.side === selectedTemplate.side);
     }
 
     function populateSlotOptions() {
       const slotForm = $('slot-form');
       const selectedTemplate = currentTemplate();
-      slotForm.innerHTML = slotsForTemplate(selectedTemplate).map(slot => {
+      slotForm.innerHTML = slotsForTemplate(selectedTemplate).map(rule => {
+        const slot = rule.name;
         const selectedPart = selectedTemplate?.parts?.find(item => item.slot_name === slot);
         const options = ['<option value="">None</option>'].concat(
           state.assets
             .filter(asset => allowedForSlot(asset, slot, selectedTemplate))
             .map(asset => `<option value="${asset.id}" ${selectedPart && Number(selectedPart.asset_id || selectedPart.id) === asset.id ? 'selected' : ''}>${esc(assetLabel(asset))}</option>`)
         );
-        return `<label>${esc(slot)}<select data-slot="${esc(slot)}">${options.join('')}</select></label>`;
+        return `<label>${esc(slot)}<span class="slot-meta">${esc(rule.side)} · ${esc(rule.content_type)}${rule.map_only ? ' · map-only' : ''}${rule.required ? ' · required' : ''}<br>${esc(rule.description || '')}</span><select data-slot="${esc(slot)}">${options.join('')}</select></label>`;
       }).join('');
     }
 
@@ -641,6 +684,9 @@
         state.samples.map(item => `<option value="${item.id}">${esc(item.species_name)}${item.dex_id ? ` · ${esc(item.dex_id)}` : ''}</option>`)
       );
       $('preview-sample-select').innerHTML = sampleOptions.join('');
+      $('builder-card-select').innerHTML = ['<option value="">Select saved card</option>'].concat(
+        state.samples.map(item => `<option value="${item.id}" ${Number(state.selectedBuilderCardId) === item.id ? 'selected' : ''}>${esc(item.species_name)}${item.dex_id ? ` · ${esc(item.dex_id)}` : ''}</option>`)
+      ).join('');
       const replaceOptions = ['<option value="">Create new asset</option>'].concat(
         state.assets.map(item => `<option value="${item.id}">${esc(assetLabel(item))}</option>`)
       );
@@ -665,6 +711,30 @@
       $('template-notes').value = template.notes || '';
       $('template-active').checked = !!template.active;
       populateSlotOptions();
+    }
+
+    async function loadBuilderCardPreview(rebuild = false) {
+      const cardId = Number($('builder-card-select').value || state.selectedBuilderCardId || 0);
+      if (!cardId) {
+        $('builder-payload-box').textContent = 'Select a saved card to inspect its structured payload.';
+        $('builder-payload-version').value = '';
+        $('builder-render-status').value = '';
+        return;
+      }
+      state.selectedBuilderCardId = cardId;
+      $('builder-error').classList.remove('visible');
+      try {
+        const endpoint = rebuild ? `/admin/cards/${cardId}/rebuild` : `/admin/cards/${cardId}/preview`;
+        const data = await fetchJson(endpoint, { method: 'POST' });
+        $('builder-payload-box').textContent = JSON.stringify(data.card_payload || {}, null, 2);
+        $('builder-payload-version').value = data.card_payload_version || '';
+        $('builder-render-status').value = data.render_status || (rebuild ? 'ready' : 'preview');
+        WildExCardRenderer.buildCard($('admin-preview-host'), data.render_card);
+        showBox('builder-status', rebuild ? 'Card payload rebuilt and saved' : 'Card preview loaded');
+      } catch (error) {
+        $('builder-error').textContent = error.message || 'Card builder request failed';
+        $('builder-error').classList.add('visible');
+      }
     }
 
     function renderTemplateCards() {
@@ -955,9 +1025,10 @@
       state.templates = data.templates || [];
       state.assets = data.assets || [];
       state.samples = data.samples || [];
-      state.templateSlots = data.template_slots || [];
+      state.slotRules = data.slot_rules || [];
       state.agentDashboard = data.agents || { agents: [], recent_tasks: [], review_queue: [] };
       if (!state.selectedTemplateId && state.templates[0]) state.selectedTemplateId = state.templates[0].id;
+      if (!state.selectedBuilderCardId && state.samples[0]) state.selectedBuilderCardId = state.samples[0].id;
       $('admin-user-pill').textContent = state.user.email;
       renderTemplatePicker();
       fillTemplateForm(currentTemplate());
@@ -969,9 +1040,10 @@
       renderAssetSections();
       renderAssets();
       $('asset-template-part').innerHTML = ['<option value="">None</option>'].concat(
-        state.templateSlots.map(slot => `<option value="${slot}">${slot}</option>`)
+        state.slotRules.map(slot => `<option value="${slot.name}">${slot.name}</option>`)
       ).join('');
       await previewTemplate();
+      await loadBuilderCardPreview(false);
     }
 
     $('asset-file').addEventListener('change', (event) => {
@@ -1064,6 +1136,12 @@
     });
     $('save-slots-btn').addEventListener('click', () => { saveSlots().catch(() => {}); });
     $('preview-template-btn').addEventListener('click', () => { previewTemplate().catch(() => {}); });
+    $('builder-card-select').addEventListener('change', () => {
+      state.selectedBuilderCardId = Number($('builder-card-select').value || 0) || null;
+      loadBuilderCardPreview(false).catch(() => {});
+    });
+    $('builder-preview-btn').addEventListener('click', () => { loadBuilderCardPreview(false).catch(() => {}); });
+    $('builder-rebuild-btn').addEventListener('click', () => { loadBuilderCardPreview(true).catch(() => {}); });
     $('activate-template-btn').addEventListener('click', () => {
       const template = currentTemplate();
       if (template) activateTemplate(template.id);

@@ -8,6 +8,7 @@ from sqlalchemy import or_
 
 from app.database import SessionLocal, db_available
 from app.models import CardAsset
+from app.services.cards.slots import SLOT_DEFINITIONS
 
 ALLOWED_ASSET_MIME_TYPES = {
     "image/svg+xml",
@@ -28,25 +29,7 @@ ASSET_SECTIONS = (
     "animal_art",
 )
 
-TEMPLATE_PART_SLOTS = (
-    "base_frame",
-    "background_texture",
-    "top_bar",
-    "number_badge",
-    "title_banner",
-    "kingdom_badge",
-    "photo_frame",
-    "info_banner",
-    "fact_banner",
-    "bottom_strip",
-    "map_frame",
-    "status_panel",
-    "frame_overlay",
-    "rarity_overlay",
-    "family_icon",
-    "species_icon",
-    "special_badge",
-)
+TEMPLATE_PART_SLOTS = tuple(slot.name for slot in SLOT_DEFINITIONS)
 
 
 @dataclass(frozen=True)

@@ -19,7 +19,16 @@ from app.services.card_assets import (
     normalize_tags,
     slugify,
 )
-from app.services.card_render import build_render_card
+from app.services.cards import (
+    CardConfigurationError,
+    apply_render_fields,
+    build_card_payload,
+    build_preview_render,
+    build_render_card,
+    list_template_payloads,
+    slot_definitions_for_side,
+    validate_slot_assignments,
+)
 from app.services.card_templates import clear_template_cache, ensure_builtin_templates, list_templates, select_template
 from app.utils.storage import upload_named_bytes
 
@@ -46,6 +55,30 @@ def _template_to_dict(selection) -> dict:
         "notes": selection.notes,
         "parts": selection.parts or [],
     }
+
+
+def _slot_rule_dict(slot) -> dict:
+    return {
+        "name": slot.name,
+        "side": slot.side,
+        "content_type": slot.content_type,
+        "allowed_asset_types": list(slot.allowed_asset_types),
+        "required": slot.required,
+        "map_only": slot.map_only,
+        "description": slot.description,
+    }
+
+
+def _all_slot_rules() -> list[dict]:
+    seen = set()
+    items = []
+    for side in ("front", "back"):
+        for slot in slot_definitions_for_side(side):
+            if slot.name in seen:
+                continue
+            seen.add(slot.name)
+            items.append(_slot_rule_dict(slot))
+    return items
 
 
 def _load_template_row(db, template_id: int) -> CardTemplate:
@@ -165,7 +198,7 @@ def admin_bootstrap(current_user: User = Depends(require_admin_user)):
                 CardAsset.template_part.is_(None),
             ).update({"template_part": "map_frame"}, synchronize_session=False)
             db.commit()
-            items = [_template_to_dict(selection) for selection in list_templates()]
+            items = list_template_payloads()
             assets = list_assets()
             rows = (
                 db.query(Card)
@@ -182,12 +215,13 @@ def admin_bootstrap(current_user: User = Depends(require_admin_user)):
         finally:
             db.close()
     if not items:
-        items = [_template_to_dict(selection) for selection in list_templates()]
+        items = list_template_payloads()
     return {
         "user": {"id": current_user.id, "email": current_user.email},
         "templates": items,
         "assets": assets,
         "template_slots": list(TEMPLATE_PART_SLOTS),
+        "slot_rules": _all_slot_rules(),
         "samples": samples,
         "agents": get_agent_dashboard(),
     }
@@ -202,7 +236,7 @@ def admin_templates(current_user: User = Depends(require_admin_user)):
             db.commit()
         finally:
             db.close()
-    return {"items": [_template_to_dict(selection) for selection in list_templates()]}
+    return {"items": list_template_payloads()}
 
 
 @router.post("/assets/upload")
@@ -380,6 +414,7 @@ async def assign_template_parts(template_id: int, request: Request, current_user
     db = SessionLocal()
     try:
         row = _load_template_row(db, template_id)
+        normalized_assignments = {}
         for slot_name, asset_id in slots.items():
             slot = (slot_name or "").strip().lower()
             if slot not in TEMPLATE_PART_SLOTS:
@@ -399,6 +434,11 @@ async def assign_template_parts(template_id: int, request: Request, current_user
             asset = db.query(CardAsset).filter(CardAsset.id == int(asset_id)).first()
             if asset is None:
                 raise HTTPException(404, f"Asset not found for slot {slot}")
+            normalized_assignments[slot] = asset_to_dict(asset)
+            try:
+                validate_slot_assignments(template_side=row.side, assignments={slot: normalized_assignments[slot]})
+            except CardConfigurationError as exc:
+                raise HTTPException(400, str(exc)) from exc
             if existing is None:
                 db.add(TemplatePartAssignment(template_id=row.id, slot_name=slot, asset_id=asset.id))
             else:
@@ -429,7 +469,8 @@ async def preview_template(request: Request, current_user: User = Depends(requir
         back_row = _load_template_row(db, int(back_template_id)) if back_template_id else None
         kingdom = (front_row.kingdom if front_row else (back_row.kingdom if back_row else "mammal"))
         source = sample_card or _fallback_sample(kingdom)
-        render_card = build_render_card(source)
+        front_template = None
+        back_template = None
         if front_row:
             selection = select_template(
                 kingdom=front_row.kingdom,
@@ -437,7 +478,7 @@ async def preview_template(request: Request, current_user: User = Depends(requir
                 preferred_name=front_row.name,
                 preferred_version=front_row.version,
             )
-            render_card["front_template"] = _template_to_dict(selection)
+            front_template = _template_to_dict(selection)
         if back_row:
             selection = select_template(
                 kingdom=back_row.kingdom,
@@ -445,38 +486,82 @@ async def preview_template(request: Request, current_user: User = Depends(requir
                 preferred_name=back_row.name,
                 preferred_version=back_row.version,
             )
-            render_card["back_template"] = _template_to_dict(selection)
+            back_template = _template_to_dict(selection)
 
-        for side_name, mapping in slot_overrides.items():
-            template_key = "front_template" if side_name == "front" else "back_template"
-            parts = [dict(item) for item in render_card[template_key].get("parts") or []]
-            by_slot = {item.get("slot_name"): item for item in parts}
+        normalized_overrides = {}
+        for side_name, mapping in (slot_overrides or {}).items():
+            side_assets = {}
             for slot_name, asset_id in (mapping or {}).items():
                 if not asset_id:
-                    by_slot.pop(slot_name, None)
+                    side_assets[slot_name] = None
                     continue
                 asset = db.query(CardAsset).filter(CardAsset.id == int(asset_id)).first()
                 if asset is None:
-                    continue
-                by_slot[slot_name] = {
-                    "id": asset.id,
-                    "asset_id": asset.id,
-                    "slot_name": slot_name,
-                    "asset_url": asset.file_path,
-                    "asset_type": asset.asset_type,
-                    "template_part": asset.template_part,
-                    "mime_type": asset.mime_type,
-                    "name": asset.name,
-                    "slug": asset.slug,
-                    "version": asset.version,
-                    "sort_order": asset.sort_order,
-                    "active": bool(asset.active),
-                }
-            render_card[template_key]["parts"] = sorted(
-                by_slot.values(),
-                key=lambda item: (int(item.get("sort_order") or 100), item.get("slot_name") or ""),
+                    raise HTTPException(404, f"Asset {asset_id} not found")
+                side_assets[slot_name] = asset_to_dict(asset)
+            normalized_overrides[side_name] = side_assets
+        try:
+            render_card = build_preview_render(
+                source=source,
+                front_template=front_template,
+                back_template=back_template,
+                slot_overrides=normalized_overrides,
             )
-        return {"render_card": render_card}
+        except CardConfigurationError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return {"render_card": render_card, "card_payload": build_card_payload(source)}
+    finally:
+        db.close()
+
+
+@router.post("/cards/{card_id}/preview")
+def preview_card_builder(card_id: int, current_user: User = Depends(require_admin_user)):
+    if not db_available():
+        raise HTTPException(503, "Database unavailable")
+    db = SessionLocal()
+    try:
+        row = db.query(Card).filter(Card.id == card_id).first()
+        if row is None:
+            raise HTTPException(404, "Card not found")
+        source = _card_source(row)
+        return {
+            "card_id": row.id,
+            "card_payload_version": row.card_payload_version,
+            "render_status": row.render_status,
+            "card_payload": build_card_payload(source),
+            "render_card": build_render_card(source),
+        }
+    finally:
+        db.close()
+
+
+@router.post("/cards/{card_id}/rebuild")
+def rebuild_card_builder(card_id: int, current_user: User = Depends(require_admin_user)):
+    if not db_available():
+        raise HTTPException(503, "Database unavailable")
+    db = SessionLocal()
+    try:
+        row = db.query(Card).filter(Card.id == card_id).first()
+        if row is None:
+            raise HTTPException(404, "Card not found")
+        source = _card_source(row)
+        payload = build_card_payload(source)
+        render_card = build_render_card(source)
+        apply_render_fields(row, render_card)
+        row.card_payload_json = json.dumps(payload)
+        row.card_payload_version = "1.1.0"
+        row.render_status = "ready"
+        row.front_template_id = render_card.get("front_template", {}).get("id")
+        row.back_template_id = render_card.get("back_template", {}).get("id")
+        db.commit()
+        return {
+            "ok": True,
+            "card_id": row.id,
+            "card_payload_version": row.card_payload_version,
+            "render_status": row.render_status,
+            "card_payload": payload,
+            "render_card": render_card,
+        }
     finally:
         db.close()
 
