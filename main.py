@@ -82,6 +82,11 @@ def startup():
                     ("group_code",   "VARCHAR(32)"),
                     ("evolution_chain_id", "VARCHAR(255)"),
                     ("evolution_stage", "INTEGER"),
+                    ("plant_group_id", "VARCHAR(64)"),
+                    ("consensus_score", "FLOAT"),
+                    ("location_validated", "BOOLEAN DEFAULT FALSE"),
+                    ("alternatives_json", "TEXT"),
+                    ("identification_reasoning", "TEXT"),
                     ("front_template_name", "VARCHAR(120)"),
                     ("front_template_version", "VARCHAR(32)"),
                     ("back_template_name", "VARCHAR(120)"),
@@ -106,6 +111,7 @@ def startup():
                     ("image_url", "VARCHAR(1000)"),
                     ("latitude", "FLOAT"),
                     ("longitude", "FLOAT"),
+                    ("plant_group_id", "VARCHAR(64)"),
                     ("encounter_id", "VARCHAR(64)"),
                     ("primary_job_id", "INTEGER"),
                     ("grouped_job_ids", "TEXT"),
@@ -113,6 +119,8 @@ def startup():
                     ("species_name", "VARCHAR(200)"),
                     ("scientific_name", "VARCHAR(200)"),
                     ("confidence", "FLOAT"),
+                    ("consensus_score", "FLOAT"),
+                    ("location_validated", "BOOLEAN DEFAULT FALSE"),
                     ("provisional", "BOOLEAN DEFAULT FALSE"),
                     ("repeat_state", "VARCHAR(32)"),
                     ("card_id", "INTEGER"),
@@ -120,6 +128,8 @@ def startup():
                     ("region_unlocked", "BOOLEAN DEFAULT FALSE"),
                     ("error_message", "TEXT"),
                     ("review_reason", "TEXT"),
+                    ("identification_reasoning", "TEXT"),
+                    ("alternatives_json", "TEXT"),
                     ("supporting_image_urls", "TEXT"),
                     ("started_at", "TIMESTAMP"),
                     ("completed_at", "TIMESTAMP"),
@@ -127,6 +137,26 @@ def startup():
                 ]:
                     try:
                         conn.execute(text(f"ALTER TABLE capture_jobs ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+                for col, typedef in [
+                    ("plant_group_id", "VARCHAR(64)"),
+                    ("record_type", "VARCHAR(32)"),
+                ]:
+                    try:
+                        conn.execute(text(f"ALTER TABLE species_results ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+                for col, typedef in [
+                    ("consensus_score", "FLOAT"),
+                    ("location_validated", "BOOLEAN DEFAULT FALSE"),
+                    ("alternatives_json", "TEXT"),
+                    ("source_job_ids_json", "TEXT"),
+                ]:
+                    try:
+                        conn.execute(text(f"ALTER TABLE species_results ADD COLUMN IF NOT EXISTS {col} {typedef}"))
                         conn.commit()
                     except Exception:
                         conn.rollback()

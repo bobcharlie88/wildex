@@ -5,10 +5,8 @@ import logging
 import os
 import tempfile
 import threading
-import time
 import uuid
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -20,12 +18,11 @@ from app.pipeline.frame_extractor import extract_best_frame, save_frame
 from app.pipeline.species_data import get_species_data
 from app.pipeline.species_id import (
     SpeciesResult,
-    TemporaryIdentificationError,
-    identify_species,
     is_temporary_identification_error,
 )
 from app.services.agents.orchestrator import run_agent_task
 from app.services.card_render import apply_render_fields, build_render_card
+from app.services.consensus_identification import _candidate_payload, build_consensus_payload, identify_group_candidates
 from app.services.dex import (
     DISCOVERY_CAPTURED,
     DISCOVERY_SEEN,
@@ -40,7 +37,6 @@ log = logging.getLogger("wildex.capture_jobs")
 IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
 VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm", "video/3gpp", "video/x-m4v"}
 ALLOWED_TYPES = IMAGE_TYPES | VIDEO_TYPES
-IDENTIFY_RETRY_DELAYS = (1.0, 2.0)
 READY_AGE_SECONDS = 5
 GROUP_TIME_WINDOW_SECONDS = 90
 GROUP_TIME_WINDOW_WITHOUT_GPS_SECONDS = 20
@@ -52,13 +48,6 @@ FAIL_CONFIDENCE_THRESHOLD = 0.45
 
 _worker_thread: threading.Thread | None = None
 _worker_stop = threading.Event()
-
-
-@dataclass
-class IdentifiedShot:
-    job_id: int
-    image_url: str | None
-    species: SpeciesResult
 
 
 def _utcnow() -> datetime:
@@ -85,6 +74,7 @@ def _job_payload(job: CaptureJob) -> dict:
         "image_url": job.image_url,
         "latitude": job.latitude,
         "longitude": job.longitude,
+        "plant_group_id": job.plant_group_id,
         "encounter_id": job.encounter_id,
         "primary_job_id": job.primary_job_id,
         "is_grouped_secondary": bool(job.primary_job_id),
@@ -93,6 +83,8 @@ def _job_payload(job: CaptureJob) -> dict:
         "species_name": job.species_name,
         "scientific_name": job.scientific_name,
         "confidence": round(job.confidence, 4) if job.confidence is not None else None,
+        "consensus_score": round(job.consensus_score, 4) if job.consensus_score is not None else None,
+        "location_validated": bool(job.location_validated),
         "provisional": job.provisional,
         "repeat_state": job.repeat_state,
         "card_id": job.card_id,
@@ -100,6 +92,8 @@ def _job_payload(job: CaptureJob) -> dict:
         "region_unlocked": job.region_unlocked,
         "error_message": job.error_message,
         "review_reason": job.review_reason,
+        "identification_reasoning": job.identification_reasoning,
+        "alternatives": _json_list(job.alternatives_json),
         "supporting_image_urls": _json_list(job.supporting_image_urls),
         "created_at": job.created_at.isoformat() if job.created_at else None,
         "updated_at": job.updated_at.isoformat() if job.updated_at else None,
@@ -138,6 +132,140 @@ def list_capture_jobs_for_user(user_id: int, *, include_secondary: bool = False,
             if row.status in counts:
                 counts[row.status] += 1
         return {"items": [serialize_capture_job(row) for row in rows], "counts": counts}
+    finally:
+        db.close()
+
+
+def confirm_capture_job_species(*, user_id: int, job_id: int, scientific_name: str | None = None) -> dict:
+    if not db_available() or SessionLocal is None:
+        raise RuntimeError("Database unavailable")
+
+    db = SessionLocal()
+    try:
+        job = (
+            db.query(CaptureJob)
+            .filter(CaptureJob.id == job_id, CaptureJob.owner_id == user_id)
+            .first()
+        )
+        if job is None:
+            raise ValueError("Capture job not found")
+        if job.primary_job_id:
+            job = db.query(CaptureJob).filter(CaptureJob.id == job.primary_job_id).first() or job
+        if job.status != "needs_review":
+            raise ValueError("Only needs-review captures can be confirmed")
+
+        alternatives = _json_list(job.alternatives_json)
+        chosen = None
+        if scientific_name:
+            for item in alternatives:
+                if (item.get("scientific_name") or "").strip().lower() == scientific_name.strip().lower():
+                    chosen = item
+                    break
+        if chosen is None and alternatives:
+            chosen = alternatives[0]
+        if chosen is None and job.scientific_name:
+            chosen = {
+                "common_name": job.species_name,
+                "scientific_name": job.scientific_name,
+                "confidence": job.confidence,
+                "category": None,
+                "sub_category": None,
+                "rank": "species",
+                "taxon_id": None,
+                "iconic_taxon": None,
+                "reason": job.identification_reasoning or "User confirmed stored capture result.",
+            }
+        if chosen is None:
+            raise ValueError("No candidate species is available to confirm")
+
+        grouped_ids = _json_list(job.grouped_job_ids) or [job.id]
+        selected_jobs = (
+            db.query(CaptureJob)
+            .filter(CaptureJob.owner_id == user_id, CaptureJob.id.in_(grouped_ids))
+            .order_by(CaptureJob.created_at.asc(), CaptureJob.id.asc())
+            .all()
+        ) or [job]
+        best_job = next((item for item in selected_jobs if item.id == job.id), selected_jobs[0])
+        supporting_urls = [
+            (item.primary_image_url or item.image_url)
+            for item in selected_jobs
+            if item.id != best_job.id and (item.primary_image_url or item.image_url)
+        ]
+        species = _species_from_candidate(
+            chosen,
+            confidence=float(chosen.get("confidence") or job.confidence or REVIEW_CONFIDENCE_THRESHOLD),
+            reasoning=job.identification_reasoning or chosen.get("reason") or "User confirmed consensus candidate.",
+            provisional=False,
+        )
+        card_row, region_unlocked, repeat_state = _save_completed_card(
+            db,
+            owner_id=user_id,
+            species=species,
+            best_job=best_job,
+            supporting_urls=supporting_urls,
+            plant_group_id=job.plant_group_id,
+            consensus_score=job.consensus_score,
+            location_validated=bool(job.location_validated),
+            alternatives=alternatives,
+            identification_reasoning=job.identification_reasoning or chosen.get("reason"),
+        )
+        normalized_species = run_agent_task(
+            agent_name="species",
+            task_type="normalize_capture_species",
+            payload={
+                "species": species,
+                "candidate_list": alternatives[:4],
+                "alternatives": alternatives[1:4],
+                "consensus_score": job.consensus_score,
+                "location_validated": job.location_validated,
+                "needs_review": False,
+            },
+            actor_user_id=user_id,
+            capture_job_id=best_job.id,
+            card_id=card_row.id,
+        )
+        _persist_species_result(
+            db,
+            capture_job_id=best_job.id,
+            card_id=card_row.id,
+            agent_result=normalized_species,
+            plant_group_id=job.plant_group_id,
+            record_type="final_confirmed",
+            consensus_score=job.consensus_score,
+            location_validated=job.location_validated,
+            alternatives=alternatives,
+            source_job_ids=grouped_ids,
+        )
+        _set_jobs_terminal(
+            db,
+            selected_jobs,
+            primary_job=best_job,
+            status="complete",
+            species_name=card_row.species_name,
+            scientific_name=card_row.scientific_name,
+            confidence=card_row.confidence,
+            provisional=False,
+            repeat_state=repeat_state,
+            card_id=card_row.id,
+            region=card_row.region,
+            region_unlocked=region_unlocked,
+            plant_group_id=job.plant_group_id,
+            consensus_score=job.consensus_score,
+            location_validated=bool(job.location_validated),
+            alternatives=alternatives,
+            identification_reasoning=(job.identification_reasoning or chosen.get("reason")),
+            supporting_urls=supporting_urls,
+        )
+        for item in (
+            db.query(ReviewQueueItem)
+            .filter(ReviewQueueItem.capture_job_id.in_(grouped_ids), ReviewQueueItem.status == "open")
+            .all()
+        ):
+            item.status = "resolved"
+            item.resolved_at = _utcnow()
+        db.commit()
+        db.refresh(best_job)
+        return {"job": serialize_capture_job(best_job), "card_id": card_row.id}
     finally:
         db.close()
 
@@ -319,23 +447,6 @@ def _claim_seed_job_id() -> int | None:
         db.close()
 
 
-def _identify_with_retry(image_path: str, lat: float | None = None, lon: float | None = None) -> SpeciesResult:
-    last_exc = None
-    for idx in range(len(IDENTIFY_RETRY_DELAYS) + 1):
-        try:
-            return identify_species(image_path, lat=lat, lon=lon)
-        except EnvironmentError:
-            raise
-        except Exception as exc:
-            last_exc = exc
-            if not isinstance(exc, TemporaryIdentificationError) and not is_temporary_identification_error(exc):
-                raise
-            if idx >= len(IDENTIFY_RETRY_DELAYS):
-                raise
-            time.sleep(IDENTIFY_RETRY_DELAYS[idx])
-    raise last_exc  # pragma: no cover
-
-
 def _distance_meters(lat1: float | None, lon1: float | None, lat2: float | None, lon2: float | None) -> float | None:
     if None in {lat1, lon1, lat2, lon2}:
         return None
@@ -373,32 +484,19 @@ def _materialize_image(image_url: str) -> tuple[str, bool]:
         return tmp.name, True
 
 
-def _cluster_key(species: SpeciesResult) -> str:
-    if species.taxon_id:
-        return f"taxon:{species.taxon_id}"
-    if species.scientific_name:
-        return f"name:{species.scientific_name.strip().lower()}"
-    return f"fallback:{(species.common_name or 'unknown').strip().lower()}:{species.category}"
-
-
-def _clone_species(species: SpeciesResult, *, confidence: float, provisional: bool, reasoning: str) -> SpeciesResult:
+def _species_from_candidate(candidate: dict[str, object], *, confidence: float, reasoning: str, provisional: bool) -> SpeciesResult:
     return SpeciesResult(
-        scientific_name=species.scientific_name,
-        common_name=species.common_name,
+        scientific_name=str(candidate.get("scientific_name") or candidate.get("label") or "Unknown species"),
+        common_name=str(candidate.get("common_name") or candidate.get("label") or candidate.get("scientific_name") or "Unknown species"),
         confidence=confidence,
-        rank=species.rank,
+        rank=str(candidate.get("rank") or "species"),
         provisional=provisional,
         reasoning=reasoning,
-        subject_visible=species.subject_visible,
-        category=species.category,
-        sub_category=species.sub_category,
-        taxon_id=species.taxon_id,
-        inat_common_name=species.inat_common_name,
-        wikipedia_summary=species.wikipedia_summary,
-        iconic_taxon=species.iconic_taxon,
-        conservation_status=species.conservation_status,
-        observations_count=species.observations_count,
-        inat_validated=species.inat_validated,
+        subject_visible=True,
+        category=str(candidate.get("category") or "animal"),
+        sub_category=str(candidate.get("sub_category") or ""),
+        taxon_id=candidate.get("taxon_id"),
+        iconic_taxon=str(candidate.get("iconic_taxon") or ""),
     )
 
 
@@ -437,19 +535,31 @@ def _persist_species_result(
     capture_job_id: int | None,
     card_id: int | None,
     agent_result: dict,
+    plant_group_id: str | None = None,
+    record_type: str | None = None,
+    consensus_score: float | None = None,
+    location_validated: bool | None = None,
+    alternatives: list[dict] | None = None,
+    source_job_ids: list[int] | None = None,
 ) -> SpeciesResultRecord:
     payload = agent_result.get("payload") or {}
     row = SpeciesResultRecord(
         capture_job_id=capture_job_id,
         card_id=card_id,
         agent_task_id=agent_result.get("task_id"),
+        plant_group_id=plant_group_id,
+        record_type=record_type,
         common_name=payload.get("common_name"),
         scientific_name=payload.get("scientific_name"),
         confidence=payload.get("confidence"),
+        consensus_score=consensus_score if consensus_score is not None else payload.get("consensus_score"),
+        location_validated=bool(location_validated if location_validated is not None else payload.get("location_validated")),
         needs_review=bool(payload.get("needs_review")),
         review_reason=payload.get("review_reason"),
         evidence_summary=payload.get("evidence_summary"),
         candidate_list_json=json.dumps(payload.get("candidate_list") or []),
+        alternatives_json=json.dumps(alternatives if alternatives is not None else payload.get("alternatives") or []),
+        source_job_ids_json=json.dumps(source_job_ids or []),
         taxon_id=payload.get("taxon_id"),
         iconic_taxon=payload.get("iconic_taxon"),
     )
@@ -481,7 +591,19 @@ def _create_review_queue_item(
     return row
 
 
-def _save_completed_card(db, *, owner_id: int, species: SpeciesResult, best_job: CaptureJob, supporting_urls: list[str]) -> tuple[Card, bool, str]:
+def _save_completed_card(
+    db,
+    *,
+    owner_id: int,
+    species: SpeciesResult,
+    best_job: CaptureJob,
+    supporting_urls: list[str],
+    plant_group_id: str | None = None,
+    consensus_score: float | None = None,
+    location_validated: bool = False,
+    alternatives: list[dict] | None = None,
+    identification_reasoning: str | None = None,
+) -> tuple[Card, bool, str]:
     gbif = None
     if best_job.latitude is not None and best_job.longitude is not None:
         try:
@@ -518,6 +640,11 @@ def _save_completed_card(db, *, owner_id: int, species: SpeciesResult, best_job:
         captured_at=_utcnow(),
         latitude=best_job.latitude,
         longitude=best_job.longitude,
+        plant_group_id=plant_group_id,
+        consensus_score=consensus_score,
+        location_validated=location_validated,
+        alternatives_json=json.dumps(alternatives or []),
+        identification_reasoning=identification_reasoning,
         capture_country=gbif.query_country if gbif else None,
         original_image_url=best_job.original_image_url or best_job.primary_image_url or best_job.image_url,
         primary_card_image_url=best_job.primary_image_url or best_job.image_url,
@@ -611,21 +738,30 @@ def _set_jobs_terminal(
     region_unlocked: bool = False,
     error_message: str | None = None,
     review_reason: str | None = None,
+    plant_group_id: str | None = None,
+    consensus_score: float | None = None,
+    location_validated: bool = False,
+    alternatives: list[dict] | None = None,
+    identification_reasoning: str | None = None,
     supporting_urls: list[str] | None = None,
 ) -> None:
     encounter_id = primary_job.encounter_id or uuid.uuid4().hex
     grouped_ids = [job.id for job in jobs]
     supporting_json = json.dumps(supporting_urls or [])
+    alternatives_json = json.dumps(alternatives or [])
     completed_at = _utcnow()
     for job in jobs:
         job.status = status
         job.encounter_id = encounter_id
+        job.plant_group_id = plant_group_id or encounter_id
         job.primary_job_id = None if job.id == primary_job.id else primary_job.id
         job.grouped_job_ids = json.dumps(grouped_ids)
         job.grouped_count = len(grouped_ids)
         job.species_name = species_name
         job.scientific_name = scientific_name
         job.confidence = confidence
+        job.consensus_score = consensus_score
+        job.location_validated = location_validated
         job.provisional = provisional
         job.repeat_state = repeat_state
         job.card_id = card_id
@@ -633,6 +769,8 @@ def _set_jobs_terminal(
         job.region_unlocked = region_unlocked
         job.error_message = error_message
         job.review_reason = review_reason
+        job.identification_reasoning = identification_reasoning
+        job.alternatives_json = alternatives_json
         job.supporting_image_urls = supporting_json
         job.completed_at = completed_at
 
@@ -656,7 +794,9 @@ def _process_seed_job(seed_id: int) -> None:
         if not seed or seed.status != "processing":
             return
         encounter_id = seed.encounter_id or uuid.uuid4().hex
+        plant_group_id = seed.plant_group_id or encounter_id
         seed.encounter_id = encounter_id
+        seed.plant_group_id = plant_group_id
 
         candidates = (
             db.query(CaptureJob)
@@ -675,11 +815,13 @@ def _process_seed_job(seed_id: int) -> None:
             job.status = "processing"
             job.started_at = _utcnow()
             job.encounter_id = encounter_id
+            job.plant_group_id = plant_group_id
         db.commit()
 
         working_set = [seed] + selected_candidates
-        shots: list[IdentifiedShot] = []
+        raw_identifications = []
         failures: list[str] = []
+        shot_inputs: list[dict[str, object]] = []
         for job in working_set:
             if not job.image_url:
                 log.warning("Capture job missing primary image before identification job_id=%s original=%s", job.id, job.original_image_url)
@@ -689,14 +831,21 @@ def _process_seed_job(seed_id: int) -> None:
                 image_path, should_delete = _materialize_image(job.image_url)
                 if should_delete:
                     tmp_paths.append(image_path)
-                species = _identify_with_retry(image_path, lat=job.latitude, lon=job.longitude)
-                shots.append(IdentifiedShot(job_id=job.id, image_url=job.image_url, species=species))
+                shot_inputs.append(
+                    {
+                        "job_id": job.id,
+                        "image_url": job.image_url,
+                        "image_path": image_path,
+                        "latitude": job.latitude,
+                        "longitude": job.longitude,
+                    }
+                )
             except EnvironmentError as exc:
                 failures.append(str(exc))
             except Exception as exc:
                 failures.append(str(exc))
 
-        if not shots:
+        if not shot_inputs:
             failure_text = "; ".join(failures) or "Identification failed for all images in this encounter."
             temporary = failures and all(_looks_temporary_failure(message) for message in failures)
             _set_jobs_terminal(
@@ -706,74 +855,171 @@ def _process_seed_job(seed_id: int) -> None:
                 status="needs_review" if temporary else "failed",
                 review_reason="Identification service was temporarily unavailable. Capture preserved for review." if temporary else None,
                 error_message=None if temporary else failure_text,
+                plant_group_id=plant_group_id,
             )
             db.commit()
             return
 
-        clusters: dict[str, list[IdentifiedShot]] = {}
-        for shot in shots:
-            clusters.setdefault(_cluster_key(shot.species), []).append(shot)
-        best_cluster = max(
-            clusters.values(),
-            key=lambda items: (
-                len(items),
-                round(sum(item.species.confidence for item in items) / len(items), 5),
-                max(item.species.confidence for item in items),
-            ),
-        )
+        for shot in shot_inputs:
+            try:
+                raw_result = identify_group_candidates(
+                    [shot],
+                    lat=shot.get("latitude"),
+                    lon=shot.get("longitude"),
+                )[0]
+                raw_identifications.append(raw_result)
+            except EnvironmentError as exc:
+                failures.append(str(exc))
+            except Exception as exc:
+                failures.append(str(exc))
 
-        selected_ids = {shot.job_id for shot in best_cluster}
-        if len(best_cluster) >= 2 and seed.id not in selected_ids:
-            selected_ids.add(seed.id)
-        selected_jobs = [job for job in working_set if job.id in selected_ids]
-        unselected_jobs = [job for job in working_set if job.id not in selected_ids]
+        if not raw_identifications:
+            failure_text = "; ".join(failures) or "Identification failed for all images in this encounter."
+            temporary = failures and all(_looks_temporary_failure(message) for message in failures)
+            _set_jobs_terminal(
+                db,
+                working_set,
+                primary_job=seed,
+                status="needs_review" if temporary else "failed",
+                review_reason="Identification service was temporarily unavailable. Capture preserved for review." if temporary else None,
+                error_message=None if temporary else failure_text,
+                plant_group_id=plant_group_id,
+            )
+            db.commit()
+            return
+
+        for raw in raw_identifications:
+            raw_agent_result = run_agent_task(
+                agent_name="species",
+                task_type="normalize_capture_species",
+                payload={
+                    "species": raw.top_species,
+                    "candidate_list": [_candidate_payload(candidate) for candidate in raw.candidates[:4]],
+                    "alternatives": [_candidate_payload(candidate) for candidate in raw.candidates[1:4]],
+                    "needs_review": raw.top_species.provisional,
+                    "review_reason": "Single-image result is provisional and awaiting group consensus." if raw.top_species.provisional else None,
+                },
+                actor_user_id=seed.owner_id,
+                capture_job_id=raw.job_id,
+            )
+            _persist_species_result(
+                db,
+                capture_job_id=raw.job_id,
+                card_id=None,
+                agent_result=raw_agent_result,
+                plant_group_id=plant_group_id,
+                record_type="raw_image",
+            )
+
+        consensus_payload = build_consensus_payload(
+            raw_identifications,
+            lat=seed.latitude,
+            lon=seed.longitude,
+            plant_group_id=plant_group_id,
+        )
+        research_result = run_agent_task(
+            agent_name="research",
+            task_type="confirm_consensus_identification",
+            payload=consensus_payload,
+            actor_user_id=seed.owner_id,
+            capture_job_id=seed.id,
+        )
+        final_payload = research_result.get("payload") or {}
+        top_candidate = (consensus_payload.get("top_candidates") or [{}])[0]
+        support_job_ids = set(top_candidate.get("support_job_ids") or [])
+        if not support_job_ids:
+            support_job_ids = {item.job_id for item in raw_identifications}
+
+        selected_jobs = [job for job in working_set if job.id in support_job_ids]
+        if not selected_jobs:
+            selected_jobs = [job for job in working_set if any(raw.job_id == job.id for raw in raw_identifications)]
+        unselected_jobs = [job for job in working_set if job.id not in support_job_ids]
         if unselected_jobs:
             _reset_unselected_jobs(unselected_jobs)
 
-        best_shot = max(best_cluster, key=lambda shot: shot.species.confidence)
-        best_job = next(job for job in selected_jobs if job.id == best_shot.job_id)
+        matching_species = None
+        for raw in raw_identifications:
+            if raw.job_id not in support_job_ids:
+                continue
+            for candidate in raw.candidates:
+                if (
+                    candidate.scientific_name == final_payload.get("scientific_name")
+                    or (candidate.taxon_id and candidate.taxon_id == final_payload.get("taxon_id"))
+                ):
+                    matching_species = candidate
+                    break
+            if matching_species is not None:
+                break
+        if matching_species is None:
+            matching_species = max(raw_identifications, key=lambda item: item.top_species.confidence).top_species
+
+        grouped_species = _species_from_candidate(
+            {
+                "common_name": final_payload.get("final_species"),
+                "scientific_name": final_payload.get("scientific_name"),
+                "category": final_payload.get("category") or matching_species.category,
+                "sub_category": final_payload.get("sub_category") or matching_species.sub_category,
+                "rank": final_payload.get("rank") or matching_species.rank,
+                "taxon_id": final_payload.get("taxon_id") or matching_species.taxon_id,
+                "iconic_taxon": final_payload.get("iconic_taxon") or matching_species.iconic_taxon,
+            },
+            confidence=float(final_payload.get("confidence") or matching_species.confidence),
+            provisional=bool(final_payload.get("provisional")),
+            reasoning=final_payload.get("reasoning") or matching_species.reasoning,
+        )
+
+        consensus_species_result = run_agent_task(
+            agent_name="species",
+            task_type="normalize_capture_species",
+            payload={
+                "species": grouped_species,
+                "candidate_list": consensus_payload.get("top_candidates") or [],
+                "alternatives": final_payload.get("alternatives") or consensus_payload.get("alternatives") or [],
+                "needs_review": grouped_species.provisional or grouped_species.confidence < REVIEW_CONFIDENCE_THRESHOLD,
+                "review_reason": "Identification confidence was too low for an automatic save." if grouped_species.provisional or grouped_species.confidence < REVIEW_CONFIDENCE_THRESHOLD else None,
+                "consensus_score": final_payload.get("consensus_score"),
+                "location_validated": final_payload.get("location_validated"),
+            },
+            actor_user_id=seed.owner_id,
+            capture_job_id=seed.id,
+        )
+        best_job = max(
+            [job for job in selected_jobs if job.primary_image_url or job.image_url],
+            key=lambda job: next(
+                (
+                    candidate.confidence
+                    for raw in raw_identifications
+                    if raw.job_id == job.id
+                    for candidate in raw.candidates
+                    if candidate.scientific_name == grouped_species.scientific_name
+                ),
+                next((raw.top_species.confidence for raw in raw_identifications if raw.job_id == job.id), 0.0),
+            ),
+        )
         supporting_urls = [
             (job.primary_image_url or job.image_url)
             for job in selected_jobs
             if job.id != best_job.id and (job.primary_image_url or job.image_url)
         ]
         log.info(
-            "Selected primary card image job_id=%s image=%s encounter=%s grouped=%s",
+            "Selected primary card image job_id=%s image=%s encounter=%s grouped=%s plant_group=%s",
             best_job.id,
             best_job.primary_image_url or best_job.image_url,
             encounter_id,
             len(selected_jobs),
-        )
-
-        grouped_confidence = min(
-            0.99,
-            max(item.species.confidence for item in best_cluster) + (0.03 * max(0, len(best_cluster) - 1)),
-        )
-        grouped_reasoning = best_shot.species.reasoning
-        if len(best_cluster) > 1:
-            grouped_reasoning = f"{grouped_reasoning} Cross-checked against {len(best_cluster)} nearby shots."
-        grouped_species = _clone_species(
-            best_shot.species,
-            confidence=grouped_confidence,
-            provisional=grouped_confidence < REVIEW_CONFIDENCE_THRESHOLD,
-            reasoning=grouped_reasoning,
-        )
-        species_result = run_agent_task(
-            agent_name="species",
-            task_type="normalize_capture_species",
-            payload={
-                "species": grouped_species,
-                "needs_review": grouped_species.provisional or grouped_species.confidence < REVIEW_CONFIDENCE_THRESHOLD,
-                "review_reason": "Identification confidence was too low for an automatic save." if grouped_species.provisional or grouped_species.confidence < REVIEW_CONFIDENCE_THRESHOLD else None,
-            },
-            actor_user_id=seed.owner_id,
-            capture_job_id=best_job.id,
+            plant_group_id,
         )
         species_row = _persist_species_result(
             db,
             capture_job_id=best_job.id,
             card_id=None,
-            agent_result=species_result,
+            agent_result=consensus_species_result,
+            plant_group_id=plant_group_id,
+            record_type="consensus",
+            consensus_score=final_payload.get("consensus_score"),
+            location_validated=final_payload.get("location_validated"),
+            alternatives=final_payload.get("alternatives") or consensus_payload.get("alternatives") or [],
+            source_job_ids=sorted(support_job_ids),
         )
 
         if not grouped_species.subject_visible or grouped_species.confidence < FAIL_CONFIDENCE_THRESHOLD:
@@ -788,6 +1034,11 @@ def _process_seed_job(seed_id: int) -> None:
                 provisional=True,
                 repeat_state=None,
                 error_message="Capture did not contain a clear enough subject to identify.",
+                plant_group_id=plant_group_id,
+                consensus_score=final_payload.get("consensus_score"),
+                location_validated=bool(final_payload.get("location_validated")),
+                alternatives=final_payload.get("alternatives") or consensus_payload.get("alternatives") or [],
+                identification_reasoning=final_payload.get("reasoning"),
                 supporting_urls=supporting_urls,
             )
             db.commit()
@@ -801,7 +1052,7 @@ def _process_seed_job(seed_id: int) -> None:
                     "needs_review": True,
                     "confidence": grouped_species.confidence,
                     "reason": "Identification confidence was too low for an automatic save.",
-                    "evidence_summary": grouped_species.reasoning,
+                    "evidence_summary": final_payload.get("reasoning") or grouped_species.reasoning,
                 },
                 actor_user_id=seed.owner_id,
                 capture_job_id=best_job.id,
@@ -824,6 +1075,11 @@ def _process_seed_job(seed_id: int) -> None:
                 provisional=True,
                 repeat_state=None,
                 review_reason="Identification confidence was too low for an automatic save.",
+                plant_group_id=plant_group_id,
+                consensus_score=final_payload.get("consensus_score"),
+                location_validated=bool(final_payload.get("location_validated")),
+                alternatives=final_payload.get("alternatives") or consensus_payload.get("alternatives") or [],
+                identification_reasoning=final_payload.get("reasoning"),
                 supporting_urls=supporting_urls,
             )
             db.commit()
@@ -835,6 +1091,11 @@ def _process_seed_job(seed_id: int) -> None:
             species=grouped_species,
             best_job=best_job,
             supporting_urls=supporting_urls,
+            plant_group_id=plant_group_id,
+            consensus_score=final_payload.get("consensus_score"),
+            location_validated=bool(final_payload.get("location_validated")),
+            alternatives=final_payload.get("alternatives") or consensus_payload.get("alternatives") or [],
+            identification_reasoning=final_payload.get("reasoning"),
         )
         species_row.card_id = card_row.id
         if card_row.rarity_display in {"Legendary", "Mythic", "Cryptic", "Extinct"}:
@@ -845,7 +1106,7 @@ def _process_seed_job(seed_id: int) -> None:
                     "needs_review": True,
                     "confidence": grouped_species.confidence,
                     "reason": f"{card_row.rarity_display} capture flagged for admin review.",
-                    "evidence_summary": grouped_species.reasoning,
+                    "evidence_summary": final_payload.get("reasoning") or grouped_species.reasoning,
                     "rarity": card_row.rarity_display,
                 },
                 actor_user_id=seed.owner_id,
@@ -872,6 +1133,11 @@ def _process_seed_job(seed_id: int) -> None:
             card_id=card_row.id,
             region=card_row.region,
             region_unlocked=region_unlocked,
+            plant_group_id=plant_group_id,
+            consensus_score=final_payload.get("consensus_score"),
+            location_validated=bool(final_payload.get("location_validated")),
+            alternatives=final_payload.get("alternatives") or consensus_payload.get("alternatives") or [],
+            identification_reasoning=final_payload.get("reasoning"),
             supporting_urls=supporting_urls,
         )
         db.commit()

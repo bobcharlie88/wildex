@@ -1,13 +1,14 @@
 import os
 import tempfile
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
 
 from app.auth import require_user
 from app.models import User
 from app.pipeline.species_id import TemporaryIdentificationError, identify_species, is_temporary_identification_error
 from app.services.capture_jobs import (
     ALLOWED_TYPES,
+    confirm_capture_job_species,
     create_capture_job,
     list_capture_jobs_for_user,
 )
@@ -55,6 +56,25 @@ def capture_jobs(
     current_user: User = Depends(require_user),
 ):
     return list_capture_jobs_for_user(current_user.id, include_secondary=include_secondary, limit=limit)
+
+
+@router.post("/capture/jobs/{job_id}/confirm-species")
+async def confirm_capture_species(
+    job_id: int,
+    payload: dict = Body(default={}),
+    current_user: User = Depends(require_user),
+):
+    try:
+        result = confirm_capture_job_species(
+            user_id=current_user.id,
+            job_id=job_id,
+            scientific_name=(payload or {}).get("scientific_name"),
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+    return {"ok": True, **result}
 
 
 @router.post("/identify")

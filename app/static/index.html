@@ -166,6 +166,10 @@
       gap: 10px;
       align-items: center;
     }
+    .job-row.review {
+      grid-template-columns: 48px 1fr;
+      align-items: start;
+    }
     .job-thumb {
       width: 48px;
       height: 48px;
@@ -198,6 +202,26 @@
     .job-status.complete { background: rgba(34,197,94,0.14); color: #86efac; }
     .job-status.needs_review { background: rgba(245,158,11,0.14); color: #fbbf24; }
     .job-status.failed { background: rgba(239,68,68,0.14); color: #fca5a5; }
+    .review-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .review-actions button {
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+    .review-actions button.primary {
+      background: rgba(34,197,94,0.18);
+      color: #b7f7c8;
+      border-color: rgba(34,197,94,0.3);
+    }
     #toast-stack {
       position: fixed;
       top: 16px;
@@ -1021,21 +1045,24 @@
 function renderJobQueue() {
       const items = captureJobs.filter(job => !job.is_grouped_secondary);
       const activeItems = items.filter(job => job.status === 'queued' || job.status === 'processing');
+      const reviewItems = items.filter(job => job.status === 'needs_review');
       const active = activeItems.length;
       const complete = items.filter(job => job.status === 'complete').length;
-      const review = items.filter(job => job.status === 'needs_review').length;
+      const review = reviewItems.length;
       const failed = items.filter(job => job.status === 'failed').length;
       $('queue-counts').textContent = `${active} active`;
       $('queue-summary').textContent = active
         ? `${complete} completed recently • ${review} review • ${failed} failed`
-        : 'Finished captures clear from this queue automatically.';
+        : review
+          ? `${review} capture${review === 1 ? '' : 's'} waiting for species confirmation`
+          : 'Finished captures clear from this queue automatically.';
 
-      if (!activeItems.length) {
+      if (!activeItems.length && !reviewItems.length) {
         $('job-list').innerHTML = '<div class="queue-empty">No active capture jobs. Finished captures have been cleared from the queue.</div>';
         return;
       }
 
-      $('job-list').innerHTML = activeItems.map(job => {
+      const activeMarkup = activeItems.map(job => {
         const title = job.species_name || (job.status === 'queued' ? 'Capture queued' : job.status === 'processing' ? 'Processing capture' : 'Capture update');
         const thumb = job.image_url ? `<img class="job-thumb" src="${esc(job.image_url)}" alt="">` : '<div class="job-thumb"></div>';
         return `
@@ -1048,6 +1075,48 @@ function renderJobQueue() {
             <div class="job-status ${esc(job.status)}">${esc(jobLabel(job))}</div>
           </div>`;
       }).join('');
+
+      const reviewMarkup = reviewItems.map(job => {
+        const thumb = job.image_url ? `<img class="job-thumb" src="${esc(job.image_url)}" alt="">` : '<div class="job-thumb"></div>';
+        const alternatives = (job.alternatives || []).slice(0, 3);
+        const buttons = alternatives.length
+          ? alternatives.map((candidate, idx) => `
+            <button type="button" class="${idx === 0 ? 'primary' : ''}" data-confirm-job="${job.id}" data-scientific-name="${esc(candidate.scientific_name || '')}">
+              ${esc(candidate.common_name || candidate.label || candidate.scientific_name || 'Possible match')}
+            </button>`).join('')
+          : `<button type="button" class="primary" data-confirm-job="${job.id}" data-scientific-name="${esc(job.scientific_name || '')}">Confirm current result</button>`;
+        return `
+          <div class="job-row review">
+            ${thumb}
+            <div>
+              <div class="job-title">${esc(job.species_name || 'Species confirmation needed')}</div>
+              <div class="job-meta">${esc(job.identification_reasoning || job.review_reason || 'Multiple possible species were found. Choose the best match to finish this capture.')}</div>
+              <div class="review-actions">${buttons}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+      $('job-list').innerHTML = `${activeMarkup}${reviewMarkup}`;
+      $$('[data-confirm-job]').forEach(btn => btn.addEventListener('click', () => {
+        confirmSpeciesForJob(Number(btn.dataset.confirmJob), btn.dataset.scientificName || '').catch(() => {});
+      }));
+    }
+
+    async function confirmSpeciesForJob(jobId, scientificName) {
+      const res = await fetch(`/capture/jobs/${jobId}/confirm-species`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scientific_name: scientificName || null }),
+      });
+      if (!res.ok) {
+        throw new Error(`Could not confirm species (${res.status})`);
+      }
+      const data = await res.json();
+      await refreshCaptureJobs();
+      if (data.card_id) {
+        location.href = `/wildex?card=${data.card_id}`;
+      }
     }
 
     function showToast(job) {

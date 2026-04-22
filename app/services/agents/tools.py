@@ -11,6 +11,7 @@ from app.services.agents.schemas import (
     CardStatsPayload,
     DrAgentOutput,
     MapAgentOutput,
+    ResearchConfirmationSchema,
     ReviewAgentOutput,
     SpeciesResultSchema,
     VerificationReportSchema,
@@ -92,6 +93,16 @@ def _candidate_list(species: SpeciesResult) -> list[AgentCandidate]:
 
 def normalize_species_result(payload: dict[str, Any]) -> SpeciesResultSchema:
     species = payload.get("species")
+    raw_candidates = payload.get("candidate_list") or []
+    parsed_candidates = [
+        item if isinstance(item, AgentCandidate) else AgentCandidate.model_validate(item)
+        for item in raw_candidates
+    ]
+    raw_alternatives = payload.get("alternatives") or []
+    parsed_alternatives = [
+        item if isinstance(item, AgentCandidate) else AgentCandidate.model_validate(item)
+        for item in raw_alternatives
+    ]
     if isinstance(species, SpeciesResult):
         confidence = round(float(species.confidence or 0.0), 4)
         needs_review = bool(payload.get("needs_review", species.provisional or confidence < 0.7))
@@ -105,13 +116,16 @@ def normalize_species_result(payload: dict[str, Any]) -> SpeciesResultSchema:
             needs_review=needs_review,
             review_reason=review_reason,
             evidence_summary=species.reasoning or "Species identified from submitted evidence.",
-            candidate_list=_candidate_list(species),
+            candidate_list=parsed_candidates or _candidate_list(species),
             category=species.category,
             sub_category=species.sub_category,
             rank=species.rank,
             taxon_id=species.taxon_id,
             iconic_taxon=species.iconic_taxon,
             provisional=species.provisional,
+            consensus_score=payload.get("consensus_score"),
+            location_validated=payload.get("location_validated"),
+            alternatives=parsed_alternatives,
         )
 
     confidence = round(float(payload.get("confidence") or 0.0), 4)
@@ -127,7 +141,7 @@ def normalize_species_result(payload: dict[str, Any]) -> SpeciesResultSchema:
         needs_review=bool(payload.get("needs_review")),
         review_reason=payload.get("review_reason"),
         evidence_summary=evidence_summary,
-        candidate_list=[
+        candidate_list=parsed_candidates or [
             AgentCandidate(
                 label=common_name,
                 scientific_name=scientific_name if scientific_name != "Unknown species" else None,
@@ -141,6 +155,9 @@ def normalize_species_result(payload: dict[str, Any]) -> SpeciesResultSchema:
         taxon_id=payload.get("taxon_id"),
         iconic_taxon=payload.get("iconic_taxon"),
         provisional=bool(payload.get("provisional")),
+        consensus_score=payload.get("consensus_score"),
+        location_validated=payload.get("location_validated"),
+        alternatives=parsed_alternatives,
     )
 
 
@@ -277,6 +294,40 @@ def build_dr_response(payload: dict[str, Any]) -> DrAgentOutput:
         ],
         referenced_card_id=payload.get("card_id"),
         referenced_capture_job_id=payload.get("capture_job_id"),
+    )
+
+
+def build_research_confirmation(payload: dict[str, Any]) -> ResearchConfirmationSchema:
+    top_candidates = payload.get("top_candidates") or []
+    selected = dict(top_candidates[0] or {})
+    alternatives = [
+        AgentCandidate(
+            label=item.get("common_name") or item.get("label") or item.get("scientific_name") or "Unknown",
+            scientific_name=item.get("scientific_name"),
+            confidence=float(item.get("confidence") or 0.0),
+            reason=item.get("location_reason") or item.get("reason"),
+        )
+        for item in payload.get("alternatives") or top_candidates[1:4]
+    ]
+    reasoning = payload.get("reasoning") or selected.get("reason") or "Consensus research confirmation completed."
+    return ResearchConfirmationSchema(
+        final_species=payload.get("final_species")
+        or selected.get("common_name")
+        or selected.get("label")
+        or selected.get("scientific_name")
+        or "Unknown species",
+        scientific_name=payload.get("scientific_name") or selected.get("scientific_name") or "Unknown species",
+        confidence=float(payload.get("confidence") or selected.get("confidence") or 0.0),
+        consensus_score=float(payload.get("consensus_score") or selected.get("consensus_score") or 0.0),
+        location_validated=bool(payload.get("location_validated") if "location_validated" in payload else selected.get("location_validated")),
+        alternatives=alternatives,
+        reasoning=reasoning,
+        category=payload.get("category") or selected.get("category"),
+        sub_category=payload.get("sub_category") or selected.get("sub_category"),
+        rank=payload.get("rank") or selected.get("rank"),
+        taxon_id=payload.get("taxon_id") or selected.get("taxon_id"),
+        iconic_taxon=payload.get("iconic_taxon") or selected.get("iconic_taxon"),
+        provisional=bool(payload.get("provisional")),
     )
 
 

@@ -5,7 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-AgentName = Literal["dr", "species", "card_builder", "verification", "map", "review"]
+AgentName = Literal["dr", "species", "card_builder", "verification", "map", "review", "research"]
 
 
 class AgentCandidate(BaseModel):
@@ -29,6 +29,9 @@ class SpeciesResultSchema(BaseModel):
     taxon_id: int | None = None
     iconic_taxon: str | None = None
     provisional: bool = False
+    consensus_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    location_validated: bool | None = None
+    alternatives: list[AgentCandidate] = Field(default_factory=list)
 
 
 class CardStatsPayload(BaseModel):
@@ -95,6 +98,22 @@ class DrAgentOutput(BaseModel):
     suggested_actions: list[str] = Field(default_factory=list)
     referenced_card_id: int | None = None
     referenced_capture_job_id: int | None = None
+
+
+class ResearchConfirmationSchema(BaseModel):
+    final_species: str
+    scientific_name: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    consensus_score: float = Field(ge=0.0, le=1.0)
+    location_validated: bool = False
+    alternatives: list[AgentCandidate] = Field(default_factory=list)
+    reasoning: str
+    category: str | None = None
+    sub_category: str | None = None
+    rank: str | None = None
+    taxon_id: int | None = None
+    iconic_taxon: str | None = None
+    provisional: bool = False
 
 
 class AgentTaskResult(BaseModel):

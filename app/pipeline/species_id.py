@@ -29,6 +29,8 @@ log = logging.getLogger("wildex.species_id")
 GEMINI_MODEL = "gemini-2.5-flash"
 INAT_TAXA_URL = "https://api.inaturalist.org/v1/taxa"
 INAT_CV_URL = "https://api.inaturalist.org/v1/computervision/score_image"
+INAT_OBSERVATIONS_URL = "https://api.inaturalist.org/v1/observations"
+ALA_OCCURRENCES_URL = "https://api.ala.org.au/occurrences/search"
 GOOGLE_VISION_URL = "https://vision.googleapis.com/v1/images:annotate"
 GBIF_SPECIES_MATCH_URL = "https://api.gbif.org/v1/species/match"
 GBIF_OCCURRENCE_URL = "https://api.gbif.org/v1/occurrence/search"
@@ -338,6 +340,103 @@ def _apply_location_plausibility(result: SpeciesResult, location_hint: dict | No
             result.reasoning = (result.reasoning or "").rstrip(".") + "." + warning
 
     return result
+
+
+def validate_species_location(
+    scientific_name: str,
+    *,
+    lat: float | None = None,
+    lon: float | None = None,
+    category: str | None = None,
+    taxon_id: int | None = None,
+) -> dict:
+    if not scientific_name or lat is None or lon is None or category == "terrain":
+        return {
+            "valid": False,
+            "country_code": None,
+            "gbif_occurrences": None,
+            "inat_observations": None,
+            "ala_occurrences": None,
+            "reason": "No usable location validation context was available.",
+        }
+
+    try:
+        location_hint = _location_hint_from_coords(lat, lon)
+    except Exception as exc:
+        log.warning("Could not derive validation location hint: %s", exc)
+        location_hint = None
+
+    country_code = (location_hint or {}).get("country_code")
+    gbif_occurrences = None
+    inat_observations = None
+    ala_occurrences = None
+    reasons: list[str] = []
+
+    if country_code:
+        try:
+            gbif_occurrences = _country_occurrence_count(scientific_name, country_code)
+        except Exception as exc:
+            log.warning("GBIF location validation failed for %s: %s", scientific_name, exc)
+        else:
+            if gbif_occurrences:
+                reasons.append(f"GBIF has {gbif_occurrences} country-level occurrences in {country_code}.")
+
+    try:
+        params = {
+            "lat": lat,
+            "lng": lon,
+            "radius": 100,
+            "per_page": 1,
+        }
+        if taxon_id:
+            params["taxon_id"] = taxon_id
+        else:
+            params["taxon_name"] = scientific_name
+        response = httpx.get(INAT_OBSERVATIONS_URL, params=params, headers=_inat_headers(), timeout=20.0)
+        response.raise_for_status()
+        inat_observations = int(response.json().get("total_results") or 0)
+        if inat_observations:
+            reasons.append(f"iNaturalist has {inat_observations} observations within 100 km.")
+    except Exception as exc:
+        log.warning("iNaturalist location validation failed for %s: %s", scientific_name, exc)
+
+    if country_code == "AU":
+        try:
+            response = httpx.get(
+                ALA_OCCURRENCES_URL,
+                params={
+                    "q": f'scientificName:"{scientific_name}"',
+                    "lat": lat,
+                    "lon": lon,
+                    "radius": 100,
+                    "pageSize": 0,
+                },
+                timeout=20.0,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            ala_occurrences = int(payload.get("totalRecords") or payload.get("totalRecordsCount") or 0)
+            if ala_occurrences:
+                reasons.append(f"ALA has {ala_occurrences} nearby Australian occurrence records.")
+        except Exception as exc:
+            log.warning("ALA location validation failed for %s: %s", scientific_name, exc)
+
+    valid = any(
+        count is not None and count > 0
+        for count in (gbif_occurrences, inat_observations, ala_occurrences)
+    )
+    if not reasons:
+        reasons.append(
+            f"No GBIF, iNaturalist, or ALA distribution support was found near {country_code or 'the capture location'}."
+        )
+    return {
+        "valid": valid,
+        "country_code": country_code,
+        "gbif_occurrences": gbif_occurrences,
+        "inat_observations": inat_observations,
+        "ala_occurrences": ala_occurrences,
+        "reason": " ".join(reasons),
+    }
 
 
 def _build_result(
@@ -897,3 +996,78 @@ def identify_species(image_path: str, lat: float | None = None, lon: float | Non
                 result.provisional = True
 
     return _apply_location_plausibility(result, location_hint)
+
+
+def identify_species_candidates(image_path: str, lat: float | None = None, lon: float | None = None) -> list[SpeciesResult]:
+    provider_errors: list[str] = []
+    temporary_failures: list[str] = []
+    hard_failures: list[str] = []
+    location_hint = None
+
+    if lat is not None and lon is not None:
+        try:
+            location_hint = _location_hint_from_coords(lat, lon)
+        except Exception as exc:
+            log.warning("Could not derive location hint from GPS: %s", exc)
+
+    collected: list[SpeciesResult] = []
+    providers = (
+        ("gemini", lambda path: identify_with_gemini(path, location_hint=location_hint)),
+        ("inaturalist_cv", identify_with_inat_cv),
+        ("google_vision", identify_with_google_vision),
+        ("google_web", identify_with_google_web),
+    )
+    for provider_name, provider in providers:
+        try:
+            result = provider(image_path)
+            if result.category != "terrain" and result.subject_visible and result.confidence > 0.25:
+                try:
+                    enrich_with_inat(result)
+                except Exception as exc:
+                    log.warning("iNaturalist taxa enrichment failed during candidate collection: %s", exc)
+                if result.category == "plant" and (
+                    not result.sub_category or result.sub_category == "other"
+                ):
+                    result.sub_category = _plant_sub_category_from_terms(
+                        result.inat_common_name,
+                        result.common_name,
+                        result.scientific_name,
+                        result.reasoning,
+                    )
+            result = _apply_location_plausibility(result, location_hint)
+            result.reasoning = (result.reasoning or "").rstrip(".") + f". Provider: {provider_name}."
+            collected.append(result)
+        except EnvironmentError as exc:
+            provider_errors.append(f"{provider_name}: {exc}")
+        except Exception as exc:
+            provider_errors.append(f"{provider_name}: {exc}")
+            if is_temporary_identification_error(exc):
+                temporary_failures.append(provider_name)
+            else:
+                hard_failures.append(provider_name)
+
+    if not collected:
+        message = "All identification providers failed: " + " | ".join(provider_errors)
+        if temporary_failures and not hard_failures:
+            raise TemporaryIdentificationError(message)
+        raise RuntimeError(message)
+
+    by_key: dict[str, SpeciesResult] = {}
+    support_counts: dict[str, int] = {}
+    for result in collected:
+        key = f"{result.taxon_id or ''}:{(result.scientific_name or result.common_name or 'unknown').strip().lower()}"
+        support_counts[key] = support_counts.get(key, 0) + 1
+        existing = by_key.get(key)
+        if existing is None or result.confidence > existing.confidence:
+            by_key[key] = result
+
+    ranked = []
+    for key, result in by_key.items():
+        support = support_counts.get(key, 1)
+        if support > 1:
+            result.confidence = min(0.99, round(result.confidence + (0.04 * (support - 1)), 4))
+            result.reasoning = f"{result.reasoning} Repeated by {support} providers."
+        ranked.append(result)
+
+    ranked.sort(key=lambda item: (item.confidence, bool(item.inat_validated), bool(item.taxon_id)), reverse=True)
+    return ranked[:6]
