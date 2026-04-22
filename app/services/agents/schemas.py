@@ -100,6 +100,16 @@ class DrAgentOutput(BaseModel):
     referenced_capture_job_id: int | None = None
 
 
+class ResearchSource(BaseModel):
+    title: str
+    url: str
+    domain: str
+    source_type: Literal["official", "scientific", "biodiversity_database", "museum_university", "reference", "journalism", "community", "unknown"]
+    reliability: Literal["high", "medium", "low"]
+    summary: str = ""
+    supports_final: bool = False
+
+
 class ResearchConfirmationSchema(BaseModel):
     final_species: str
     scientific_name: str
@@ -114,6 +124,10 @@ class ResearchConfirmationSchema(BaseModel):
     taxon_id: int | None = None
     iconic_taxon: str | None = None
     provisional: bool = False
+    source_quality_summary: str = ""
+    uncertainty_notes: list[str] = Field(default_factory=list)
+    conflict_notes: list[str] = Field(default_factory=list)
+    sources: list[ResearchSource] = Field(default_factory=list)
 
 
 class AgentTaskResult(BaseModel):

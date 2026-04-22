@@ -726,6 +726,13 @@
         ],
         placeholder: 'Ask for authenticity scoring, metadata interpretation, or suspicious-indicator analysis for a submission.',
       },
+      research: {
+        taskTypes: [
+          { value: 'confirm_consensus_identification', label: 'Confirm Consensus Identification' },
+          { value: 'inspect_candidate_plausibility', label: 'Inspect Candidate Plausibility' },
+        ],
+        placeholder: 'Ask for source-backed species confirmation, distribution checks, or conflict notes across external sources.',
+      },
       map: {
         taskTypes: [
           { value: 'sync_progress', label: 'Sync Progress' },
@@ -1339,6 +1346,9 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
       } else if (agentName === 'verification') {
         payload.summary = prompt || 'Inspect submission authenticity and suspicious indicators.';
         payload.metadata_summary_text = prompt || 'Inspect submission authenticity and suspicious indicators.';
+      } else if (agentName === 'research') {
+        payload.reasoning = prompt || 'Inspect source support, distribution plausibility, and alternative candidates.';
+        payload.summary = prompt || 'Inspect source support, distribution plausibility, and alternative candidates.';
       } else if (agentName === 'map') {
         payload.summary = prompt || 'Inspect current region progress.';
       } else if (agentName === 'review') {

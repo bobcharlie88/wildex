@@ -787,6 +787,43 @@ async def admin_agent_task(request: Request, current_user: User = Depends(requir
         fallback = _fallback_sample("mammal")
         input_payload.setdefault("source", fallback)
         input_payload.setdefault("card", build_render_card(fallback))
+    elif agent_name == "research" and not input_payload.get("top_candidates"):
+        input_payload.setdefault("top_candidates", [
+            {
+                "common_name": "Red Kangaroo",
+                "scientific_name": "Osphranter rufus",
+                "confidence": 0.91,
+                "consensus_score": 0.88,
+                "location_validated": True,
+                "category": "animal",
+                "sub_category": "mammal",
+                "rank": "species",
+                "taxon_id": 425141,
+                "iconic_taxon": "Mammalia",
+                "reason": "Repeated across nearby captures and supported by known Australian distribution.",
+            },
+            {
+                "common_name": "Eastern Grey Kangaroo",
+                "scientific_name": "Macropus giganteus",
+                "confidence": 0.53,
+                "consensus_score": 0.44,
+                "location_validated": True,
+                "category": "animal",
+                "sub_category": "mammal",
+                "rank": "species",
+                "taxon_id": 425142,
+                "iconic_taxon": "Mammalia",
+                "reason": "Secondary marsupial match with weaker visual support.",
+            },
+        ])
+        input_payload.setdefault("final_species", "Red Kangaroo")
+        input_payload.setdefault("scientific_name", "Osphranter rufus")
+        input_payload.setdefault("confidence", 0.91)
+        input_payload.setdefault("consensus_score", 0.88)
+        input_payload.setdefault("location_validated", True)
+        input_payload.setdefault("country", "Australia")
+        input_payload.setdefault("state", "Western Australia")
+        input_payload.setdefault("reasoning", "Repeated evidence and known range favour Red Kangaroo over similar macropods.")
     elif agent_name == "verification" and not input_payload.get("report") and not input_payload.get("submission"):
         input_payload.setdefault("report", {
             "authenticity_confidence": 0.0,
