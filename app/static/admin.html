@@ -542,6 +542,37 @@
         <section class="panel">
           <div class="panel-head">
             <div>
+              <h2>Cleared Requests</h2>
+              <p>Submission requests at or above the authenticity threshold.</p>
+            </div>
+          </div>
+          <div class="review-list" id="submission-cleared-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Manual Review Requests</h2>
+              <p>Anything below threshold or suspicious stays here for admin inspection.</p>
+            </div>
+          </div>
+          <div class="review-list" id="submission-review-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Submission Detail</h2>
+              <p>Image preview, metadata summary, suspicious findings, and decision history.</p>
+            </div>
+          </div>
+          <div class="error-box" id="submission-error"></div>
+          <div class="task-log" id="submission-detail"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
               <h2>Template Preview</h2>
               <p>Use the same shared viewer path as the game to validate the final composed front/back card before activation.</p>
             </div>
@@ -591,8 +622,10 @@
       assets: [],
       samples: [],
       slotRules: [],
+      submissions: { cleared: [], manual_review: [] },
       selectedTemplateId: null,
       selectedBuilderCardId: null,
+      selectedSubmissionId: null,
       agentDashboard: { agents: [], recent_tasks: [], review_queue: [] },
     };
 
@@ -848,6 +881,72 @@
       `).join('') || '<div class="muted">No flagged captures right now.</div>';
     }
 
+    function submissionScore(item) {
+      return `${Math.round(Number(item.report?.authenticity_confidence || 0) * 100)}% authentic · ${Math.round(Number(item.report?.ai_suspicion_score || 0) * 100)}% AI suspicion`;
+    }
+
+    function submissionCardHtml(item) {
+      return `
+        <article class="review-item">
+          <header>
+            <div>
+              <strong>${esc(item.entered_name || item.entered_species || item.original_filename || `Submission #${item.id}`)}</strong>
+              <div class="muted">${esc(item.submitted_at || '')}</div>
+            </div>
+            <span class="pill ${item.status === 'approved' || item.status === 'cleared' ? 'active' : ''}">${esc(item.status || 'unknown')}</span>
+          </header>
+          <div class="agent-meta">${esc(item.verification_reason || '')}</div>
+          <div class="muted">${esc(submissionScore(item))}</div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="openSubmissionDetail(${item.id})">Open detail</button>
+          </div>
+        </article>`;
+    }
+
+    function renderSubmissionQueues() {
+      $('submission-cleared-list').innerHTML = (state.submissions.cleared || []).map(submissionCardHtml).join('') || '<div class="muted">No cleared requests yet.</div>';
+      $('submission-review-list').innerHTML = (state.submissions.manual_review || []).map(submissionCardHtml).join('') || '<div class="muted">No manual review requests right now.</div>';
+    }
+
+    function renderSubmissionDetail(item) {
+      if (!item) {
+        $('submission-detail').innerHTML = '<div class="muted">Select a cleared or manual-review request to inspect the full verification report.</div>';
+        return;
+      }
+      $('submission-detail').innerHTML = `
+        <article class="task-item">
+          <img src="${esc(item.image_url || '')}" alt="" style="width:100%;max-height:260px;object-fit:contain;border-radius:14px;background:rgba(255,255,255,.04);margin-bottom:12px">
+          <div><strong>${esc(item.entered_name || item.entered_species || item.original_filename || `Submission #${item.id}`)}</strong></div>
+          <div class="muted">${esc(item.location_text || 'No location provided')}${item.date_observed ? ` · ${esc(item.date_observed)}` : ''}</div>
+          <div class="agent-meta">${esc(item.notes || 'No user notes provided.')}</div>
+          <div class="task-payload">Authenticity: ${esc(submissionScore(item))}
+
+Recommendation: ${esc(item.report?.recommendation || item.status || 'manual_review')}
+
+Device: ${esc(item.report?.device_info || 'Unavailable')}
+
+Capture Datetime: ${esc(item.report?.capture_datetime || 'Unavailable')}
+
+Date/Time Check: ${esc(item.report?.date_time_check_result || 'No date/time result')}
+
+Metadata Summary:
+${esc(JSON.stringify(item.report?.metadata_summary || {}, null, 2))}
+
+Suspicious Findings:
+${esc((item.report?.suspicious_findings || []).join('\n') || 'None recorded')}
+
+Decision History:
+${esc(JSON.stringify(item.decision_history || [], null, 2))}
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="decideSubmission(${item.id}, 'approve_anyway')">Approve Anyway</button>
+            <button class="btn btn-danger" type="button" onclick="decideSubmission(${item.id}, 'reject')">Reject</button>
+            <button class="btn btn-secondary" type="button" onclick="decideSubmission(${item.id}, 'request_more_info')">Request More Info</button>
+            <button class="btn btn-secondary" type="button" onclick="decideSubmission(${item.id}, 'mark_suspicious')">Mark Suspicious</button>
+          </div>
+        </article>`;
+    }
+
     function renderAssetSections() {
       const counts = {};
       state.assets.forEach(asset => { counts[asset.asset_type] = (counts[asset.asset_type] || 0) + 1; });
@@ -963,7 +1062,37 @@
         $('template-error').classList.add('visible');
       }
     }
+
+    async function openSubmissionDetail(id) {
+      state.selectedSubmissionId = Number(id);
+      $('submission-error').classList.remove('visible');
+      try {
+        const data = await fetchJson(`/admin/submissions/${id}`);
+        renderSubmissionDetail(data.item);
+      } catch (error) {
+        $('submission-error').textContent = error.message || 'Could not load submission detail';
+        $('submission-error').classList.add('visible');
+      }
+    }
+
+    async function decideSubmission(id, action) {
+      const notes = window.prompt('Optional admin notes for this decision:', '') || '';
+      try {
+        const data = await fetchJson(`/admin/submissions/${id}/decision`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, notes }),
+        });
+        await boot();
+        renderSubmissionDetail(data.item);
+      } catch (error) {
+        $('submission-error').textContent = error.message || 'Could not update submission';
+        $('submission-error').classList.add('visible');
+      }
+    }
     window.activateTemplate = activateTemplate;
+    window.openSubmissionDetail = openSubmissionDetail;
+    window.decideSubmission = decideSubmission;
     window.toggleAsset = async (id, active) => {
       try {
         await fetchJson(`/admin/assets/${id}/status`, {
@@ -1026,15 +1155,21 @@
       state.assets = data.assets || [];
       state.samples = data.samples || [];
       state.slotRules = data.slot_rules || [];
+      state.submissions = data.submissions || { cleared: [], manual_review: [] };
       state.agentDashboard = data.agents || { agents: [], recent_tasks: [], review_queue: [] };
       if (!state.selectedTemplateId && state.templates[0]) state.selectedTemplateId = state.templates[0].id;
       if (!state.selectedBuilderCardId && state.samples[0]) state.selectedBuilderCardId = state.samples[0].id;
+      if (!state.selectedSubmissionId) {
+        const firstSubmission = state.submissions.manual_review[0] || state.submissions.cleared[0];
+        state.selectedSubmissionId = firstSubmission ? firstSubmission.id : null;
+      }
       $('admin-user-pill').textContent = state.user.email;
       renderTemplatePicker();
       fillTemplateForm(currentTemplate());
       renderAgents();
       renderTaskHistory();
       renderReviewQueue();
+      renderSubmissionQueues();
       renderTemplateCards();
       renderVersionCards();
       renderAssetSections();
@@ -1044,6 +1179,11 @@
       ).join('');
       await previewTemplate();
       await loadBuilderCardPreview(false);
+      if (state.selectedSubmissionId) {
+        await openSubmissionDetail(state.selectedSubmissionId);
+      } else {
+        renderSubmissionDetail(null);
+      }
     }
 
     $('asset-file').addEventListener('change', (event) => {

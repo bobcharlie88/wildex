@@ -348,3 +348,55 @@ class ReviewQueueItem(Base):
     capture_job: Mapped[CaptureJob | None] = relationship(foreign_keys=[capture_job_id])
     card: Mapped[Card | None] = relationship(foreign_keys=[card_id])
     species_result: Mapped[SpeciesResultRecord | None] = relationship(foreign_keys=[species_result_id])
+
+
+class SubmissionRequest(Base):
+    __tablename__ = "submission_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+    image_url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    original_filename: Mapped[str | None] = mapped_column(String(255))
+    mime_type: Mapped[str | None] = mapped_column(String(120))
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    entered_name: Mapped[str | None] = mapped_column(String(200))
+    entered_species: Mapped[str | None] = mapped_column(String(200))
+    location_text: Mapped[str | None] = mapped_column(String(255))
+    date_observed: Mapped[str | None] = mapped_column(String(32))
+    notes: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default="pending_verification", index=True)
+    verification_reason: Mapped[str | None] = mapped_column(Text)
+    admin_notes: Mapped[str | None] = mapped_column(Text)
+    decision_history_json: Mapped[str | None] = mapped_column(Text)
+
+    submitter: Mapped[User | None] = relationship(foreign_keys=[user_id])
+    verification_report: Mapped["SubmissionVerificationReport | None"] = relationship(
+        back_populates="request",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+class SubmissionVerificationReport(Base):
+    __tablename__ = "submission_verification_reports"
+    __table_args__ = (
+        UniqueConstraint("request_id", name="uq_submission_verification_request"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("submission_requests.id"), index=True, nullable=False)
+    authenticity_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    ai_suspicion_score: Mapped[float] = mapped_column(Float, default=0.0)
+    metadata_present: Mapped[bool] = mapped_column(Boolean, default=False)
+    gps_present: Mapped[bool] = mapped_column(Boolean, default=False)
+    capture_datetime: Mapped[str | None] = mapped_column(String(64))
+    date_time_check_result: Mapped[str | None] = mapped_column(Text)
+    device_info: Mapped[str | None] = mapped_column(String(255))
+    metadata_summary_json: Mapped[str | None] = mapped_column(Text)
+    suspicious_findings_json: Mapped[str | None] = mapped_column(Text)
+    recommendation: Mapped[str] = mapped_column(String(32), default="manual_review", index=True)
+    raw_report_json: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    request: Mapped[SubmissionRequest] = relationship(back_populates="verification_report")

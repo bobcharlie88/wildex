@@ -31,3 +31,5 @@ ADMIN_EMAILS = {
     for email in os.getenv("ADMIN_EMAILS", "").split(",")
     if email.strip()
 }
+SUBMISSION_CLEAR_THRESHOLD = float(os.getenv("SUBMISSION_CLEAR_THRESHOLD", "0.90"))
+SUBMISSION_REJECT_THRESHOLD = float(os.getenv("SUBMISSION_REJECT_THRESHOLD", "0.45"))

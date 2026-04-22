@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WildEx Submissions</title>
+  <style>
+    :root {
+      --bg: #0a141b;
+      --panel: #12202b;
+      --panel2: #172936;
+      --text: #edf6f0;
+      --muted: #91a8ad;
+      --line: rgba(255,255,255,.09);
+      --accent: #d5b06a;
+      --ok: #8ad496;
+      --warn: #f2d18c;
+      --danger: #ffb4b4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: linear-gradient(180deg, #14222d, #0a141b 45%);
+      color: var(--text);
+      padding: 18px 14px 40px;
+    }
+    .shell { max-width: 1080px; margin: 0 auto; display: grid; gap: 16px; }
+    .panel {
+      background: rgba(18,32,43,.95);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px;
+    }
+    .hero { display: grid; gap: 10px; }
+    .hero h1 { margin: 0; font-size: 2rem; }
+    .muted { color: var(--muted); line-height: 1.5; }
+    .layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(320px, .9fr); }
+    label { display: grid; gap: 6px; color: var(--muted); font-size: .9rem; }
+    input, textarea {
+      width: 100%;
+      padding: 12px 13px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel2);
+      color: var(--text);
+      font: inherit;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    .grid-2 { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .btn {
+      border: none;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn-primary { background: linear-gradient(180deg, #e6c47a, #c49d4b); color: #281a0b; }
+    .btn-secondary { background: rgba(255,255,255,.05); color: var(--text); border: 1px solid var(--line); }
+    .status, .error {
+      display: none;
+      padding: 12px 14px;
+      border-radius: 14px;
+      margin-bottom: 12px;
+    }
+    .status.visible { display: block; background: rgba(138,212,150,.12); border: 1px solid rgba(138,212,150,.22); color: var(--ok); }
+    .error.visible { display: block; background: rgba(255,110,110,.12); border: 1px solid rgba(255,110,110,.18); color: var(--danger); }
+    .list { display: grid; gap: 12px; }
+    .item {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.03);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .item img { width: 100%; max-height: 180px; object-fit: cover; border-radius: 12px; background: rgba(255,255,255,.04); }
+    .pill {
+      display: inline-flex;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      font-size: .78rem;
+      border: 1px solid var(--line);
+      width: fit-content;
+    }
+    .score { color: var(--accent); font-weight: 700; }
+    @media (max-width: 860px) {
+      .layout, .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="panel hero">
+      <h1>Animal Submission Verification</h1>
+      <p class="muted">Upload an animal photo for WildEx review. Every submission is screened for metadata consistency, likely authenticity, and suspicious AI or editing indicators before it can move into the main admin pipeline.</p>
+      <div class="toolbar">
+        <a class="btn btn-secondary" href="/wildex">Back to Hub</a>
+      </div>
+    </section>
+
+    <div class="layout">
+      <section class="panel">
+        <div class="status" id="submit-status"></div>
+        <div class="error" id="submit-error"></div>
+        <form id="submission-form">
+          <label>Animal Photo<input type="file" name="image" accept=".jpg,.jpeg,.png,.webp,.heic,.heif" required></label>
+          <div class="grid-2">
+            <label>Common Name<input name="entered_name" placeholder="Red Kangaroo"></label>
+            <label>Scientific Name<input name="entered_species" placeholder="Macropus rufus"></label>
+          </div>
+          <div class="grid-2">
+            <label>Location / Region<input name="location_text" placeholder="Perth Hills, WA"></label>
+            <label>Date Observed<input type="date" name="date_observed"></label>
+          </div>
+          <label>Notes / Description<textarea name="notes" placeholder="What you saw, why it matters, conditions, behaviour, or any uncertainty."></textarea></label>
+          <div class="toolbar">
+            <button class="btn btn-primary" type="submit">Submit for Verification</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2 style="margin:0 0 10px">What Happens Next</h2>
+        <p class="muted">WildEx assigns an authenticity confidence score, checks EXIF metadata when present, looks for suspicious software tags, and decides whether the submission can be auto-cleared or must go to manual review.</p>
+        <div class="list" style="margin-top:12px">
+          <div class="item">
+            <div class="pill">Cleared Requests</div>
+            <div class="muted">High-confidence real-looking submissions at or above the configured threshold.</div>
+          </div>
+          <div class="item">
+            <div class="pill">Manual Review</div>
+            <div class="muted">Anything below threshold or with suspicious indicators stays in the admin review queue.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2 style="margin:0 0 12px">Your Recent Submissions</h2>
+      <div class="list" id="my-submissions"></div>
+    </section>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    async function fetchJson(url, options = {}) {
+      const resp = await fetch(url, { credentials: 'same-origin', ...options });
+      if (resp.status === 401) {
+        location.href = '/login';
+        throw new Error('Login required');
+      }
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText || 'Request failed' }));
+        throw new Error(err.detail || 'Request failed');
+      }
+      return resp.json();
+    }
+
+    function showBox(id, message) {
+      const node = $(id);
+      node.textContent = message || '';
+      node.classList.toggle('visible', Boolean(message));
+    }
+
+    function renderItems(items) {
+      $('my-submissions').innerHTML = (items || []).map((item) => `
+        <article class="item">
+          <img src="${item.image_url}" alt="">
+          <div class="pill">${item.status}</div>
+          <div><strong>${item.entered_name || item.entered_species || item.original_filename || 'Submission'}</strong></div>
+          <div class="muted">${item.location_text || 'No location provided'}${item.date_observed ? ` · ${item.date_observed}` : ''}</div>
+          <div class="muted">${item.verification_reason || ''}</div>
+          <div class="score">Authenticity ${(Number(item.report?.authenticity_confidence || 0) * 100).toFixed(0)}% · AI suspicion ${(Number(item.report?.ai_suspicion_score || 0) * 100).toFixed(0)}%</div>
+          <div class="muted">${(item.report?.suspicious_findings || []).slice(0, 2).join(' ') || 'No major flags recorded.'}</div>
+        </article>
+      `).join('') || '<div class="muted">No submissions yet.</div>';
+    }
+
+    async function loadMine() {
+      const data = await fetchJson('/submissions/mine');
+      renderItems(data.items || []);
+    }
+
+    $('submission-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      showBox('submit-status', '');
+      showBox('submit-error', '');
+      const formData = new FormData(event.target);
+      try {
+        await fetchJson('/submissions', { method: 'POST', body: formData });
+        event.target.reset();
+        showBox('submit-status', 'Submission received and routed through verification.');
+        await loadMine();
+      } catch (error) {
+        showBox('submit-error', error.message || 'Submission failed');
+        $('submit-error').classList.add('visible');
+      }
+    });
+
+    loadMine().catch((error) => {
+      showBox('submit-error', error.message || 'Could not load submissions');
+      $('submit-error').classList.add('visible');
+    });
+  </script>
+</body>
+</html>

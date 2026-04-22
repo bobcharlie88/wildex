@@ -20,6 +20,7 @@ from app.routers.auth import router as auth_router
 from app.routers.capture import router as capture_router
 from app.routers.cards import router as cards_router
 from app.routers.dex import router as dex_router
+from app.routers.submissions import router as submissions_router
 from app.routers.wildex import router as wildex_router
 from app.services.capture_jobs import start_capture_worker, stop_capture_worker
 
@@ -32,6 +33,7 @@ app.include_router(auth_router)
 app.include_router(capture_router)
 app.include_router(cards_router)
 app.include_router(dex_router)
+app.include_router(submissions_router)
 app.include_router(wildex_router)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

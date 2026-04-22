@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 
 from app.auth import get_current_user, require_admin_user
 from app.database import SessionLocal, db_available
-from app.models import Card, CardAsset, CardTemplate, CaptureJob, TemplatePartAssignment, User
+from app.models import Card, CardAsset, CardTemplate, CaptureJob, SubmissionRequest, TemplatePartAssignment, User
 from app.services.agents.orchestrator import get_agent_dashboard, run_agent_task
 from app.services.card_assets import (
     ALLOWED_ASSET_MIME_TYPES,
@@ -30,6 +30,7 @@ from app.services.cards import (
     validate_slot_assignments,
 )
 from app.services.card_templates import clear_template_cache, ensure_builtin_templates, list_templates, select_template
+from app.services.submissions import append_decision_history, submission_to_dict
 from app.utils.storage import upload_named_bytes
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -79,6 +80,20 @@ def _all_slot_rules() -> list[dict]:
             seen.add(slot.name)
             items.append(_slot_rule_dict(slot))
     return items
+
+
+def _submission_dashboard(db) -> dict:
+    rows = (
+        db.query(SubmissionRequest)
+        .order_by(SubmissionRequest.submitted_at.desc(), SubmissionRequest.id.desc())
+        .limit(80)
+        .all()
+    )
+    items = [submission_to_dict(row) for row in rows]
+    return {
+        "cleared": [item for item in items if item["status"] in {"cleared", "approved"}],
+        "manual_review": [item for item in items if item["status"] in {"manual_review", "rejected"}],
+    }
 
 
 def _load_template_row(db, template_id: int) -> CardTemplate:
@@ -189,6 +204,7 @@ def admin_bootstrap(current_user: User = Depends(require_admin_user)):
     items: list[dict] = []
     assets: list[dict] = list_assets()
     samples: list[dict] = []
+    submissions = {"cleared": [], "manual_review": []}
     if db_available():
         db = SessionLocal()
         try:
@@ -212,6 +228,7 @@ def admin_bootstrap(current_user: User = Depends(require_admin_user)):
                 "dex_id": row.dex_id,
                 "render_card": build_render_card(row),
             } for row in rows]
+            submissions = _submission_dashboard(db)
         finally:
             db.close()
     if not items:
@@ -223,6 +240,7 @@ def admin_bootstrap(current_user: User = Depends(require_admin_user)):
         "template_slots": list(TEMPLATE_PART_SLOTS),
         "slot_rules": _all_slot_rules(),
         "samples": samples,
+        "submissions": submissions,
         "agents": get_agent_dashboard(),
     }
 
@@ -593,6 +611,64 @@ def activate_template(template_id: int, current_user: User = Depends(require_adm
 @router.get("/review-queue")
 def review_queue(current_user: User = Depends(require_admin_user)):
     return {"items": get_agent_dashboard().get("review_queue", [])}
+
+
+@router.get("/submissions")
+def admin_submissions(current_user: User = Depends(require_admin_user)):
+    if not db_available():
+        raise HTTPException(503, "Database unavailable")
+    db = SessionLocal()
+    try:
+        return _submission_dashboard(db)
+    finally:
+        db.close()
+
+
+@router.get("/submissions/{submission_id}")
+def admin_submission_detail(submission_id: int, current_user: User = Depends(require_admin_user)):
+    if not db_available():
+        raise HTTPException(503, "Database unavailable")
+    db = SessionLocal()
+    try:
+        row = db.query(SubmissionRequest).filter(SubmissionRequest.id == submission_id).first()
+        if row is None:
+            raise HTTPException(404, "Submission not found")
+        return {"item": submission_to_dict(row)}
+    finally:
+        db.close()
+
+
+@router.post("/submissions/{submission_id}/decision")
+async def admin_submission_decision(submission_id: int, request: Request, current_user: User = Depends(require_admin_user)):
+    if not db_available():
+        raise HTTPException(503, "Database unavailable")
+    payload = await request.json()
+    action = (payload.get("action") or "").strip().lower()
+    notes = (payload.get("notes") or "").strip() or None
+    allowed_actions = {
+        "approve_anyway": "approved",
+        "reject": "rejected",
+        "request_more_info": "manual_review",
+        "mark_suspicious": "manual_review",
+    }
+    if action not in allowed_actions:
+        raise HTTPException(400, "Unsupported submission action")
+    db = SessionLocal()
+    try:
+        row = db.query(SubmissionRequest).filter(SubmissionRequest.id == submission_id).first()
+        if row is None:
+            raise HTTPException(404, "Submission not found")
+        row.status = allowed_actions[action]
+        if notes:
+            row.admin_notes = notes
+        if action == "mark_suspicious" and not row.verification_reason:
+            row.verification_reason = "Marked suspicious by admin."
+        append_decision_history(row, action=action, actor_email=current_user.email, notes=notes)
+        db.commit()
+        db.refresh(row)
+        return {"ok": True, "item": submission_to_dict(row)}
+    finally:
+        db.close()
 
 
 @router.post("/agents/tasks")
