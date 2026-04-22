@@ -9,13 +9,31 @@ from sqlalchemy import desc
 
 from app.database import SessionLocal, db_available
 from app.models import AgentTask, ReviewQueueItem
+from app.services.agents.base import AgentExecutionError
 from app.services.agents.registry import get_agent, list_agents
 
 log = logging.getLogger("wildex.agents")
+MAX_AGENT_ATTEMPTS = 2
+
+
+def _sanitize_for_log(value: Any, *, depth: int = 0) -> Any:
+    if depth >= 4:
+        return "<max-depth>"
+    if isinstance(value, bytes):
+        return f"<bytes:{len(value)}>"
+    if isinstance(value, dict):
+        return {str(key): _sanitize_for_log(val, depth=depth + 1) for key, val in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_sanitize_for_log(item, depth=depth + 1) for item in list(value)[:25]]
+    if isinstance(value, str):
+        return value if len(value) <= 1000 else f"{value[:1000]}...(truncated)"
+    if hasattr(value, "model_dump"):
+        return _sanitize_for_log(value.model_dump(mode="json"), depth=depth + 1)
+    return value
 
 
 def _json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=True, default=str)
+    return json.dumps(_sanitize_for_log(value), ensure_ascii=True, default=str)
 
 
 def run_agent_task(
@@ -26,10 +44,16 @@ def run_agent_task(
     actor_user_id: int | None = None,
     card_id: int | None = None,
     capture_job_id: int | None = None,
+    tool_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     agent = get_agent(agent_name)
     db = SessionLocal() if db_available() and SessionLocal is not None else None
     task_row = None
+    sanitized_input = {
+        "task_type": task_type,
+        "payload": payload,
+        "tool_context": tool_context or {},
+    }
     try:
         if db is not None:
             try:
@@ -40,7 +64,7 @@ def run_agent_task(
                     actor_user_id=actor_user_id,
                     card_id=card_id,
                     capture_job_id=capture_job_id,
-                    input_payload=_json(payload),
+                    input_payload=_json(sanitized_input),
                 )
                 db.add(task_row)
                 db.commit()
@@ -49,30 +73,71 @@ def run_agent_task(
                 log.warning("Agent task logging unavailable; continuing without DB task row", exc_info=True)
                 db.rollback()
                 task_row = None
-        result = agent.run(task_type, payload)
-        output = result.model_dump(mode="json")
-        if db is not None and task_row is not None:
-            task_row.status = "complete"
-            task_row.summary = result.summary
-            task_row.output_payload = _json(output)
-            task_row.completed_at = datetime.utcnow()
-            db.commit()
-        return {
-            "task_id": task_row.id if task_row is not None else None,
-            "agent_name": result.agent_name,
-            "task_type": result.task_type,
-            "summary": result.summary,
-            "payload": result.payload,
-        }
+
+        last_error: Exception | None = None
+        for attempt in range(1, MAX_AGENT_ATTEMPTS + 1):
+            strict_payload = dict(payload)
+            strict_payload["_agent_meta"] = {
+                "attempt": attempt,
+                "max_attempts": MAX_AGENT_ATTEMPTS,
+                "strict_mode": attempt > 1,
+                "instructions": agent.strict_instructions(task_type),
+            }
+            try:
+                log.info(
+                    "Running agent task agent=%s task=%s attempt=%s payload=%s",
+                    agent_name,
+                    task_type,
+                    attempt,
+                    _json(strict_payload),
+                )
+                result = agent.run(task_type, strict_payload, tool_context=tool_context)
+                output = result.model_dump(mode="json")
+                log.info(
+                    "Agent task complete agent=%s task=%s attempt=%s output=%s",
+                    agent_name,
+                    task_type,
+                    attempt,
+                    _json(output),
+                )
+                if db is not None and task_row is not None:
+                    task_row.status = "complete"
+                    task_row.summary = result.summary
+                    task_row.output_payload = _json(output)
+                    task_row.completed_at = datetime.utcnow()
+                    db.commit()
+                return {
+                    "task_id": task_row.id if task_row is not None else None,
+                    "agent_name": result.agent_name,
+                    "task_type": result.task_type,
+                    "summary": result.summary,
+                    "payload": result.payload,
+                }
+            except Exception as exc:
+                last_error = exc
+                log.warning(
+                    "Agent task attempt failed agent=%s task=%s attempt=%s error=%s",
+                    agent_name,
+                    task_type,
+                    attempt,
+                    exc,
+                    exc_info=True,
+                )
+                if attempt >= MAX_AGENT_ATTEMPTS:
+                    break
+
+        assert last_error is not None
+        raise last_error
     except Exception as exc:
+        error = exc if isinstance(exc, AgentExecutionError) else AgentExecutionError(str(exc))
         log.exception("Agent task failed agent=%s task=%s", agent_name, task_type)
         if db is not None and task_row is not None:
             db.rollback()
             task_row.status = "failed"
-            task_row.error = str(exc)
+            task_row.error = str(error)
             task_row.completed_at = datetime.utcnow()
             db.commit()
-        raise
+        raise error
     finally:
         if db is not None:
             db.close()
@@ -83,6 +148,8 @@ def get_agent_dashboard(*, limit: int = 12) -> dict[str, Any]:
         {
             "name": agent.name,
             "description": agent.description,
+            "instructions": agent.instructions,
+            "task_types": list(agent.allowed_task_types),
             "status": "ready",
             "last_task": None,
             "recent_errors": [],

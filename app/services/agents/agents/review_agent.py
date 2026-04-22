@@ -3,35 +3,24 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.agents.base import BaseAgent
-from app.services.agents.schemas import AgentTaskResult, ReviewAgentOutput
+from app.services.agents.schemas import ReviewAgentOutput
+from app.services.agents.tools import build_review_recommendation
 
 
 class ReviewAgent(BaseAgent):
     name = "review"
-    description = "Flags unusual or uncertain sightings into a structured review queue."
+    description = "Flags unusual or uncertain findings for structured manual review."
+    instructions = (
+        "You are the WildEx Review Agent.\n\n"
+        "Your only job is to decide whether a finding should be escalated to manual review and at what priority.\n"
+        "You must not identify species, generate card stats, or modify any queue directly.\n"
+        "Return only structured JSON matching the review recommendation schema."
+    )
+    allowed_task_types = ("flag_capture_review", "flag_unusual_capture", "inspect_review_queue", "admin_request")
+    output_model = ReviewAgentOutput
 
-    def run(self, task_type: str, payload: dict[str, Any]) -> AgentTaskResult:
-        confidence = float(payload.get("confidence") or 0.0)
-        reason = payload.get("reason") or ""
-        rarity = str(payload.get("rarity") or "").lower()
-        needs_review = bool(payload.get("needs_review"))
-        priority = "medium"
-        if rarity in {"legendary", "mythic", "cryptic", "extinct"} or confidence < 0.45:
-            priority = "high"
-        elif confidence < 0.7:
-            priority = "medium"
-        else:
-            priority = "low"
-        output = ReviewAgentOutput(
-            needs_review=needs_review,
-            priority=priority,
-            reason=reason or ("Capture requires manual review." if needs_review else "No review action required."),
-            evidence_summary=payload.get("evidence_summary") or "",
-            queue_status="recommended" if needs_review else "not_required",
-        )
-        return AgentTaskResult(
-            agent_name="review",
-            task_type=task_type,
-            summary=output.reason,
-            payload=output.model_dump(mode="json"),
-        )
+    def _run(self, task_type: str, payload: dict[str, Any], *, tool_context: dict[str, Any]) -> ReviewAgentOutput:
+        return build_review_recommendation(payload)
+
+    def summarize(self, task_type: str, output: ReviewAgentOutput, payload: dict[str, Any]) -> str:
+        return output.reason

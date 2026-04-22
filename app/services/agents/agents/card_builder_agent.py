@@ -2,39 +2,29 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.pipeline.card_generator import WildCard
-from app.services.agents.base import BaseAgent
-from app.services.agents.schemas import AgentTaskResult, CardBuilderOutput, CardStatsPayload
-from app.services.card_render import build_card_payload, build_render_card
+from app.services.agents.base import AgentExecutionError, BaseAgent
+from app.services.agents.schemas import CardBuilderOutput
+from app.services.agents.tools import build_card_payload_tool
 
 
 class CardBuilderAgent(BaseAgent):
     name = "card_builder"
-    description = "Builds structured card content payloads and clean renderer slot content."
+    description = "Builds structured card payloads from verified species data and source context."
+    instructions = (
+        "You are the WildEx Card Builder Agent.\n\n"
+        "Your only job is to convert verified species data into a structured card payload.\n"
+        "You must generate balanced stats, 3-4 moves, concise flavor text, and slot content.\n"
+        "You must not generate HTML, duplicate content blocks, or modify database state.\n"
+        "Return only structured JSON matching the card payload schema."
+    )
+    allowed_task_types = ("build_card_payload", "rebuild_card_payload", "inspect_card_payload", "admin_request")
+    output_model = CardBuilderOutput
 
-    def run(self, task_type: str, payload: dict[str, Any]) -> AgentTaskResult:
-        source = payload["source"]
-        render_card = build_render_card(source)
-        card_payload = build_card_payload(source)
-        moves = render_card.get("abilities") or []
-        output = CardBuilderOutput(
-            card_title=card_payload["card_title"],
-            scientific_name=card_payload["scientific_name"],
-            rarity=card_payload["rarity"],
-            stats=CardStatsPayload.model_validate(card_payload["stats"]),
-            moves=moves,
-            diet=card_payload["diet"],
-            habitat_text=card_payload["habitat_text"],
-            flavor_text=card_payload["flavor_text"],
-            fact_snippets=card_payload["fact_snippets"],
-            slot_content=render_card.get("slot_content") or {},
-            render_hints=render_card.get("render_hints") or {},
-            front_template=render_card.get("front_template") or {},
-            back_template=render_card.get("back_template") or {},
-        )
-        return AgentTaskResult(
-            agent_name="card_builder",
-            task_type=task_type,
-            summary=f"Built card payload for {output.card_title}",
-            payload=output.model_dump(mode="json", by_alias=True),
-        )
+    def _run(self, task_type: str, payload: dict[str, Any], *, tool_context: dict[str, Any]) -> CardBuilderOutput:
+        source = payload.get("source")
+        if not source:
+            raise AgentExecutionError("card_builder requires source data")
+        return build_card_payload_tool(source)
+
+    def summarize(self, task_type: str, output: CardBuilderOutput, payload: dict[str, Any]) -> str:
+        return f"Built card payload for {output.card_title}"

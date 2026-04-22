@@ -713,13 +713,22 @@
       },
       card_builder: {
         taskTypes: [
+          { value: 'build_card_payload', label: 'Build Card Payload' },
           { value: 'rebuild_card_payload', label: 'Rebuild Card Payload' },
           { value: 'inspect_card_payload', label: 'Inspect Card Payload' },
         ],
         placeholder: 'Ask for payload rebuilds, slot-content inspection, or layout feedback tied to the current card source.',
       },
+      verification: {
+        taskTypes: [
+          { value: 'score_submission_authenticity', label: 'Score Submission Authenticity' },
+          { value: 'inspect_submission_verification', label: 'Inspect Submission Verification' },
+        ],
+        placeholder: 'Ask for authenticity scoring, metadata interpretation, or suspicious-indicator analysis for a submission.',
+      },
       map: {
         taskTypes: [
+          { value: 'sync_progress', label: 'Sync Progress' },
           { value: 'inspect_region_progress', label: 'Inspect Region Progress' },
           { value: 'recalculate_region_progress', label: 'Recalculate Region Progress' },
         ],
@@ -966,6 +975,7 @@
             </select>
           </label>
           <label>Capture Job ID<input id="agent-capture-${esc(agent.name)}" placeholder="Optional capture job id"></label>
+          <label>Submission ID<input id="agent-submission-${esc(agent.name)}" placeholder="Optional submission id"></label>
           <label>Task prompt<textarea id="agent-prompt-${esc(agent.name)}" placeholder="${esc(agentConfig(agent.name).placeholder)}"></textarea></label>
           <div class="toolbar">
             <button class="btn btn-secondary" type="button" onclick="runAgentTask('${esc(agent.name)}')">Run ${esc(agent.name)}</button>
@@ -1326,6 +1336,9 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
         payload.reasoning = prompt || 'Inspect current species evidence.';
       } else if (agentName === 'card_builder') {
         payload.summary = prompt || 'Rebuild card payload from current source.';
+      } else if (agentName === 'verification') {
+        payload.summary = prompt || 'Inspect submission authenticity and suspicious indicators.';
+        payload.metadata_summary_text = prompt || 'Inspect submission authenticity and suspicious indicators.';
       } else if (agentName === 'map') {
         payload.summary = prompt || 'Inspect current region progress.';
       } else if (agentName === 'review') {
@@ -1339,6 +1352,7 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
       const prompt = $(`agent-prompt-${agentName}`).value.trim();
       const cardId = $(`agent-card-${agentName}`).value;
       const captureJobId = $(`agent-capture-${agentName}`).value.trim();
+      const submissionId = $(`agent-submission-${agentName}`)?.value.trim();
       const taskType = $(`agent-task-${agentName}`)?.value || agentConfig(agentName).taskTypes[0]?.value || 'admin_request';
       try {
         $(`agent-response-${agentName}`).textContent = 'Running task...';
@@ -1350,6 +1364,7 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
             task_type: taskType,
             card_id: cardId ? Number(cardId) : null,
             capture_job_id: captureJobId ? Number(captureJobId) : null,
+            submission_id: submissionId ? Number(submissionId) : null,
             payload: buildAgentPayload(agentName, prompt),
           }),
         });

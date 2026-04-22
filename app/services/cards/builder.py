@@ -267,21 +267,35 @@ def build_card_payload(source) -> dict:
     strength_effect = _stored_or(theme["strength_effect"], source, "strength_effect")
     weakness_name = _stored_or(theme["weakness_name"], source, "weakness_name")
     weakness_effect = _stored_or(theme["weakness_effect"], source, "weakness_effect")
-    moves = _moves(species_name, kingdom_key)
-    fact_text = (_value(source, "wikipedia_summary") or "").strip() or (
+    source_moves = [str(item).strip() for item in (_value(source, "moves") or []) if str(item).strip()]
+    moves = source_moves or _moves(species_name, kingdom_key)
+    fact_candidates = [
+        (_value(source, "fact_text") or "").strip(),
+        (_value(source, "fact_1") or "").strip(),
+        (_value(source, "fact_2") or "").strip(),
+        (_value(source, "wikipedia_summary") or "").strip(),
+    ]
+    fact_snippets = []
+    for item in fact_candidates:
+        if item and item not in fact_snippets:
+            fact_snippets.append(item)
+    fact_text = fact_snippets[0] if fact_snippets else (
         f"{species_name} has {int(_value(source, 'observations_count') or 0):,} recorded observations."
         if _value(source, "observations_count") else
         f"{species_name} has a confirmed WildEx entry."
     )
+    habitat_text = _stored_or(_habitat_text(species_name, kingdom_key, capture_country), source, "habitat_text")
+    diet_text = _stored_or(_diet_text(species_name, kingdom_key), source, "diet")
+    flavor_text = _value(source, "blurb") or f"{species_name} is logged as a WildEx field record."
     payload = {
         "card_title": species_name,
         "scientific_name": scientific_name,
         "common_name": species_name,
         "rarity": rarity,
-        "diet": _diet_text(species_name, kingdom_key),
-        "habitat_text": _habitat_text(species_name, kingdom_key, capture_country),
-        "flavor_text": _value(source, "blurb") or f"{species_name} is logged as a WildEx field record.",
-        "fact_snippets": [fact_text],
+        "diet": diet_text,
+        "habitat_text": habitat_text,
+        "flavor_text": flavor_text,
+        "fact_snippets": fact_snippets or [fact_text],
         "stats": {
             "hp": hp,
             "atk": attack,
@@ -316,12 +330,12 @@ def build_card_payload(source) -> dict:
                     {"label": "Common Name", "value": species_name},
                     {"label": "Scientific Name", "value": scientific_name},
                     {"label": "Length", "value": _length_text(species_name, kingdom_key)},
-                    {"label": "Habitat", "value": _habitat_text(species_name, kingdom_key, capture_country)},
-                    {"label": "Diet", "value": _diet_text(species_name, kingdom_key)},
+                    {"label": "Habitat", "value": habitat_text},
+                    {"label": "Diet", "value": diet_text},
                 ]
             },
             "info_banner": {"text": "INFO"},
-            "flavor_text_block": {"text": _value(source, "blurb") or f"{species_name} is logged as a WildEx field record."},
+            "flavor_text_block": {"text": flavor_text},
             "fact_banner": {"text": "FACT"},
             "fact_text": {"text": fact_text},
             "status_panel": {
@@ -336,8 +350,8 @@ def build_card_payload(source) -> dict:
             "weakness_box": {"title": weakness_name, "text": weakness_effect},
             "stat_panel": {"rows": [{"label": "HP", "value": hp}, {"label": "ATK", "value": attack}, {"label": "DEF", "value": defence}, {"label": "SPD", "value": speed}]},
             "moves_panel": {"rows": moves},
-            "diet_panel": {"title": "Diet", "text": _diet_text(species_name, kingdom_key)},
-            "habitat_line": {"text": _habitat_text(species_name, kingdom_key, capture_country)},
+            "diet_panel": {"title": "Diet", "text": diet_text},
+            "habitat_line": {"text": habitat_text},
             "type_panel": {"title": theme["type_label"], "text": biome_bonus},
             "abilities_panel": {"rows": moves},
             "environment_panel": {"rows": [f"Gains advantage in {str(biome).lower()} terrain", f"Vulnerable to {str(weakness_name).lower()} conditions"]},

@@ -8,7 +8,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 from app.auth import get_current_user, require_user
 from app.database import SessionLocal, db_available
 from app.models import SubmissionRequest, SubmissionVerificationReport, User
-from app.services.submission_verification import serialize_report_fields, verify_submission_image
+from app.services.agents.orchestrator import run_agent_task
+from app.services.submission_verification import serialize_report_fields
 from app.services.submissions import submission_to_dict
 from app.utils.storage import upload_named_bytes
 
@@ -69,12 +70,19 @@ async def create_submission(
     )
     log.info("Stored submission image user=%s image=%s", current_user.email, image_url)
 
-    report = verify_submission_image(
-        data=content,
-        filename=original_filename,
-        content_type=content_type,
-        observed_date=(date_observed or "").strip() or None,
+    verification_result = run_agent_task(
+        agent_name="verification",
+        task_type="score_submission_authenticity",
+        payload={
+            "filename": original_filename,
+            "content_type": content_type,
+            "observed_date": (date_observed or "").strip() or None,
+            "file_size": len(content),
+        },
+        actor_user_id=current_user.id,
+        tool_context={"data": content},
     )
+    report = verification_result["payload"]
 
     db = SessionLocal()
     try:

@@ -5,12 +5,14 @@ from app.services.agents.agents.dr_agent import DrAgent
 from app.services.agents.agents.map_agent import MapAgent
 from app.services.agents.agents.review_agent import ReviewAgent
 from app.services.agents.agents.species_agent import SpeciesAgent
+from app.services.agents.agents.verification_agent import VerificationAgent
 
 
 _AGENTS = {
     "dr": DrAgent(),
     "species": SpeciesAgent(),
     "card_builder": CardBuilderAgent(),
+    "verification": VerificationAgent(),
     "map": MapAgent(),
     "review": ReviewAgent(),
 }

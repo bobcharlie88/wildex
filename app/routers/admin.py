@@ -742,6 +742,7 @@ async def admin_agent_task(request: Request, current_user: User = Depends(requir
     input_payload = dict(payload.get("payload") or {})
     card_id = int(payload["card_id"]) if payload.get("card_id") else None
     capture_job_id = int(payload["capture_job_id"]) if payload.get("capture_job_id") else None
+    submission_id = int(payload["submission_id"]) if payload.get("submission_id") else None
     if not agent_name:
         raise HTTPException(400, "agent_name is required")
 
@@ -772,6 +773,13 @@ async def admin_agent_task(request: Request, current_user: User = Depends(requir
                 input_payload.setdefault("provisional", job.provisional)
                 input_payload.setdefault("region", job.region)
                 input_payload.setdefault("user_id", job.owner_id)
+            if submission_id:
+                submission = db.query(SubmissionRequest).filter(SubmissionRequest.id == submission_id).first()
+                if submission is None:
+                    raise HTTPException(404, "Submission not found")
+                input_payload.setdefault("submission", submission_to_dict(submission))
+                input_payload.setdefault("report", input_payload["submission"].get("report") or {})
+                input_payload.setdefault("submission_id", submission.id)
         finally:
             db.close()
 
@@ -779,6 +787,23 @@ async def admin_agent_task(request: Request, current_user: User = Depends(requir
         fallback = _fallback_sample("mammal")
         input_payload.setdefault("source", fallback)
         input_payload.setdefault("card", build_render_card(fallback))
+    elif agent_name == "verification" and not input_payload.get("report") and not input_payload.get("submission"):
+        input_payload.setdefault("report", {
+            "authenticity_confidence": 0.0,
+            "ai_suspicion_score": 0.5,
+            "metadata_present": False,
+            "metadata_summary": {"error": "No submission context provided."},
+            "metadata_summary_text": "No submission context provided.",
+            "gps_present": False,
+            "capture_datetime": None,
+            "date_time_check_result": "No submission context provided.",
+            "device_info": None,
+            "suspicious_findings": ["No submission context provided to the verification agent."],
+            "recommendation": "manual_review",
+            "status": "manual_review",
+            "verification_reason": "Verification requires image or submission context.",
+            "raw_report": {},
+        })
     elif agent_name == "dr" and not input_payload.get("card"):
         input_payload.setdefault("card", {})
     elif agent_name == "review":
