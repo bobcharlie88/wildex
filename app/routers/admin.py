@@ -775,6 +775,17 @@ async def admin_agent_task(request: Request, current_user: User = Depends(requir
         finally:
             db.close()
 
+    if agent_name == "card_builder" and not input_payload.get("source"):
+        fallback = _fallback_sample("mammal")
+        input_payload.setdefault("source", fallback)
+        input_payload.setdefault("card", build_render_card(fallback))
+    elif agent_name == "dr" and not input_payload.get("card"):
+        input_payload.setdefault("card", {})
+    elif agent_name == "review":
+        input_payload.setdefault("needs_review", True)
+        input_payload.setdefault("reason", input_payload.get("question") or input_payload.get("summary") or "Admin review inspection requested.")
+        input_payload.setdefault("evidence_summary", input_payload.get("question") or input_payload.get("summary") or "Admin review inspection requested.")
+
     result = run_agent_task(
         agent_name=agent_name,
         task_type=task_type,

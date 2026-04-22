@@ -1018,21 +1018,24 @@
       return 'Uploaded and waiting for a worker.';
     }
 
-    function renderJobQueue() {
+function renderJobQueue() {
       const items = captureJobs.filter(job => !job.is_grouped_secondary);
-      const active = items.filter(job => job.status === 'queued' || job.status === 'processing').length;
+      const activeItems = items.filter(job => job.status === 'queued' || job.status === 'processing');
+      const active = activeItems.length;
       const complete = items.filter(job => job.status === 'complete').length;
       const review = items.filter(job => job.status === 'needs_review').length;
       const failed = items.filter(job => job.status === 'failed').length;
       $('queue-counts').textContent = `${active} active`;
-      $('queue-summary').textContent = `${complete} ready • ${review} review • ${failed} failed`;
+      $('queue-summary').textContent = active
+        ? `${complete} completed recently • ${review} review • ${failed} failed`
+        : 'Finished captures clear from this queue automatically.';
 
-      if (!items.length) {
-        $('job-list').innerHTML = '<div class="queue-empty">No capture jobs yet.</div>';
+      if (!activeItems.length) {
+        $('job-list').innerHTML = '<div class="queue-empty">No active capture jobs. Finished captures have been cleared from the queue.</div>';
         return;
       }
 
-      $('job-list').innerHTML = items.map(job => {
+      $('job-list').innerHTML = activeItems.map(job => {
         const title = job.species_name || (job.status === 'queued' ? 'Capture queued' : job.status === 'processing' ? 'Processing capture' : 'Capture update');
         const thumb = job.image_url ? `<img class="job-thumb" src="${esc(job.image_url)}" alt="">` : '<div class="job-thumb"></div>';
         return `

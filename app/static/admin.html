@@ -202,6 +202,36 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+    .agent-history {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .agent-history-item {
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(0,0,0,.16);
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .agent-history-item header {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      align-items: center;
+    }
+    .agent-history-item .muted {
+      font-size: .74rem;
+      line-height: 1.35;
+    }
+    .agent-history-empty {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(0,0,0,.14);
+      color: var(--muted);
+      font-size: .78rem;
+    }
     .code-box {
       margin-top: 12px;
       padding: 12px;
@@ -667,6 +697,44 @@
       agentDashboard: { agents: [], recent_tasks: [], review_queue: [] },
     };
 
+    const AGENT_CONFIG = {
+      dr: {
+        taskTypes: [
+          { value: 'player_help', label: 'Player Help' },
+        ],
+        placeholder: 'Ask The Dr to explain a card, rarity, progression, or what the player should do next.',
+      },
+      species: {
+        taskTypes: [
+          { value: 'inspect_species_result', label: 'Inspect Species Result' },
+          { value: 'normalize_capture_species', label: 'Normalize Capture Species' },
+        ],
+        placeholder: 'Ask why confidence is low, what evidence was strongest, or what candidate species should be compared.',
+      },
+      card_builder: {
+        taskTypes: [
+          { value: 'rebuild_card_payload', label: 'Rebuild Card Payload' },
+          { value: 'inspect_card_payload', label: 'Inspect Card Payload' },
+        ],
+        placeholder: 'Ask for payload rebuilds, slot-content inspection, or layout feedback tied to the current card source.',
+      },
+      map: {
+        taskTypes: [
+          { value: 'inspect_region_progress', label: 'Inspect Region Progress' },
+          { value: 'recalculate_region_progress', label: 'Recalculate Region Progress' },
+        ],
+        placeholder: 'Ask about region counters, unlock state, repeat captures, or progression for the current user/card context.',
+      },
+      review: {
+        taskTypes: [
+          { value: 'inspect_review_queue', label: 'Inspect Review Queue' },
+          { value: 'flag_capture_review', label: 'Flag Capture Review' },
+          { value: 'flag_unusual_capture', label: 'Flag Unusual Capture' },
+        ],
+        placeholder: 'Ask why a capture should be reviewed, what priority it deserves, or inspect unusual sightings.',
+      },
+    };
+
     function $(id) { return document.getElementById(id); }
     function esc(value) {
       return String(value ?? '')
@@ -846,14 +914,29 @@
       `).join('');
     }
 
-    function agentTaskType(agentName) {
-      return {
-        dr: 'player_help',
-        species: 'inspect_species_result',
-        card_builder: 'rebuild_card_payload',
-        map: 'inspect_region_progress',
-        review: 'inspect_review_queue',
-      }[agentName] || 'admin_request';
+    function agentConfig(agentName) {
+      return AGENT_CONFIG[agentName] || {
+        taskTypes: [{ value: 'admin_request', label: 'Admin Request' }],
+        placeholder: `Describe the task or question for ${agentName}`,
+      };
+    }
+
+    function prettyAgentPayload(payload) {
+      if (payload == null) return 'No response payload.';
+      if (typeof payload === 'string') return payload;
+      if (typeof payload.reply === 'string') {
+        const extra = Array.isArray(payload.suggested_actions) && payload.suggested_actions.length
+          ? `\n\nSuggested actions:\n- ${payload.suggested_actions.join('\n- ')}`
+          : '';
+        return `${payload.reply}${extra}`;
+      }
+      return JSON.stringify(payload, null, 2);
+    }
+
+    function agentHistory(agentName) {
+      return (state.agentDashboard.recent_tasks || [])
+        .filter(task => task.agent_name === agentName)
+        .slice(0, 4);
     }
 
     function renderAgents() {
@@ -871,6 +954,11 @@
             ${agent.last_task?.summary ? `<div>${esc(agent.last_task.summary)}</div>` : ''}
             ${(agent.recent_errors || []).slice(0, 1).map(item => `<div style="color:#ffd0d0">Recent error: ${esc(item.error)}</div>`).join('')}
           </div>
+          <label>Task Type
+            <select id="agent-task-${esc(agent.name)}">
+              ${agentConfig(agent.name).taskTypes.map(item => `<option value="${esc(item.value)}">${esc(item.label)}</option>`).join('')}
+            </select>
+          </label>
           <label>Context Card
             <select id="agent-card-${esc(agent.name)}">
               <option value="">No card context</option>
@@ -878,11 +966,23 @@
             </select>
           </label>
           <label>Capture Job ID<input id="agent-capture-${esc(agent.name)}" placeholder="Optional capture job id"></label>
-          <label>Task prompt<textarea id="agent-prompt-${esc(agent.name)}" placeholder="Describe the task or question for ${esc(agent.name)}"></textarea></label>
+          <label>Task prompt<textarea id="agent-prompt-${esc(agent.name)}" placeholder="${esc(agentConfig(agent.name).placeholder)}"></textarea></label>
           <div class="toolbar">
             <button class="btn btn-secondary" type="button" onclick="runAgentTask('${esc(agent.name)}')">Run ${esc(agent.name)}</button>
           </div>
-          <div class="agent-response" id="agent-response-${esc(agent.name)}">No task run yet.</div>
+          <div class="agent-response" id="agent-response-${esc(agent.name)}">${esc(prettyAgentPayload(agentHistory(agent.name)[0]?.output_payload || agentHistory(agent.name)[0]?.error || 'No task run yet.'))}</div>
+          <div class="agent-history">
+            ${agentHistory(agent.name).map(task => `
+              <article class="agent-history-item">
+                <header>
+                  <strong>${esc(task.task_type || 'task')}</strong>
+                  <span class="pill ${task.status === 'complete' ? 'active' : ''}">${esc(task.status || 'unknown')}</span>
+                </header>
+                <div class="muted">${esc(task.created_at || '')}</div>
+                <div class="task-payload">${esc(prettyAgentPayload(task.output_payload || task.error || task.summary || {}))}</div>
+              </article>
+            `).join('') || '<div class="agent-history-empty">No recent tasks for this agent.</div>'}
+          </div>
         </article>
       `).join('') || '<div class="muted">No agents registered.</div>';
     }
@@ -1215,27 +1315,46 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
       fillTemplateForm(template);
       previewTemplate().catch(() => {});
     };
+    function buildAgentPayload(agentName, prompt) {
+      const payload = {};
+      if (prompt) {
+        payload.question = prompt;
+        payload.summary = prompt;
+      }
+      if (agentName === 'species') {
+        payload.evidence_summary = prompt || 'Inspect current species evidence.';
+        payload.reasoning = prompt || 'Inspect current species evidence.';
+      } else if (agentName === 'card_builder') {
+        payload.summary = prompt || 'Rebuild card payload from current source.';
+      } else if (agentName === 'map') {
+        payload.summary = prompt || 'Inspect current region progress.';
+      } else if (agentName === 'review') {
+        payload.reason = prompt || 'Inspect review requirement for the selected context.';
+        payload.evidence_summary = prompt || 'Admin review inspection requested.';
+        payload.needs_review = true;
+      }
+      return payload;
+    }
     window.runAgentTask = async (agentName) => {
       const prompt = $(`agent-prompt-${agentName}`).value.trim();
       const cardId = $(`agent-card-${agentName}`).value;
       const captureJobId = $(`agent-capture-${agentName}`).value.trim();
+      const taskType = $(`agent-task-${agentName}`)?.value || agentConfig(agentName).taskTypes[0]?.value || 'admin_request';
       try {
+        $(`agent-response-${agentName}`).textContent = 'Running task...';
         const data = await fetchJson('/admin/agents/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             agent_name: agentName,
-            task_type: agentTaskType(agentName),
+            task_type: taskType,
             card_id: cardId ? Number(cardId) : null,
             capture_job_id: captureJobId ? Number(captureJobId) : null,
-            payload: {
-              question: prompt,
-              summary: prompt,
-              region: prompt,
-            },
+            payload: buildAgentPayload(agentName, prompt),
           }),
         });
-        $(`agent-response-${agentName}`).textContent = JSON.stringify(data.task.payload || {}, null, 2);
+        $(`agent-response-${agentName}`).textContent = prettyAgentPayload(data.task.payload || {});
+        $(`agent-prompt-${agentName}`).value = '';
         await boot();
       } catch (error) {
         $(`agent-response-${agentName}`).textContent = error.message || 'Agent task failed';
