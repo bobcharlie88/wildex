@@ -15,6 +15,7 @@ from app.services.agents.schemas import (
     AgentCandidate,
     CardBuilderOutput,
     CardStatsPayload,
+    DirectorAgentOutput,
     DrAgentOutput,
     MapAgentOutput,
     ResearchSource,
@@ -401,6 +402,64 @@ def build_dr_response(payload: dict[str, Any]) -> DrAgentOutput:
         suggested_actions=suggested_actions,
         referenced_card_id=payload.get("card_id"),
         referenced_capture_job_id=payload.get("capture_job_id"),
+    )
+
+
+def build_director_response(payload: dict[str, Any]) -> DirectorAgentOutput:
+    dashboard = payload.get("dashboard") or {}
+    queue = payload.get("review_queue") or dashboard.get("review_queue") or []
+    submissions = payload.get("submissions") or {}
+    template_count = int(payload.get("template_count") or 0)
+    missing_audio = int(payload.get("cards_missing_audio") or 0)
+    missing_assets = int(payload.get("missing_template_assets") or 0)
+    active_submissions = int((submissions.get("counts") or {}).get("active") or 0)
+    manual_review = int((submissions.get("counts") or {}).get("manual_review") or 0)
+
+    missing_context: list[str] = []
+    if not dashboard:
+        missing_context.append("agent dashboard")
+    if not submissions:
+        missing_context.append("submission queue summary")
+    if missing_context:
+        return DirectorAgentOutput(
+            reply=f"I need {', '.join(missing_context)} to produce a reliable admin overview.",
+            missing_context=missing_context,
+        )
+
+    priority_items: list[str] = []
+    if manual_review:
+        priority_items.append(f"{manual_review} submission items are waiting in manual review.")
+    if queue:
+        priority_items.append(f"{len(queue)} capture review items are flagged in the review queue.")
+    if missing_assets:
+        priority_items.append(f"{missing_assets} template asset assignments still need attention.")
+    if missing_audio:
+        priority_items.append(f"{missing_audio} cards are still missing audio.")
+    if active_submissions:
+        priority_items.append(f"{active_submissions} submission items are still active in the live queue.")
+    if not priority_items:
+        priority_items.append("No major admin blockers are currently visible.")
+
+    recommended_actions: list[str] = []
+    if manual_review:
+        recommended_actions.append("Clear the manual review submissions first.")
+    if queue:
+        recommended_actions.append("Process the highest-priority capture review items next.")
+    if missing_assets:
+        recommended_actions.append("Open Template Builder and resolve missing art assignments.")
+    if not recommended_actions:
+        recommended_actions.append("Use Agent Lab to spot-check templates and recent cards.")
+
+    reply = (
+        f"Admin overview: {template_count} templates tracked, "
+        f"{manual_review} manual-review submissions, {len(queue)} flagged capture reviews, "
+        f"and {missing_assets} missing template assets."
+    )
+    return DirectorAgentOutput(
+        reply=reply,
+        priority_items=priority_items[:4],
+        recommended_actions=recommended_actions[:4],
+        missing_context=[],
     )
 
 

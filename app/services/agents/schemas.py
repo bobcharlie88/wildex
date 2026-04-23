@@ -5,7 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-AgentName = Literal["dr", "species", "card_builder", "verification", "map", "review", "research"]
+AgentName = Literal["dr", "species", "card_builder", "verification", "map", "review", "research", "director"]
 
 
 class AgentCandidate(BaseModel):
@@ -101,6 +101,13 @@ class DrAgentOutput(BaseModel):
     suggested_actions: list[str] = Field(default_factory=list)
     referenced_card_id: int | None = None
     referenced_capture_job_id: int | None = None
+
+
+class DirectorAgentOutput(BaseModel):
+    reply: str
+    priority_items: list[str] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
+    missing_context: list[str] = Field(default_factory=list)
 
 
 class ResearchSource(BaseModel):

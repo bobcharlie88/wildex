@@ -741,6 +741,7 @@ async def admin_agent_task(request: Request, current_user: User = Depends(requir
     task_type = (payload.get("task_type") or "admin_request").strip()
     input_payload = dict(payload.get("payload") or {})
     card_id = int(payload["card_id"]) if payload.get("card_id") else None
+    template_id = int(payload["template_id"]) if payload.get("template_id") else None
     capture_job_id = int(payload["capture_job_id"]) if payload.get("capture_job_id") else None
     submission_id = int(payload["submission_id"]) if payload.get("submission_id") else None
     if not agent_name:
@@ -758,6 +759,16 @@ async def admin_agent_task(request: Request, current_user: User = Depends(requir
                 input_payload.setdefault("card_id", row.id)
                 input_payload.setdefault("user_id", row.owner_id)
                 input_payload.setdefault("region", row.region)
+            if template_id:
+                template_row = _load_template_row(db, template_id)
+                selection = select_template(
+                    kingdom=template_row.kingdom,
+                    side=template_row.side,
+                    preferred_name=template_row.name,
+                    preferred_version=template_row.version,
+                )
+                input_payload.setdefault("template", _template_to_dict(selection))
+                input_payload.setdefault("template_id", template_row.id)
             if capture_job_id:
                 job = db.query(CaptureJob).filter(CaptureJob.id == capture_job_id).first()
                 if job is None:
@@ -780,6 +791,18 @@ async def admin_agent_task(request: Request, current_user: User = Depends(requir
                 input_payload.setdefault("submission", submission_to_dict(submission))
                 input_payload.setdefault("report", input_payload["submission"].get("report") or {})
                 input_payload.setdefault("submission_id", submission.id)
+            if agent_name == "director":
+                input_payload.setdefault("dashboard", get_agent_dashboard())
+                input_payload.setdefault("submissions", _submission_dashboard(db))
+                input_payload.setdefault("template_count", db.query(CardTemplate.id).count())
+                input_payload.setdefault(
+                    "cards_missing_audio",
+                    db.query(Card.id).filter((Card.sound_url.is_(None)) | (Card.sound_url == "")).count(),
+                )
+                input_payload.setdefault(
+                    "missing_template_assets",
+                    db.query(CardTemplate.id).filter((CardTemplate.asset_path.is_(None)) | (CardTemplate.asset_path == "")).count(),
+                )
         finally:
             db.close()
 

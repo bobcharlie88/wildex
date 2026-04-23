@@ -72,8 +72,36 @@
       gap: 16px;
       align-items: start;
     }
+    .admin-nav {
+      position: sticky;
+      top: 8px;
+      z-index: 20;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px;
+      background: rgba(10,18,25,.78);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+    }
+    .nav-chip {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .nav-chip.active {
+      color: #23170b;
+      background: linear-gradient(180deg, #e6c47a, #c49d4b);
+      border-color: transparent;
+    }
     .stack { display: grid; gap: 16px; }
     .panel { padding: 18px; }
+    .panel.compact { padding: 16px; }
     .panel-head {
       display: flex;
       justify-content: space-between;
@@ -81,6 +109,51 @@
       gap: 10px;
       margin-bottom: 16px;
     }
+    .subhead {
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: .82rem;
+      text-transform: uppercase;
+      letter-spacing: .14em;
+    }
+    .field-group {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 18px;
+      background: rgba(255,255,255,.025);
+      margin-bottom: 12px;
+    }
+    .field-group > h3,
+    .field-group > h4 { margin: 0; font-size: .95rem; }
+    .field-group > p { color: var(--muted); font-size: .84rem; line-height: 1.5; }
+    details.collapse,
+    details.debug-panel {
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 16px;
+      background: rgba(255,255,255,.025);
+      overflow: hidden;
+    }
+    details.collapse + details.collapse,
+    details.debug-panel + details.debug-panel { margin-top: 10px; }
+    details.collapse summary,
+    details.debug-panel summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 16px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    details.collapse summary::-webkit-details-marker,
+    details.debug-panel summary::-webkit-details-marker { display: none; }
+    details.collapse[open] summary,
+    details.debug-panel[open] summary { border-bottom: 1px solid rgba(255,255,255,.06); }
+    .collapse-body { padding: 14px 16px 16px; }
     .panel-head p, .muted {
       color: var(--muted);
       font-size: .92rem;
@@ -168,6 +241,15 @@
       gap: 10px;
       margin-top: 14px;
     }
+    .toolbar.sticky-mobile {
+      position: sticky;
+      bottom: 10px;
+      padding: 10px;
+      background: rgba(18,32,43,.92);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 16px;
+      z-index: 4;
+    }
     .template-list, .asset-grid, .version-list, .agent-grid, .task-log, .review-list {
       display: grid;
       gap: 10px;
@@ -185,6 +267,28 @@
       background: rgba(255,255,255,.03);
     }
     .agent-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .agent-tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .agent-tab {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .agent-tab.active {
+      color: #23170b;
+      background: linear-gradient(180deg, #e6c47a, #c49d4b);
+      border-color: transparent;
+    }
+    .agent-lab-panel { display: none; }
+    .agent-lab-panel.active { display: block; }
     .agent-meta {
       color: var(--muted);
       font-size: .84rem;
@@ -245,6 +349,25 @@
       overflow: auto;
       max-height: 340px;
     }
+    .tool-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tool-chip {
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08);
+      color: var(--muted);
+      padding: 6px 10px;
+      font-size: .76rem;
+    }
+    .context-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .dev-hidden { display: none; }
     .slot-meta {
       display: block;
       margin-top: 4px;
@@ -344,10 +467,11 @@
       .layout { grid-template-columns: 1fr; }
     }
     @media (max-width: 720px) {
-      .grid-2, .grid-3, .search-row { grid-template-columns: 1fr; }
+      .grid-2, .grid-3, .search-row, .context-grid { grid-template-columns: 1fr; }
       .hero { align-items: start; }
       .shell { padding: 14px 10px 28px; }
       .panel { padding: 15px; }
+      .admin-nav { top: 4px; }
     }
   </style>
 </head>
@@ -356,8 +480,8 @@
     <section class="hero">
       <div>
         <div class="eyebrow">WildEx Admin Console</div>
-        <h1>Templates, Art, and Preview Control</h1>
-        <p>Upload card art, icons, frame pieces, map assets, and template layers directly through the app. Assign assets to slots, preview the result against a real card, then activate the template version without changing the repo.</p>
+        <h1>Admin Control Panel</h1>
+        <p>Manage template art, preview cards, clear queues, and use admin-only agents without turning the page into a raw debug surface.</p>
       </div>
       <div class="actions">
         <div class="pill" id="admin-user-pill">Loading…</div>
@@ -365,6 +489,14 @@
         <button class="btn btn-secondary" id="open-hub-btn" type="button">Open Hub</button>
         <button class="btn btn-danger" id="logout-btn" type="button">Sign Out</button>
       </div>
+    </section>
+
+    <section class="admin-nav" id="admin-nav">
+      <button class="nav-chip active" type="button" data-nav="templates">Template Lab</button>
+      <button class="nav-chip" type="button" data-nav="agents">Agent Lab</button>
+      <button class="nav-chip" type="button" data-nav="submissions">Submission Queue</button>
+      <button class="nav-chip" type="button" data-nav="assets">Asset Library</button>
+      <button class="nav-chip" type="button" data-nav="history">History</button>
     </section>
 
     <div class="layout">
@@ -438,72 +570,87 @@
           </form>
         </section>
 
-        <section class="panel">
+        <section class="panel" id="template-lab-panel">
           <div class="panel-head">
             <div>
               <h2>Template Builder</h2>
-              <p>Pick a template version, assign art to slots, preview it against a sample card, then activate it.</p>
+              <p>Build clean front/back templates, assign only the art that matters, and keep advanced configuration hidden unless you need it.</p>
             </div>
           </div>
           <div class="status-box" id="template-status"></div>
           <div class="error-box" id="template-error"></div>
           <form id="template-form">
-            <div class="grid-3">
-              <label>Template<select id="template-picker"></select></label>
-              <label>Name<input id="template-name"></label>
-              <label>Slug<input id="template-slug" placeholder="reptile-front-common"></label>
+            <div class="field-group">
+              <div class="subhead">Basic Info</div>
+              <div class="grid-3">
+                <label>Template<select id="template-picker"></select></label>
+                <label>Name<input id="template-name"></label>
+                <label>Slug<input id="template-slug" placeholder="naturalist-front-v1"></label>
+              </div>
+              <div class="grid-3">
+                <label>Side
+                  <select id="template-side">
+                    <option value="front">Front</option>
+                    <option value="back">Back</option>
+                  </select>
+                </label>
+                <label>Preview Sample
+                  <select id="preview-sample-select"></select>
+                </label>
+                <label class="checkbox"><input id="template-active" type="checkbox"> Activate on save</label>
+              </div>
             </div>
-            <div class="grid-3">
-              <label>Kingdom<input id="template-kingdom" placeholder="reptile"></label>
-              <label>Side
-                <select id="template-side">
-                  <option value="front">Front</option>
-                  <option value="back">Back</option>
-                </select>
-              </label>
-              <label>Version<input id="template-version" value="1.0.0"></label>
+            <div class="field-group">
+              <div class="subhead">Classification</div>
+              <div class="grid-3">
+                <label>Kingdom<input id="template-kingdom" placeholder="reptile"></label>
+                <label>Category<input id="template-category" placeholder="default"></label>
+                <label>Version<input id="template-version" value="1.0.0"></label>
+              </div>
+              <div class="grid-2">
+                <label>Family<input id="template-family" placeholder="dragon"></label>
+                <label>Environment<input id="template-environment" placeholder="desert"></label>
+              </div>
             </div>
-            <div class="grid-3">
-              <label>Category<input id="template-category" placeholder="default"></label>
-              <label>Family<input id="template-family" placeholder="dragon"></label>
-              <label>Environment<input id="template-environment" placeholder="desert"></label>
+            <div class="field-group">
+              <div class="subhead">Assets</div>
+              <p>Front templates can now rely on one integrated master frame like <code>front_frame_main.png</code> instead of a stack of small front overlays.</p>
             </div>
-            <div class="grid-3">
-              <label>Base Asset Path<input id="template-asset-path" placeholder="/static/card_templates/..."></label>
-              <label>Layout Key<input id="template-layout-key" placeholder="master-front"></label>
-              <label>Preview Sample
-                <select id="preview-sample-select"></select>
-              </label>
-            </div>
-            <div class="grid-2">
-              <label>Label<input id="template-label"></label>
-              <label class="checkbox"><input id="template-active" type="checkbox"> Activate on save</label>
-            </div>
-            <label>Notes<textarea id="template-notes"></textarea></label>
-            <div class="toolbar">
+            <details class="collapse">
+              <summary>Advanced Template Settings</summary>
+              <div class="collapse-body">
+                <div class="grid-3">
+                  <label>Base Asset Path<input id="template-asset-path" placeholder="/static/card_templates/..."></label>
+                  <label>Layout Key<input id="template-layout-key" placeholder="master-front"></label>
+                  <label>Label<input id="template-label"></label>
+                </div>
+                <label>Notes<textarea id="template-notes"></textarea></label>
+              </div>
+            </details>
+            <div class="toolbar sticky-mobile">
               <button class="btn btn-primary" type="submit">Save Template</button>
               <button class="btn btn-secondary" type="button" id="new-template-btn">New Template</button>
               <button class="btn btn-secondary" type="button" id="activate-template-btn">Activate Template</button>
             </div>
           </form>
-          <div class="panel-head" style="margin-top:18px">
-            <div>
-              <h3>Slot Assignments</h3>
-              <p>Assign uploaded parts such as top bar, photo frame, badges, overlays, icons, and map frames.</p>
+          <details class="collapse" open>
+            <summary>Slot Assignments</summary>
+            <div class="collapse-body">
+              <p class="muted">Only slots valid for the selected side are shown. Map-only slots stay on back templates.</p>
+              <form id="slot-form" class="slot-grid"></form>
+              <div class="toolbar sticky-mobile">
+                <button class="btn btn-secondary" type="button" id="save-slots-btn">Save Slot Assignments</button>
+                <button class="btn btn-secondary" type="button" id="preview-template-btn">Preview Template</button>
+              </div>
             </div>
-          </div>
-          <form id="slot-form" class="slot-grid"></form>
-          <div class="toolbar">
-            <button class="btn btn-secondary" type="button" id="save-slots-btn">Save Slot Assignments</button>
-            <button class="btn btn-secondary" type="button" id="preview-template-btn">Preview Template</button>
-          </div>
+          </details>
         </section>
 
         <section class="panel">
           <div class="panel-head">
             <div>
               <h2>Card Builder</h2>
-              <p>Inspect the stored card payload, rebuild it through the clean backend builder, and preview the exact render result used in-app.</p>
+              <p>Inspect and rebuild card payloads without exposing raw data until you want it.</p>
             </div>
           </div>
           <div class="status-box" id="builder-status"></div>
@@ -519,20 +666,26 @@
             <button class="btn btn-secondary" type="button" id="builder-preview-btn">Preview Card</button>
             <button class="btn btn-primary" type="button" id="builder-rebuild-btn">Rebuild Payload</button>
           </div>
-          <div class="code-box" id="builder-payload-box">Select a saved card to inspect its structured payload.</div>
+          <details class="debug-panel">
+            <summary>Show Debug Data</summary>
+            <div class="collapse-body">
+              <div class="code-box" id="builder-payload-box">Select a saved card to inspect its structured payload.</div>
+            </div>
+          </details>
         </section>
 
-        <section class="panel">
+        <section class="panel" id="agent-lab-panel">
           <div class="panel-head">
             <div>
-              <h2>Agent Control</h2>
-              <p>Run targeted tasks against The Dr and the hidden specialist agents. Every task is logged through the backend orchestrator.</p>
+              <h2>Agent Lab</h2>
+              <p>Admin-only tool-backed agents for card interpretation, research, design fixes, and control-room summaries.</p>
             </div>
           </div>
+          <div class="agent-tabs" id="agent-tabs"></div>
           <div class="agent-grid" id="agent-grid"></div>
         </section>
 
-        <section class="panel">
+        <section class="panel" id="assets-panel">
           <div class="panel-head">
             <div>
               <h2>Asset Library</h2>
@@ -569,7 +722,7 @@
           <div class="review-list" id="review-list"></div>
         </section>
 
-        <section class="panel">
+        <section class="panel" id="submission-queue-panel">
           <div class="panel-head">
             <div>
               <h2>Submission Queue</h2>
@@ -666,7 +819,12 @@
               <p>Recent task runs, summaries, and surfaced errors.</p>
             </div>
           </div>
-          <div class="task-log" id="agent-task-log"></div>
+          <details class="debug-panel">
+            <summary>Show Task History</summary>
+            <div class="collapse-body">
+              <div class="task-log" id="agent-task-log"></div>
+            </div>
+          </details>
         </section>
 
         <section class="panel">
@@ -676,7 +834,12 @@
               <p>Current stored templates and the slots they expose.</p>
             </div>
           </div>
-          <div class="template-list" id="template-list"></div>
+          <details class="debug-panel">
+            <summary>Show Template Configs</summary>
+            <div class="collapse-body">
+              <div class="template-list" id="template-list"></div>
+            </div>
+          </details>
         </section>
       </div>
     </div>
@@ -695,59 +858,53 @@
       selectedBuilderCardId: null,
       selectedSubmissionId: null,
       agentDashboard: { agents: [], recent_tasks: [], review_queue: [] },
+      activeAgentPanel: 'dr',
     };
 
-    const AGENT_CONFIG = {
+    const AGENT_LAB = {
       dr: {
+        backend: 'dr',
+        label: 'Dr',
+        description: 'Field-biologist assistant for card explanation, feeding, biome fit, and next-step advice.',
+        tools: ['get_card', 'get_species_record', 'get_player_collection', 'get_hungry_cards', 'get_biome_progress'],
         taskTypes: [
-          { value: 'player_help', label: 'Player Help' },
+          { value: 'player_help', label: 'Card Explain' },
         ],
-        placeholder: 'Ask The Dr to explain a card, rarity, progression, or what the player should do next.',
-      },
-      species: {
-        taskTypes: [
-          { value: 'inspect_species_result', label: 'Inspect Species Result' },
-          { value: 'normalize_capture_species', label: 'Normalize Capture Species' },
-        ],
-        placeholder: 'Ask why confidence is low, what evidence was strongest, or what candidate species should be compared.',
-      },
-      card_builder: {
-        taskTypes: [
-          { value: 'build_card_payload', label: 'Build Card Payload' },
-          { value: 'rebuild_card_payload', label: 'Rebuild Card Payload' },
-          { value: 'inspect_card_payload', label: 'Inspect Card Payload' },
-        ],
-        placeholder: 'Ask for payload rebuilds, slot-content inspection, or layout feedback tied to the current card source.',
-      },
-      verification: {
-        taskTypes: [
-          { value: 'score_submission_authenticity', label: 'Score Submission Authenticity' },
-          { value: 'inspect_submission_verification', label: 'Inspect Submission Verification' },
-        ],
-        placeholder: 'Ask for authenticity scoring, metadata interpretation, or suspicious-indicator analysis for a submission.',
+        placeholder: 'Explain this card, give feeding advice, suggest biome fit, or tell me what the player should do next.',
       },
       research: {
+        backend: 'research',
+        label: 'Research',
+        description: 'Checks species facts, compares card text to known data, and flags weak wording.',
+        tools: ['get_card', 'search_species', 'get_species_record', 'compare_card_to_species_data', 'mark_needs_fix', 'queue_for_review'],
         taskTypes: [
-          { value: 'confirm_consensus_identification', label: 'Confirm Consensus Identification' },
-          { value: 'inspect_candidate_plausibility', label: 'Inspect Candidate Plausibility' },
+          { value: 'confirm_consensus_identification', label: 'Verify Species Data' },
+          { value: 'inspect_candidate_plausibility', label: 'Compare Against Sources' },
         ],
-        placeholder: 'Ask for source-backed species confirmation, distribution checks, or conflict notes across external sources.',
+        placeholder: 'Verify species data, compare wording, or explain where the current card text conflicts with known sources.',
       },
-      map: {
+      design: {
+        backend: 'card_builder',
+        label: 'Design',
+        description: 'Inspects template problems, missing assets, preview issues, and slot assignments.',
+        tools: ['list_templates', 'get_template', 'preview_template', 'list_missing_template_assets', 'assign_asset_to_slot', 'get_card'],
         taskTypes: [
-          { value: 'sync_progress', label: 'Sync Progress' },
-          { value: 'inspect_region_progress', label: 'Inspect Region Progress' },
-          { value: 'recalculate_region_progress', label: 'Recalculate Region Progress' },
+          { value: 'inspect_card_payload', label: 'Inspect Template Problem' },
+          { value: 'rebuild_card_payload', label: 'Rebuild Preview Payload' },
+          { value: 'build_card_payload', label: 'Explain Slot Content' },
         ],
-        placeholder: 'Ask about region counters, unlock state, repeat captures, or progression for the current user/card context.',
+        placeholder: 'Explain a broken preview, missing asset, duplicated layer, or what should be assigned to each slot.',
       },
-      review: {
+      director: {
+        backend: 'director',
+        label: 'Director',
+        description: 'Summarizes what is blocked, what matters most, and where admin attention should go next.',
+        tools: ['list_cards_needing_review', 'list_templates', 'list_cards_missing_audio', 'list_missing_template_assets', 'queue_for_review', 'get_card'],
         taskTypes: [
-          { value: 'inspect_review_queue', label: 'Inspect Review Queue' },
-          { value: 'flag_capture_review', label: 'Flag Capture Review' },
-          { value: 'flag_unusual_capture', label: 'Flag Unusual Capture' },
+          { value: 'overview', label: 'Overview' },
+          { value: 'summarize_workload', label: 'Summarize Workload' },
         ],
-        placeholder: 'Ask why a capture should be reviewed, what priority it deserves, or inspect unusual sightings.',
+        placeholder: 'Summarize the highest-priority admin issues, blocked items, and what should be fixed next.',
       },
     };
 
@@ -930,10 +1087,14 @@
       `).join('');
     }
 
-    function agentConfig(agentName) {
-      return AGENT_CONFIG[agentName] || {
+    function agentConfig(agentKey) {
+      return AGENT_LAB[agentKey] || {
+        backend: agentKey,
+        label: agentKey,
+        description: '',
+        tools: [],
         taskTypes: [{ value: 'admin_request', label: 'Admin Request' }],
-        placeholder: `Describe the task or question for ${agentName}`,
+        placeholder: `Describe the task or question for ${agentKey}`,
       };
     }
 
@@ -941,10 +1102,21 @@
       if (payload == null) return 'No response payload.';
       if (typeof payload === 'string') return payload;
       if (typeof payload.reply === 'string') {
-        const extra = Array.isArray(payload.suggested_actions) && payload.suggested_actions.length
-          ? `\n\nSuggested actions:\n- ${payload.suggested_actions.join('\n- ')}`
-          : '';
-        return `${payload.reply}${extra}`;
+        const extra = [];
+        if (Array.isArray(payload.priority_items) && payload.priority_items.length) {
+          extra.push(`Priority items:\n- ${payload.priority_items.join('\n- ')}`);
+        }
+        if (Array.isArray(payload.recommended_actions) && payload.recommended_actions.length) {
+          extra.push(`Recommended actions:\n- ${payload.recommended_actions.join('\n- ')}`);
+        }
+        if (Array.isArray(payload.suggested_actions) && payload.suggested_actions.length) {
+          extra.push(`Suggested actions:\n- ${payload.suggested_actions.join('\n- ')}`);
+        }
+        if (Array.isArray(payload.missing_context) && payload.missing_context.length) {
+          extra.push(`Missing context:\n- ${payload.missing_context.join('\n- ')}`);
+        }
+        if (payload.follow_up) extra.push(`Follow-up:\n${payload.follow_up}`);
+        return [payload.reply].concat(extra).join('\n\n');
       }
       return JSON.stringify(payload, null, 2);
     }
@@ -956,52 +1128,86 @@
     }
 
     function renderAgents() {
-      $('agent-grid').innerHTML = (state.agentDashboard.agents || []).map(agent => `
-        <article class="agent-card">
-          <header>
-            <div>
-              <strong>${esc(agent.name)}</strong>
-              <div class="muted">${esc(agent.description || '')}</div>
+      $('agent-tabs').innerHTML = Object.entries(AGENT_LAB).map(([key, config]) => `
+        <button class="agent-tab ${state.activeAgentPanel === key ? 'active' : ''}" type="button" data-agent-tab="${esc(key)}">${esc(config.label)}</button>
+      `).join('');
+      $('agent-grid').innerHTML = Object.entries(AGENT_LAB).map(([key, config]) => {
+        const dashboardAgent = (state.agentDashboard.agents || []).find(item => item.name === config.backend) || {};
+        const history = agentHistory(config.backend);
+        return `
+          <article class="agent-card agent-lab-panel ${state.activeAgentPanel === key ? 'active' : ''}" data-agent-panel="${esc(key)}">
+            <header>
+              <div>
+                <strong>${esc(config.label)}</strong>
+                <div class="muted">${esc(config.description || '')}</div>
+              </div>
+              <span class="pill active">Admin Only</span>
+            </header>
+            <div class="agent-meta">
+              Backend: ${esc(config.backend)} · Status: ${esc(dashboardAgent.status || 'ready')}
+              ${dashboardAgent.last_task?.summary ? `<div>${esc(dashboardAgent.last_task.summary)}</div>` : ''}
+              ${(dashboardAgent.recent_errors || []).slice(0, 1).map(item => `<div style="color:#ffd0d0">Recent error: ${esc(item.error)}</div>`).join('')}
             </div>
-            <span class="pill active">${esc(agent.status || 'ready')}</span>
-          </header>
-          <div class="agent-meta">
-            Last task: ${esc(agent.last_task?.task_type || 'none')}${agent.last_task?.status ? ` · ${esc(agent.last_task.status)}` : ''}
-            ${agent.last_task?.summary ? `<div>${esc(agent.last_task.summary)}</div>` : ''}
-            ${(agent.recent_errors || []).slice(0, 1).map(item => `<div style="color:#ffd0d0">Recent error: ${esc(item.error)}</div>`).join('')}
-          </div>
-          <label>Task Type
-            <select id="agent-task-${esc(agent.name)}">
-              ${agentConfig(agent.name).taskTypes.map(item => `<option value="${esc(item.value)}">${esc(item.label)}</option>`).join('')}
-            </select>
-          </label>
-          <label>Context Card
-            <select id="agent-card-${esc(agent.name)}">
-              <option value="">No card context</option>
-              ${(state.samples || []).map(item => `<option value="${item.id}">${esc(item.species_name)}${item.dex_id ? ` · ${esc(item.dex_id)}` : ''}</option>`).join('')}
-            </select>
-          </label>
-          <label>Capture Job ID<input id="agent-capture-${esc(agent.name)}" placeholder="Optional capture job id"></label>
-          <label>Submission ID<input id="agent-submission-${esc(agent.name)}" placeholder="Optional submission id"></label>
-          <label>Task prompt<textarea id="agent-prompt-${esc(agent.name)}" placeholder="${esc(agentConfig(agent.name).placeholder)}"></textarea></label>
-          <div class="toolbar">
-            <button class="btn btn-secondary" type="button" onclick="runAgentTask('${esc(agent.name)}')">Run ${esc(agent.name)}</button>
-          </div>
-          <div class="agent-response" id="agent-response-${esc(agent.name)}">${esc(prettyAgentPayload(agentHistory(agent.name)[0]?.output_payload || agentHistory(agent.name)[0]?.error || 'No task run yet.'))}</div>
-          <div class="agent-history">
-            ${agentHistory(agent.name).map(task => `
-              <article class="agent-history-item">
-                <header>
-                  <strong>${esc(task.task_type || 'task')}</strong>
-                  <span class="pill ${task.status === 'complete' ? 'active' : ''}">${esc(task.status || 'unknown')}</span>
-                </header>
-                <div class="muted">${esc(task.created_at || '')}</div>
-                <div class="task-payload">${esc(prettyAgentPayload(task.output_payload || task.error || task.summary || {}))}</div>
-              </article>
-            `).join('') || '<div class="agent-history-empty">No recent tasks for this agent.</div>'}
-          </div>
-        </article>
-      `).join('') || '<div class="muted">No agents registered.</div>';
+            <div class="field-group">
+              <div class="subhead">Tools</div>
+              <div class="tool-list">${config.tools.map(tool => `<span class="tool-chip">${esc(tool)}</span>`).join('')}</div>
+            </div>
+            <div class="field-group">
+              <div class="subhead">Context</div>
+              <div class="context-grid">
+                <label>Current Card
+                  <select id="agent-card-${esc(key)}">
+                    <option value="">No card context</option>
+                    ${(state.samples || []).map(item => `<option value="${item.id}">${esc(item.species_name)}${item.dex_id ? ` · ${esc(item.dex_id)}` : ''}</option>`).join('')}
+                  </select>
+                </label>
+                <label>Current Template
+                  <select id="agent-template-${esc(key)}">
+                    <option value="">No template context</option>
+                    ${state.templates.map(item => `<option value="${item.id}">${esc(item.label || item.name)} · ${esc(item.side)}</option>`).join('')}
+                  </select>
+                </label>
+                <label>Review Queue Item
+                  <input id="agent-capture-${esc(key)}" placeholder="Capture job id">
+                </label>
+                <label>Submission / Player Item
+                  <input id="agent-submission-${esc(key)}" placeholder="Submission id">
+                </label>
+              </div>
+              <div class="toolbar">
+                <button class="btn btn-secondary" type="button" onclick="useCurrentAgentContext('${esc(key)}')">Use Current Item As Context</button>
+              </div>
+            </div>
+            <label>Task Type
+              <select id="agent-task-${esc(key)}">
+                ${config.taskTypes.map(item => `<option value="${esc(item.value)}">${esc(item.label)}</option>`).join('')}
+              </select>
+            </label>
+            <label>Message<textarea id="agent-prompt-${esc(key)}" placeholder="${esc(config.placeholder)}"></textarea></label>
+            <div class="toolbar">
+              <button class="btn btn-secondary" type="button" onclick="runAgentTask('${esc(key)}')">Run ${esc(config.label)}</button>
+            </div>
+            <div class="agent-response" id="agent-response-${esc(key)}">${esc(prettyAgentPayload(history[0]?.output_payload || history[0]?.error || 'No task run yet.'))}</div>
+            <details class="debug-panel">
+              <summary>Recent Actions</summary>
+              <div class="collapse-body">
+                <div class="agent-history">
+                  ${history.map(task => `
+                    <article class="agent-history-item">
+                      <header>
+                        <strong>${esc(task.task_type || 'task')}</strong>
+                        <span class="pill ${task.status === 'complete' ? 'active' : ''}">${esc(task.status || 'unknown')}</span>
+                      </header>
+                      <div class="muted">${esc(task.created_at || '')}</div>
+                      <div class="task-payload">${esc(prettyAgentPayload(task.output_payload || task.error || task.summary || {}))}</div>
+                    </article>
+                  `).join('') || '<div class="agent-history-empty">No recent tasks for this panel.</div>'}
+                </div>
+              </div>
+            </details>
+          </article>
+        `;
+      }).join('');
     }
 
     function renderTaskHistory() {
@@ -1099,6 +1305,19 @@
         .join('') || '<div class="muted">No completed or archived request history yet.</div>';
     }
 
+    function openAdminNav(target) {
+      const mapping = {
+        templates: 'template-lab-panel',
+        agents: 'agent-lab-panel',
+        submissions: 'submission-queue-panel',
+        assets: 'assets-panel',
+        history: 'agent-task-log',
+      };
+      document.querySelectorAll('.nav-chip').forEach(node => node.classList.toggle('active', node.dataset.nav === target));
+      const node = $(mapping[target]);
+      if (node) node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     function renderSubmissionDetail(item) {
       if (!item) {
         $('submission-detail').innerHTML = '<div class="muted">Select any request to inspect the verification report, decision history, and queue state.</div>';
@@ -1120,15 +1339,20 @@ Capture Datetime: ${esc(item.report?.capture_datetime || 'Unavailable')}
 
 Date/Time Check: ${esc(item.report?.date_time_check_result || 'No date/time result')}
 
-Metadata Summary:
-${esc(JSON.stringify(item.report?.metadata_summary || {}, null, 2))}
-
 Suspicious Findings:
 ${esc((item.report?.suspicious_findings || []).join('\n') || 'None recorded')}
+          </div>
+          <details class="debug-panel" style="margin-top:12px">
+            <summary>Show Debug Data</summary>
+            <div class="collapse-body">
+              <div class="task-payload">Metadata Summary:
+${esc(JSON.stringify(item.report?.metadata_summary || {}, null, 2))}
 
 Decision History:
 ${esc(JSON.stringify(item.decision_history || [], null, 2))}
-          </div>
+              </div>
+            </div>
+          </details>
           <div class="toolbar">
             <button class="btn btn-secondary" type="button" onclick="decideSubmission(${item.id}, 'approve_anyway')">Approve Anyway</button>
             <button class="btn btn-danger" type="button" onclick="decideSubmission(${item.id}, 'reject')">Reject</button>
@@ -1332,40 +1556,52 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
       fillTemplateForm(template);
       previewTemplate().catch(() => {});
     };
-    function buildAgentPayload(agentName, prompt) {
+    window.useCurrentAgentContext = (agentKey) => {
+      if ($(`agent-card-${agentKey}`) && state.selectedBuilderCardId) {
+        $(`agent-card-${agentKey}`).value = String(state.selectedBuilderCardId);
+      }
+      if ($(`agent-template-${agentKey}`) && state.selectedTemplateId) {
+        $(`agent-template-${agentKey}`).value = String(state.selectedTemplateId);
+      }
+      if ($(`agent-submission-${agentKey}`) && state.selectedSubmissionId) {
+        $(`agent-submission-${agentKey}`).value = String(state.selectedSubmissionId);
+      }
+    };
+    function buildAgentPayload(agentKey, prompt) {
+      const config = agentConfig(agentKey);
+      const agentName = config.backend;
       const payload = {};
       if (prompt) {
         payload.question = prompt;
         payload.summary = prompt;
       }
-      if (agentName === 'species') {
-        payload.evidence_summary = prompt || 'Inspect current species evidence.';
-        payload.reasoning = prompt || 'Inspect current species evidence.';
-      } else if (agentName === 'card_builder') {
-        payload.summary = prompt || 'Rebuild card payload from current source.';
-      } else if (agentName === 'verification') {
-        payload.summary = prompt || 'Inspect submission authenticity and suspicious indicators.';
-        payload.metadata_summary_text = prompt || 'Inspect submission authenticity and suspicious indicators.';
+      if (agentName === 'dr') {
+        payload.mode = $(`agent-task-${agentKey}`).value || 'card_explain';
       } else if (agentName === 'research') {
         payload.reasoning = prompt || 'Inspect source support, distribution plausibility, and alternative candidates.';
         payload.summary = prompt || 'Inspect source support, distribution plausibility, and alternative candidates.';
-      } else if (agentName === 'map') {
-        payload.summary = prompt || 'Inspect current region progress.';
-      } else if (agentName === 'review') {
-        payload.reason = prompt || 'Inspect review requirement for the selected context.';
-        payload.evidence_summary = prompt || 'Admin review inspection requested.';
-        payload.needs_review = true;
+      } else if (agentName === 'card_builder') {
+        payload.summary = prompt || 'Rebuild card payload from current source.';
+      } else if (agentName === 'director') {
+        payload.summary = prompt || 'Summarize admin workload and current blockers.';
       }
+      const selectedCardId = $(`agent-card-${agentKey}`)?.value;
+      if (selectedCardId) payload.card_id = Number(selectedCardId);
+      const selectedTemplateId = $(`agent-template-${agentKey}`)?.value;
+      if (selectedTemplateId) payload.template_id = Number(selectedTemplateId);
       return payload;
     }
-    window.runAgentTask = async (agentName) => {
-      const prompt = $(`agent-prompt-${agentName}`).value.trim();
-      const cardId = $(`agent-card-${agentName}`).value;
-      const captureJobId = $(`agent-capture-${agentName}`).value.trim();
-      const submissionId = $(`agent-submission-${agentName}`)?.value.trim();
-      const taskType = $(`agent-task-${agentName}`)?.value || agentConfig(agentName).taskTypes[0]?.value || 'admin_request';
+    window.runAgentTask = async (agentKey) => {
+      const config = agentConfig(agentKey);
+      const agentName = config.backend;
+      const prompt = $(`agent-prompt-${agentKey}`).value.trim();
+      const cardId = $(`agent-card-${agentKey}`)?.value;
+      const templateId = $(`agent-template-${agentKey}`)?.value;
+      const captureJobId = $(`agent-capture-${agentKey}`)?.value.trim();
+      const submissionId = $(`agent-submission-${agentKey}`)?.value.trim();
+      const taskType = $(`agent-task-${agentKey}`)?.value || config.taskTypes[0]?.value || 'admin_request';
       try {
-        $(`agent-response-${agentName}`).textContent = 'Running task...';
+        $(`agent-response-${agentKey}`).textContent = 'Running task...';
         const data = await fetchJson('/admin/agents/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1373,16 +1609,17 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
             agent_name: agentName,
             task_type: taskType,
             card_id: cardId ? Number(cardId) : null,
+            template_id: templateId ? Number(templateId) : null,
             capture_job_id: captureJobId ? Number(captureJobId) : null,
             submission_id: submissionId ? Number(submissionId) : null,
-            payload: buildAgentPayload(agentName, prompt),
+            payload: buildAgentPayload(agentKey, prompt),
           }),
         });
-        $(`agent-response-${agentName}`).textContent = prettyAgentPayload(data.task.payload || {});
-        $(`agent-prompt-${agentName}`).value = '';
+        $(`agent-response-${agentKey}`).textContent = prettyAgentPayload(data.task.payload || {});
+        $(`agent-prompt-${agentKey}`).value = '';
         await boot();
       } catch (error) {
-        $(`agent-response-${agentName}`).textContent = error.message || 'Agent task failed';
+        $(`agent-response-${agentKey}`).textContent = error.message || 'Agent task failed';
       }
     };
 
@@ -1483,26 +1720,45 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
       }
     });
 
+    $('template-name').addEventListener('input', () => {
+      if ($('template-slug').value.trim()) return;
+      $('template-slug').value = $('template-name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    });
+    $('template-side').addEventListener('change', () => {
+      const side = $('template-side').value;
+      if (side === 'front') {
+        $('template-layout-key').value = 'master-front';
+        if (!$('template-asset-path').value.trim()) $('template-asset-path').value = '/static/card_templates/shared/front_frame_main.png';
+      } else {
+        $('template-layout-key').value = 'master-back';
+      }
+      populateSlotOptions();
+    });
+
     $('template-form').addEventListener('submit', async (event) => {
       event.preventDefault();
       $('template-error').classList.remove('visible');
+      const derivedSlug = $('template-slug').value.trim() || $('template-name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const side = $('template-side').value;
+      const layoutKey = $('template-layout-key').value.trim() || (side === 'front' ? 'master-front' : 'master-back');
+      const assetPath = $('template-asset-path').value.trim() || (side === 'front' ? '/static/card_templates/shared/front_frame_main.png' : '');
       const payload = {
         id: state.selectedTemplateId,
         name: $('template-name').value.trim(),
-        slug: $('template-slug').value.trim(),
+        slug: derivedSlug,
         kingdom: $('template-kingdom').value.trim(),
-        side: $('template-side').value,
+        side,
         version: $('template-version').value.trim(),
         category: $('template-category').value.trim(),
         family: $('template-family').value.trim(),
         environment: $('template-environment').value.trim(),
-        asset_path: $('template-asset-path').value.trim(),
-        layout_key: $('template-layout-key').value.trim(),
+        asset_path: assetPath,
+        layout_key: layoutKey,
         preview_card_id: $('preview-sample-select').value ? Number($('preview-sample-select').value) : null,
         label: $('template-label').value.trim(),
         notes: $('template-notes').value.trim(),
         active: $('template-active').checked,
-        config: { layout_key: $('template-layout-key').value.trim() },
+        config: { layout_key: layoutKey },
       };
       try {
         const result = await fetchJson('/admin/templates', {
@@ -1545,10 +1801,24 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
     $('new-template-btn').addEventListener('click', () => {
       state.selectedTemplateId = null;
       $('template-form').reset();
+      $('template-side').value = 'front';
+      $('template-layout-key').value = 'master-front';
+      $('template-asset-path').value = '/static/card_templates/shared/front_frame_main.png';
       populateSlotOptions();
     });
     $('asset-search').addEventListener('input', renderAssets);
     $('asset-type-filter').addEventListener('change', renderAssets);
+    $('agent-tabs').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-agent-tab]');
+      if (!button) return;
+      state.activeAgentPanel = button.dataset.agentTab;
+      renderAgents();
+    });
+    $('admin-nav').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-nav]');
+      if (!button) return;
+      openAdminNav(button.dataset.nav);
+    });
     $('refresh-btn').addEventListener('click', async () => {
       try {
         await boot();
