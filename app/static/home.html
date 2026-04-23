@@ -886,6 +886,23 @@
       return taxonomy(entry).family;
     }
 
+    function discoveryRank(entry) {
+      if (entry.discovery_state === 'CAPTURED') return 2;
+      if (entry.discovery_state === 'SEEN') return 1;
+      return 0;
+    }
+
+    function bestLabel(rows, labelFn) {
+      const scores = new Map();
+      rows.forEach(entry => {
+        const label = labelFn(entry);
+        const next = discoveryRank(entry);
+        scores.set(label, Math.max(scores.get(label) || 0, next));
+      });
+      return [...scores.entries()]
+        .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))[0]?.[0] || null;
+    }
+
     function activeEntries() {
       let rows = state.entries.slice();
       if (state.selectedRegion) rows = rows.filter(entry => entry.region === state.selectedRegion);
@@ -954,18 +971,37 @@
       const regionEntries = state.entries.filter(entry => !state.selectedRegion || entry.region === state.selectedRegion);
       const kingdoms = [...new Set(regionEntries.map(kingdomRoot))];
       if (!state.selectedKingdom || !kingdoms.includes(state.selectedKingdom)) {
-        state.selectedKingdom = kingdoms[0] || null;
+        state.selectedKingdom = bestLabel(regionEntries, kingdomRoot) || kingdoms[0] || null;
       }
       const categoryEntries = regionEntries.filter(entry => !state.selectedKingdom || kingdomRoot(entry) === state.selectedKingdom);
       const categories = [...new Set(categoryEntries.map(categoryLabel))];
       if (!state.selectedCategory || !categories.includes(state.selectedCategory)) {
-        state.selectedCategory = categories[0] || null;
+        state.selectedCategory = bestLabel(categoryEntries, categoryLabel) || categories[0] || null;
       }
       const familyEntries = categoryEntries.filter(entry => !state.selectedCategory || categoryLabel(entry) === state.selectedCategory);
       const families = [...new Set(familyEntries.map(familyLabel))];
       if (!state.selectedFamily || !families.includes(state.selectedFamily)) {
-        state.selectedFamily = families[0] || null;
+        state.selectedFamily = bestLabel(familyEntries, familyLabel) || families[0] || null;
       }
+    }
+
+    function focusFirstCapturedPath() {
+      const captured = state.entries.filter(entry => entry.discovery_state === 'CAPTURED');
+      if (!captured.length) return false;
+      const first = captured
+        .slice()
+        .sort((a, b) => {
+          const byRegion = (a.region || '').localeCompare(b.region || '');
+          if (byRegion) return byRegion;
+          const byDex = (a.dex_id || '').localeCompare(b.dex_id || '');
+          if (byDex) return byDex;
+          return (a.id || 0) - (b.id || 0);
+        })[0];
+      state.selectedRegion = first.region || state.selectedRegion;
+      state.selectedKingdom = kingdomRoot(first);
+      state.selectedCategory = categoryLabel(first);
+      state.selectedFamily = familyLabel(first);
+      return true;
     }
 
     function renderSelectors() {
@@ -1330,7 +1366,14 @@
       location.href = '/login';
     });
     document.getElementById('open-first-unlocked').addEventListener('click', () => {
-      if (state.selectedRegion) document.getElementById('index-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      focusFirstCapturedPath();
+      renderMap();
+      renderSelectors();
+      renderEntries();
+      if (state.selectedRegion) {
+        document.getElementById('mini-status').textContent = `${REGION_LABELS[state.selectedRegion]} active`;
+        document.getElementById('index-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     });
 
     queuedCount().then(count => { document.getElementById('queue-count').textContent = count; }).catch(() => {});
