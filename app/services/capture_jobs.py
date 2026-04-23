@@ -300,6 +300,7 @@ def create_capture_job(*, owner_id: int, content: bytes, content_type: str | Non
     suffix, is_video = validate_capture_upload(content_type, content)
     if SessionLocal is None:
         raise RuntimeError("Database not configured")
+    start_capture_worker()
 
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(content)

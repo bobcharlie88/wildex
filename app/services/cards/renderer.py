@@ -99,16 +99,16 @@ def build_render_card(source) -> dict:
     kingdom_key = _kingdom(_value(source, "category"), _value(source, "sub_category"), _value(source, "iconic_taxon"))
     theme = THEMES[kingdom_key]
     front_template = select_template_payload(
-        kingdom="universal",
+        kingdom=_value(source, "kingdom") or kingdom_key,
         side="front",
-        preferred_name="naturalist-front-v1",
-        preferred_version="1.0.0",
+        preferred_name=_value(source, "front_template_name") or "naturalist-front-v1",
+        preferred_version=_value(source, "front_template_version") or "1.0.0",
     )
     back_template = select_template_payload(
-        kingdom="universal",
+        kingdom=_value(source, "kingdom") or kingdom_key,
         side="back",
-        preferred_name="naturalist-back-v1",
-        preferred_version="1.0.0",
+        preferred_name=_value(source, "back_template_name") or "naturalist-back-v1",
+        preferred_version=_value(source, "back_template_version") or "1.0.0",
     )
     capture_country = _value(source, "capture_country")
     range_mode, range_regions, local_markers = _range_mode(species_name, kingdom_key, capture_country)
