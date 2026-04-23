@@ -12,7 +12,7 @@ from sqlalchemy import desc
 
 from app.auth import require_user
 from app.database import SessionLocal, db_available
-from app.models import Card, User, UserDexDiscovery
+from app.models import AgentTask, Card, CardTemplate, CaptureJob, ReviewQueueItem, SpeciesResultRecord, User, UserDexDiscovery
 from app.pipeline.card_generator import generate_card
 from app.pipeline.species_data import get_species_data
 from app.pipeline.species_id import TemporaryIdentificationError, identify_species, is_temporary_identification_error
@@ -163,6 +163,36 @@ def delete_card(card_id: int, current_user: User = Depends(require_user)):
         if not row:
             raise HTTPException(404, "Card not found")
         dex_entry_id = row.dex_entry_id
+        (
+            db.query(CaptureJob)
+            .filter(CaptureJob.card_id == row.id)
+            .update({CaptureJob.card_id: None}, synchronize_session=False)
+        )
+        (
+            db.query(AgentTask)
+            .filter(AgentTask.card_id == row.id)
+            .update({AgentTask.card_id: None}, synchronize_session=False)
+        )
+        (
+            db.query(SpeciesResultRecord)
+            .filter(SpeciesResultRecord.card_id == row.id)
+            .update({SpeciesResultRecord.card_id: None}, synchronize_session=False)
+        )
+        (
+            db.query(ReviewQueueItem)
+            .filter(ReviewQueueItem.card_id == row.id)
+            .update({ReviewQueueItem.card_id: None}, synchronize_session=False)
+        )
+        (
+            db.query(CardTemplate)
+            .filter(CardTemplate.preview_card_id == row.id)
+            .update({CardTemplate.preview_card_id: None}, synchronize_session=False)
+        )
+        (
+            db.query(UserDexDiscovery)
+            .filter(UserDexDiscovery.last_card_id == row.id)
+            .update({UserDexDiscovery.last_card_id: None}, synchronize_session=False)
+        )
         if user and user.favorite_card_id == row.id:
             user.favorite_card_id = None
         db.delete(row)
