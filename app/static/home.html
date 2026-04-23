@@ -179,8 +179,8 @@
       border-radius: 24px;
       border: 1px solid rgba(81, 64, 38, 0.28);
       background:
-        radial-gradient(circle at 50% 44%, rgba(255,245,217,.72), rgba(223,196,147,.88) 52%, rgba(145,108,62,.95) 100%),
-        linear-gradient(180deg, #d9bb82, #a67e47);
+        radial-gradient(circle at 50% 44%, rgba(236,222,183,.42), rgba(110,83,48,.68) 55%, rgba(43,28,14,.94) 100%),
+        linear-gradient(180deg, #8f7046, #3c2816);
       overflow: hidden;
       padding: 12px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 16px 32px rgba(0,0,0,.22);
@@ -211,6 +211,14 @@
     .map-parchment {
       fill: url(#paperTone);
       opacity: .94;
+    }
+    .map-atlas-image {
+      opacity: .9;
+      filter: saturate(.82) contrast(1.02) brightness(.96);
+    }
+    .map-atlas-wash {
+      fill: rgba(72, 49, 24, .18);
+      mix-blend-mode: multiply;
     }
     .map-grid, .map-route {
       fill: none;
@@ -664,10 +672,17 @@
                   <stop offset="0%" stop-color="#efe1bd"></stop>
                   <stop offset="100%" stop-color="#d9bc82"></stop>
                 </linearGradient>
+                <clipPath id="atlasClip">
+                  <ellipse cx="500" cy="310" rx="422" ry="222"></ellipse>
+                </clipPath>
               </defs>
               <rect class="map-frame" x="8" y="8" width="984" height="604" rx="42"></rect>
               <ellipse class="map-sea" cx="500" cy="310" rx="438" ry="238"></ellipse>
               <ellipse class="map-parchment" cx="500" cy="310" rx="422" ry="222"></ellipse>
+              <g clip-path="url(#atlasClip)">
+                <image class="map-atlas-image" href="/static/maps/atlas_world_base.jpg" x="78" y="88" width="844" height="444" preserveAspectRatio="none"></image>
+                <ellipse class="map-atlas-wash" cx="500" cy="310" rx="422" ry="222"></ellipse>
+              </g>
               <path class="map-grid" d="M130 310 H870 M188 238 C320 260,680 260,812 238 M188 382 C320 360,680 360,812 382"></path>
               <path class="map-grid" d="M500 96 V524 M360 112 C384 204,384 416,360 508 M640 112 C616 204,616 416,640 508"></path>
               <path class="map-route" d="M184 270 C292 184, 438 172, 552 222 S752 338, 824 288"></path>
