@@ -1,44 +1,18 @@
 (function () {
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const CARD_W = 744;
-  const CARD_H = 1039;
+  const CARD_W = 1461;
+  const CARD_H = 1076;
   const MASTER_FRONT_FRAME = '/static/card_templates/shared/front_frame_main.png';
+  const MASTER_BACK_FRAME = '/static/card_templates/shared/back_frame_main.png';
   const SLOT_LAYOUTS = {
     front: {
-      base_frame: { x: 0, y: 0, w: 744, h: 1039 },
-      background_texture: { x: 12, y: 12, w: 720, h: 1015 },
-      top_bar: { x: 24, y: 40, w: 680, h: 92 },
-      number_badge: { x: 24, y: 46, w: 150, h: 88 },
-      title_banner: { x: 184, y: 48, w: 366, h: 84 },
-      kingdom_badge: { x: 552, y: 46, w: 152, h: 88 },
-      photo_frame: { x: 372, y: 238, w: 324, h: 412 },
-      info_banner: { x: 52, y: 658, w: 198, h: 58 },
-      fact_banner: { x: 52, y: 932, w: 640, h: 64 },
-      bottom_strip: { x: 40, y: 928, w: 654, h: 74 },
-      frame_overlay: { x: 0, y: 0, w: 744, h: 1039 },
-      rarity_overlay: { x: 536, y: 846, w: 140, h: 92 },
-      family_icon: { x: 592, y: 64, w: 70, h: 54 },
-      species_icon: { x: 60, y: 944, w: 74, h: 40 },
-      special_badge: { x: 534, y: 148, w: 132, h: 60 },
+      base_frame: { x: 0, y: 0, w: CARD_W, h: CARD_H },
     },
     back: {
-      base_frame: { x: 0, y: 0, w: 744, h: 1039 },
-      background_texture: { x: 12, y: 12, w: 720, h: 1015 },
-      top_bar: { x: 24, y: 40, w: 680, h: 92 },
-      number_badge: { x: 24, y: 46, w: 150, h: 88 },
-      title_banner: { x: 184, y: 48, w: 366, h: 84 },
-      kingdom_badge: { x: 594, y: 44, w: 108, h: 92 },
-      map_frame: { x: 304, y: 240, w: 392, h: 232 },
-      status_panel: { x: 50, y: 236, w: 252, h: 120 },
-      bottom_strip: { x: 40, y: 978, w: 654, h: 40 },
-      frame_overlay: { x: 0, y: 0, w: 744, h: 1039 },
-      rarity_overlay: { x: 186, y: 928, w: 380, h: 62 },
-      family_icon: { x: 612, y: 62, w: 72, h: 56 },
-      species_icon: { x: 604, y: 942, w: 72, h: 46 },
-      special_badge: { x: 70, y: 930, w: 106, h: 60 },
+      base_frame: { x: 0, y: 0, w: CARD_W, h: CARD_H },
     },
   };
-  const OVERLAY_SLOTS = new Set(['photo_frame', 'frame_overlay', 'rarity_overlay', 'family_icon', 'species_icon', 'special_badge']);
+  const OVERLAY_SLOTS = new Set();
 
   function esc(value) {
     return String(value ?? '')
@@ -71,6 +45,40 @@
     return lines.map((line, idx) =>
       `<text x="${x}" y="${y + (idx * lineHeight)}" font-size="${size}" ${extra}>${esc(line)}</text>`
     ).join('');
+  }
+
+  function rarityFilledCount(rarity) {
+    const normalized = String(rarity || '').trim().toLowerCase();
+    return ({
+      common: 1,
+      uncommon: 2,
+      rare: 3,
+      legendary: 4,
+      mythic: 5,
+      cryptic: 5,
+      extinct: 5,
+    })[normalized] || 1;
+  }
+
+  function formatDiscoveredText(data) {
+    const region = String(data.region || '').trim();
+    const capturedAt = String(data.captured_at || '').trim();
+    let dateText = '';
+    if (capturedAt) {
+      const parsed = new Date(capturedAt);
+      if (!Number.isNaN(parsed.getTime())) {
+        dateText = parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      }
+    }
+    return [dateText, region].filter(Boolean).join(' | ') || 'WildEx field log';
+  }
+
+  function inatHref(data) {
+    if (data.inat_url) return data.inat_url;
+    if (data.taxon_id) return `https://www.inaturalist.org/taxa/${encodeURIComponent(data.taxon_id)}`;
+    const query = data.scientific_name || data.species_name || '';
+    if (!query) return '';
+    return `https://www.inaturalist.org/taxa/search?q=${encodeURIComponent(query)}`;
   }
 
   function markerSvg(data) {
@@ -138,14 +146,14 @@
     return [];
   }
 
-  function frontBaseFramePart(template) {
+  function baseFramePart(template, fallbackUrl) {
     const parts = templateParts(template);
     const base = parts.find((part) => (part.slot_name || 'base_frame') === 'base_frame');
     if (base?.asset_url) return base;
     if (template?.asset_url) {
       return { slot_name: 'base_frame', asset_url: template.asset_url, asset_type: 'template', sort_order: 0 };
     }
-    return { slot_name: 'base_frame', asset_url: MASTER_FRONT_FRAME, asset_type: 'template', sort_order: 0 };
+    return { slot_name: 'base_frame', asset_url: fallbackUrl, asset_type: 'template', sort_order: 0 };
   }
 
   function slotBox(side, slotName) {
@@ -205,117 +213,78 @@
 
   function frontSvg(data, templateTemplate, imageHref) {
     const namePlate = slotContent(data, 'name_plate', { title: data.species_name, subtitle: data.scientific_name });
-    const infoPanel = slotContent(data, 'info_panel', {});
-    const infoRows = Array.isArray(infoPanel.rows) ? infoPanel.rows.map((row) => [row.label, row.value]) : [
-      ['Common Name', data.common_name || data.species_name],
-      ['Scientific Name', data.scientific_name],
-      ['Length', data.length_text],
-      ['Habitat', data.habitat_text],
-      ['Diet', data.diet_text],
-    ];
-    const numberBadge = slotContent(data, 'number_badge', { text: data.card_number });
-    const titleBanner = slotContent(data, 'title_banner', { text: 'WILDEX' });
-    const kingdomBadge = slotContent(data, 'kingdom_badge', { text: data.banner_text });
-    const infoBanner = slotContent(data, 'info_banner', { text: 'INFO' });
-    const flavorBlock = slotContent(data, 'flavor_text_block', { text: data.info_text || '' });
-    const factBanner = slotContent(data, 'fact_banner', { text: 'FACT' });
-    const factText = slotContent(data, 'fact_text', { text: data.fact_text || '' });
-    const creatureArt = slotContent(data, 'creature_art', { image_url: data.image_url });
-    const infoY = [0, 80, 160, 250, 340];
-    const infoContent = infoRows.map((row, idx) => {
-      const lines = chunkText(row[1], idx === 3 ? 28 : 22, idx === 3 ? 3 : 2);
-      return `
-        <text x="82" y="${255 + infoY[idx]}" font-size="18" font-weight="700" fill="#5a3d2a" letter-spacing="1.2">${esc(row[0].toUpperCase())}</text>
-        ${textLines(lines, 82, 282 + infoY[idx], 22, 22, 'fill="#2c1d13" font-family="Georgia, serif"')}
-      `;
-    }).join('');
-    const infoLines = chunkText(flavorBlock.text || data.info_text, 52, 6);
-    const factLines = chunkText(factText.text || data.fact_text, 56, 2);
-    const artHref = imageHref || creatureArt.image_url || data.image_url || '';
-    const framePart = frontBaseFramePart(templateTemplate);
+    const abilities = (slotContent(data, 'abilities_panel', { rows: data.abilities }).rows || data.abilities || []).slice(0, 4);
+    const statRows = Array.isArray(slotContent(data, 'stat_panel', {}).rows)
+      ? slotContent(data, 'stat_panel', {}).rows
+      : [
+          { label: 'HP', value: data.hp },
+          { label: 'ATK', value: data.atk },
+          { label: 'DEF', value: data.def },
+          { label: 'SPD', value: data.spd },
+        ];
+    const framePart = baseFramePart(templateTemplate, MASTER_FRONT_FRAME);
+    const artHref = imageHref || data.image_url || '';
+    const habitatLines = chunkText(data.habitat_text || '', 22, 2);
+    const rarityText = String(data.rarity || '').toUpperCase();
     return `
       <svg xmlns="${SVG_NS}" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}">
         <defs>
-          <clipPath id="photoClip"><rect x="380" y="260" width="292" height="370" rx="14"></rect></clipPath>
+          <clipPath id="frontPhotoClip"><rect x="334" y="184" width="706" height="583" rx="18"></rect></clipPath>
         </defs>
         <image href="${esc(framePart.asset_url || MASTER_FRONT_FRAME)}" x="0" y="0" width="${CARD_W}" height="${CARD_H}" preserveAspectRatio="none"></image>
-        <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(numberBadge.text || data.card_number)}</text>
-        <text x="208" y="101" font-size="42" font-weight="800" fill="#f7eedb" letter-spacing="5">${esc(titleBanner.text || 'WILDEX')}</text>
-        <text x="630" y="100" text-anchor="middle" font-size="28" font-weight="700" fill="#f7eedb">${esc(kingdomBadge.text || data.banner_text)}</text>
-        <text x="372" y="176" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(namePlate.title || data.species_name)}</text>
-        <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="#5a3d2a">${esc(namePlate.subtitle || data.scientific_name)}</text>
-        ${infoContent}
-        ${artHref ? `<image href="${artHref}" x="380" y="260" width="292" height="370" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"></image>` : ''}
-        <text x="148" y="696" text-anchor="middle" font-size="28" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(infoBanner.text || 'INFO')}</text>
-        ${textLines(infoLines, 64, 748, 28, 24, 'fill="#2c1d13" font-family="Georgia, serif"')}
-        <text x="88" y="972" font-size="26" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(factBanner.text || 'FACT')}</text>
-        ${textLines(factLines, 188, 971, 22, 20, 'fill="#f7eedb" font-family="Georgia, serif" font-style="italic"')}
+        ${artHref ? `<image href="${esc(artHref)}" x="334" y="184" width="706" height="583" preserveAspectRatio="xMidYMid slice" clip-path="url(#frontPhotoClip)"></image>` : ''}
+        <text x="92" y="102" text-anchor="middle" font-size="58" font-family="Segoe UI, sans-serif" font-weight="800" fill="#f7eedb">${esc(data.card_number || '')}</text>
+        <text x="244" y="108" text-anchor="middle" font-size="30" font-family="Segoe UI, sans-serif" font-weight="800" fill="#f7eedb" letter-spacing="1.8">${esc(rarityText)}</text>
+        <text x="655" y="96" text-anchor="middle" font-size="66" font-family="Segoe UI, sans-serif" font-weight="800" fill="#f7eedb">${esc(namePlate.title || data.species_name)}</text>
+        <text x="655" y="156" text-anchor="middle" font-size="34" font-family="Georgia, serif" font-style="italic" fill="#e8d14f">${esc(namePlate.subtitle || data.scientific_name)}</text>
+        <g transform="translate(1113 31) scale(1.25 0.95)">
+          ${mapInnerSvg(data)}
+        </g>
+        ${statRows.slice(0, 4).map((row, idx) => `<text x="182" y="${315 + idx * 130}" text-anchor="end" font-size="54" font-family="Segoe UI, sans-serif" font-weight="800" fill="#f2eadb">${esc(row.value ?? '')}</text>`).join('')}
+        ${abilities.map((line, idx) => {
+          const title = typeof line === 'string' ? line : line?.name || '';
+          return `
+            <text x="1143" y="${283 + idx * 130}" font-size="36" font-family="Segoe UI, sans-serif" font-weight="800" fill="#f2eadb">${esc(title)}</text>
+          `;
+        }).join('')}
+        ${textLines(habitatLines, 164, 958, 42, 30, 'fill="#f2eadb" font-family="Segoe UI, sans-serif" font-weight="700"')}
+        <text x="727" y="958" text-anchor="middle" font-size="34" font-family="Segoe UI, sans-serif" font-weight="800" fill="#d9cfaf">${esc(data.banner_text || data.kingdom || '')}</text>
+        <text x="1053" y="958" text-anchor="middle" font-size="34" font-family="Segoe UI, sans-serif" font-weight="800" fill="#d9cfaf">LVL 1</text>
+        <text x="1300" y="958" text-anchor="middle" font-size="34" font-family="Segoe UI, sans-serif" font-weight="800" fill="#d9cfaf">XP 0/100</text>
       </svg>`;
   }
 
-  function backSvg(data, templateTemplate) {
+  function backSvg(data, templateTemplate, imageHref, qrHref) {
+    const framePart = baseFramePart(templateTemplate, MASTER_BACK_FRAME);
     const namePlate = slotContent(data, 'name_plate', { title: data.species_name, subtitle: data.scientific_name });
-    const statusPanel = slotContent(data, 'status_panel', {});
-    const strengthBox = slotContent(data, 'strength_box', { title: data.strength_name, text: data.strength_effect });
-    const weaknessBox = slotContent(data, 'weakness_box', { title: data.weakness_name, text: data.weakness_effect });
-    const statPanel = slotContent(data, 'stat_panel', {});
-    const typePanel = slotContent(data, 'type_panel', { title: data.type_label, text: data.biome_bonus });
-    const abilitiesPanel = slotContent(data, 'abilities_panel', { rows: data.abilities });
-    const environmentPanel = slotContent(data, 'environment_panel', { rows: data.environment_triggers });
-    const callButton = slotContent(data, 'call_button', { label: 'Play Call', enabled: !!data.sound_url });
-    const bottomStrip = slotContent(data, 'bottom_strip', { items: [`Rarity: ${data.rarity}`, `Threat Level: ${data.threat_level}`, `Aggression: ${data.aggression}`] });
-    const numberBadge = slotContent(data, 'number_badge', { text: data.card_number });
-    const titleBanner = slotContent(data, 'title_banner', { text: data.dex_id || 'WILDEX' });
-    const kingdomBadge = slotContent(data, 'kingdom_badge', { text: data.banner_text });
-    const statusRows = Array.isArray(statusPanel.rows) ? statusPanel.rows : [
-      { label: 'Rarity', value: data.rarity },
-      { label: 'Threat', value: data.threat_level },
-      { label: 'Aggression', value: data.aggression },
-    ];
-    const statRows = Array.isArray(statPanel.rows) ? statPanel.rows : [
-      { label: 'HP', value: data.hp },
-      { label: 'ATK', value: data.atk },
-      { label: 'DEF', value: data.def },
-      { label: 'SPD', value: data.spd },
-    ];
-    const abilities = (abilitiesPanel.rows || data.abilities || []).slice(0, 3);
-    const triggers = (environmentPanel.rows || data.environment_triggers || []).slice(0, 2);
-    const footerItems = bottomStrip.items || [`Rarity: ${data.rarity}`, `Threat Level: ${data.threat_level}`, `Aggression: ${data.aggression}`];
+    const aboutLines = chunkText(data.info_text || '', 30, 9);
+    const dietLines = chunkText(data.diet_text || '', 21, 6);
+    const activeLines = chunkText(data.biome_bonus || data.biome || '', 20, 2);
+    const temperamentLines = chunkText(data.aggression || '', 20, 2);
+    const quoteLines = chunkText(data.fact_text || '', 26, 2);
+    const discoveredLines = chunkText(formatDiscoveredText(data), 20, 2);
+    const mediaHref = imageHref || data.image_url || '';
+    const qrImageHref = qrHref || data.qr_url || '';
+    const filledDots = rarityFilledCount(data.rarity);
     return `
       <svg xmlns="${SVG_NS}" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}">
-        ${svgPartLayers(templateTemplate, 'back', 'underlay')}
-        <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(numberBadge.text || data.card_number)}</text>
-        <text x="208" y="100" font-size="30" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(data.dex_id || titleBanner.text || 'WILDEX')}</text>
-        <text x="650" y="101" text-anchor="middle" font-size="20" font-weight="700" fill="#f7eedb">${esc(kingdomBadge.text || data.banner_text)}</text>
-        <text x="372" y="176" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(namePlate.title || data.species_name)}</text>
-        <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="#5a3d2a">${esc(namePlate.subtitle || data.scientific_name)}</text>
-        ${statusRows.map((row, idx) => `
-        <text x="78" y="${280 + idx * 34}" font-size="20" font-weight="800" fill="#5a3d2a">${esc(String(row.label || '').toUpperCase())}</text>
-        <text x="${idx === 1 ? 220 : 210}" y="${280 + idx * 34}" font-size="22" font-weight="700" fill="#2c1d13">${esc(row.value || '')}</text>`).join('')}
-        <g transform="translate(347 284)">
-          <g transform="scale(1.52 1.28)">
-            ${mapInnerSvg(data)}
-          </g>
-        </g>
-        <text x="78" y="414" font-size="20" font-weight="800" fill="#5a3d2a">STRENGTH</text>
-        <text x="78" y="448" font-size="34" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(strengthBox.title || data.strength_name)}</text>
-        <text x="78" y="474" font-size="22" fill="#2c1d13">${esc(strengthBox.text || data.strength_effect)}</text>
-        <text x="78" y="530" font-size="20" font-weight="800" fill="#5a3d2a">WEAKNESS</text>
-        <text x="78" y="564" font-size="34" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(weaknessBox.title || data.weakness_name)}</text>
-        <text x="78" y="590" font-size="22" fill="#2c1d13">${esc(weaknessBox.text || data.weakness_effect)}</text>
-        ${statRows.map((row, idx) => `
-        <text x="78" y="${648 + idx * 48}" font-size="24" font-weight="800" fill="#5a3d2a">${esc(row.label)}</text>
-        <text x="224" y="${648 + idx * 48}" text-anchor="end" font-size="42" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(row.value)}</text>`).join('')}
-        <text x="308" y="648" font-size="20" font-weight="800" fill="#5a3d2a">TYPE</text>
-        <text x="308" y="678" font-size="32" font-family="Georgia, serif" font-weight="700" fill="#2c1d13">${esc(typePanel.title || data.type_label)}</text>
-        <text x="308" y="708" font-size="20" fill="#2c1d13">${esc(typePanel.text || data.biome_bonus)}</text>
-        <text x="308" y="764" font-size="20" font-weight="800" fill="#5a3d2a">ABILITIES</text>
-        ${abilities.map((line, idx) => `<text x="320" y="${798 + idx * 26}" font-size="22" fill="#2c1d13">&#8226; ${esc(line)}</text>`).join('')}
-        <text x="78" y="862" font-size="20" font-weight="800" fill="#5a3d2a">ENVIRONMENT TRIGGERS</text>
-        ${triggers.map((line, idx) => `<text x="78" y="${892 + idx * 22}" font-size="22" fill="#2c1d13">${esc(line)}</text>`).join('')}
-        ${(callButton.enabled || data.sound_url) ? `<text x="372" y="966" text-anchor="middle" font-size="36" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(callButton.label || 'Play Call')}</text>` : ''}
-        ${svgPartLayers(templateTemplate, 'back', 'overlay')}
-        ${(footerItems || []).slice(0, 3).map((item, idx) => `<text x="${[76, 290, 532][idx] || 76}" y="1007" font-size="15" fill="#f7eedb">${esc(item)}</text>`).join('')}
+        <defs>
+          <clipPath id="backMediaClip"><rect x="539" y="39" width="498" height="731" rx="24"></rect></clipPath>
+        </defs>
+        <image href="${esc(framePart.asset_url || MASTER_BACK_FRAME)}" x="0" y="0" width="${CARD_W}" height="${CARD_H}" preserveAspectRatio="none"></image>
+        ${mediaHref ? `<image href="${esc(mediaHref)}" x="539" y="39" width="498" height="731" preserveAspectRatio="xMidYMid slice" clip-path="url(#backMediaClip)" opacity="0.9"></image>` : ''}
+        <text x="116" y="90" font-size="62" font-family="Segoe UI, sans-serif" font-weight="800" fill="#215633">${esc(namePlate.title || data.species_name)}</text>
+        <text x="116" y="143" font-size="33" font-family="Georgia, serif" font-style="italic" fill="#1f1d18">${esc(namePlate.subtitle || data.scientific_name)}</text>
+        ${textLines(aboutLines, 60, 236, 55, 26, 'fill="#4a4339" font-family="Segoe UI, sans-serif"')}
+        <text x="220" y="779" font-size="36" font-family="Segoe UI, sans-serif" font-weight="800" fill="#215633">${esc(data.length_text || '')}</text>
+        ${textLines(dietLines, 1147, 220, 52, 25, 'fill="#5f5648" font-family="Segoe UI, sans-serif"')}
+        ${textLines(activeLines, 1124, 612, 44, 26, 'fill="#5f5648" font-family="Segoe UI, sans-serif"')}
+        ${textLines(temperamentLines, 1124, 748, 44, 26, 'fill="#5f5648" font-family="Segoe UI, sans-serif"')}
+        <text x="1362" y="101" text-anchor="middle" font-size="62" font-family="Segoe UI, sans-serif" font-weight="800" fill="#f7eedb">${esc(data.card_number || '')}</text>
+        ${[0, 1, 2, 3, 4].map((idx) => `<circle cx="${78 + idx * 56}" cy="930" r="20" fill="${idx < filledDots ? '#8c9f35' : 'none'}" stroke="#7d6a45" stroke-width="3"></circle>`).join('')}
+        ${textLines(quoteLines, 487, 932, 42, 26, 'fill="#d9cfaf" font-family="Georgia, serif" font-style="italic"')}
+        ${textLines(discoveredLines, 869, 932, 42, 24, 'fill="#d9cfaf" font-family="Segoe UI, sans-serif"')}
+        ${qrImageHref ? `<image href="${esc(qrImageHref)}" x="1176" y="844" width="121" height="121" preserveAspectRatio="none"></image>` : ''}
       </svg>`;
   }
 
@@ -354,104 +323,11 @@
   }
 
   function frontFaceHtml(data) {
-    const namePlate = slotContent(data, 'name_plate', { title: data.species_name, subtitle: data.scientific_name });
-    const infoPanel = slotContent(data, 'info_panel', {});
-    const infoRows = Array.isArray(infoPanel.rows) ? infoPanel.rows : [
-      { label: 'Common Name', value: data.common_name || data.species_name },
-      { label: 'Scientific Name', value: data.scientific_name },
-      { label: 'Length', value: data.length_text },
-      { label: 'Habitat', value: data.habitat_text },
-      { label: 'Diet', value: data.diet_text },
-    ];
-    const creatureArt = slotContent(data, 'creature_art', { image_url: data.image_url });
-    const numberBadge = slotContent(data, 'number_badge', { text: data.card_number });
-    const titleBanner = slotContent(data, 'title_banner', { text: 'WILDEX' });
-    const kingdomBadge = slotContent(data, 'kingdom_badge', { text: data.banner_text });
-    const infoBanner = slotContent(data, 'info_banner', { text: 'INFO' });
-    const infoText = slotContent(data, 'flavor_text_block', { text: data.info_text || '' });
-    const factBanner = slotContent(data, 'fact_banner', { text: 'FACT' });
-    const factText = slotContent(data, 'fact_text', { text: data.fact_text || '' });
-    const framePart = frontBaseFramePart(data.front_template);
-    return `
-      <div class="wx-template-frame">
-        <img
-          class="wx-asset-layer slot-base_frame"
-          src="${esc(framePart.asset_url || MASTER_FRONT_FRAME)}"
-          alt=""
-          style="left:0;top:0;width:100%;height:100%;z-index:0"
-          data-slot="base_frame"
-        >
-        <div class="wx-front-number">${esc(numberBadge.text || data.card_number)}</div>
-        <div class="wx-front-wordmark">${esc(titleBanner.text || 'WILDEX')}</div>
-        <div class="wx-front-banner">${esc(kingdomBadge.text || data.banner_text)}</div>
-        <div class="wx-front-name">${esc(namePlate.title || data.species_name)}</div>
-        <div class="wx-front-scientific">${esc(namePlate.subtitle || data.scientific_name)}</div>
-        <div class="wx-front-info">${infoRows.map((row) => `
-          <div class="wx-info-row">
-            <div class="wx-info-label">${esc(row.label)}</div>
-            <div class="wx-info-value">${esc(row.value || '')}</div>
-          </div>
-        `).join('')}</div>
-        <div class="wx-front-photo">
-          ${creatureArt.image_url || data.image_url ? `<img class="wx-photo-image" src="${esc(creatureArt.image_url || data.image_url)}" alt="">` : `<div class="wx-photo-missing">No image</div>`}
-        </div>
-        <div class="wx-front-info-tag">${esc(infoBanner.text || 'INFO')}</div>
-        <div class="wx-front-info-text">${esc(infoText.text || data.info_text || '')}</div>
-        <div class="wx-front-fact-tag">${esc(factBanner.text || 'FACT')}</div>
-        <div class="wx-front-fact-text">${esc(factText.text || data.fact_text || '')}</div>
-      </div>`;
+    return frontSvg(data, data.front_template, data.image_url || '');
   }
 
   function backFaceHtml(data) {
-    const namePlate = slotContent(data, 'name_plate', { title: data.species_name, subtitle: data.scientific_name });
-    const statusPanel = slotContent(data, 'status_panel', {});
-    const strengthBox = slotContent(data, 'strength_box', { title: data.strength_name, text: data.strength_effect });
-    const weaknessBox = slotContent(data, 'weakness_box', { title: data.weakness_name, text: data.weakness_effect });
-    const statPanel = slotContent(data, 'stat_panel', {});
-    const typePanel = slotContent(data, 'type_panel', { title: data.type_label, text: data.biome_bonus });
-    const abilitiesPanel = slotContent(data, 'abilities_panel', { rows: data.abilities });
-    const environmentPanel = slotContent(data, 'environment_panel', { rows: data.environment_triggers });
-    const callButton = slotContent(data, 'call_button', { label: 'Play Call', enabled: !!data.sound_url });
-    const bottomStrip = slotContent(data, 'bottom_strip', { items: [`Rarity: ${data.rarity}`, `Threat Level: ${data.threat_level}`, `Aggression: ${data.aggression}`] });
-    const numberBadge = slotContent(data, 'number_badge', { text: data.card_number });
-    const titleBanner = slotContent(data, 'title_banner', { text: data.dex_id || 'WILDEX' });
-    const kingdomBadge = slotContent(data, 'kingdom_badge', { text: data.banner_text });
-    const statusRows = Array.isArray(statusPanel.rows) ? statusPanel.rows : [
-      { label: 'Rarity', value: data.rarity },
-      { label: 'Threat', value: data.threat_level },
-      { label: 'Aggression', value: data.aggression },
-    ];
-    const statRows = Array.isArray(statPanel.rows) ? statPanel.rows : [
-      { label: 'HP', value: data.hp },
-      { label: 'ATK', value: data.atk },
-      { label: 'DEF', value: data.def },
-      { label: 'SPD', value: data.spd },
-    ];
-    return `
-      <div class="wx-template-frame">
-        ${htmlPartLayers(data.back_template, 'back')}
-        <div class="wx-back-number">${esc(numberBadge.text || data.card_number)}</div>
-        <div class="wx-back-dex">${esc(data.dex_id || titleBanner.text || 'WILDEX')}</div>
-        <div class="wx-back-badge">${esc(kingdomBadge.text || data.banner_text)}</div>
-        <div class="wx-back-name">${esc(namePlate.title || data.species_name)}</div>
-        <div class="wx-back-scientific">${esc(namePlate.subtitle || data.scientific_name)}</div>
-        <div class="wx-back-status">
-          ${statusRows.map((row) => `<div><strong>${esc(row.label)}</strong><span>${esc(row.value || '')}</span></div>`).join('')}
-        </div>
-        <div class="wx-back-map">${mapSvg(data)}</div>
-        <div class="wx-back-strength"><strong>STRENGTH</strong><span>${esc(strengthBox.title || data.strength_name)}</span><em>${esc(strengthBox.text || data.strength_effect)}</em></div>
-        <div class="wx-back-weakness"><strong>WEAKNESS</strong><span>${esc(weaknessBox.title || data.weakness_name)}</span><em>${esc(weaknessBox.text || data.weakness_effect)}</em></div>
-        <div class="wx-back-stats">
-          ${statRows.map((row) => `<div><strong>${esc(row.label)}</strong><span>${esc(row.value)}</span></div>`).join('')}
-        </div>
-        <div class="wx-back-type"><strong>TYPE</strong><span>${esc(typePanel.title || data.type_label)}</span><em>${esc(typePanel.text || data.biome_bonus)}</em></div>
-        <div class="wx-back-abilities"><strong>ABILITIES</strong>${listHtml(abilitiesPanel.rows || data.abilities)}</div>
-        <div class="wx-back-triggers"><strong>ENVIRONMENT TRIGGERS</strong>${triggerHtml(environmentPanel.rows || data.environment_triggers)}</div>
-        <div class="wx-back-call ${(callButton.enabled || data.sound_url) ? '' : 'is-hidden'}">${esc(callButton.label || 'Play Call')}</div>
-        <div class="wx-back-footer">
-          ${(bottomStrip.items || []).map((item) => `<span>${esc(item)}</span>`).join('')}
-        </div>
-      </div>`;
+    return backSvg(data, data.back_template, data.image_url || '', data.qr_url || '');
   }
 
   function renderErrorHtml(reason, data = {}) {
@@ -472,12 +348,14 @@
       if (!templateParts(data.front_template).length || !templateParts(data.back_template).length) {
         throw new Error('Template asset missing');
       }
+      const frontMarkup = frontSvg(data, data.front_template, data.image_url || '');
+      const backMarkup = backSvg(data, data.back_template, data.image_url || '', data.qr_url || '');
       target.innerHTML = `
         <div class="wx-card-shell">
           <div class="wx-flip-card">
             <div class="wx-flip-inner">
-              <div class="wx-face front ${esc(data.theme_class)}">${frontFaceHtml(data)}</div>
-              <div class="wx-face back ${esc(data.theme_class)}">${backFaceHtml(data)}</div>
+              <div class="wx-face front ${esc(data.theme_class)}">${frontMarkup}</div>
+              <div class="wx-face back ${esc(data.theme_class)}">${backMarkup}</div>
             </div>
           </div>
         </div>`;
@@ -557,10 +435,11 @@
       ...part,
       asset_url: await assetToDataUrl(part.asset_url || ''),
     })));
-    const imageHref = side === 'front' ? await assetToDataUrl(data.image_url || '') : '';
+    const imageHref = data.image_url ? await assetToDataUrl(data.image_url || '') : '';
+    const qrHref = side === 'back' && data.qr_url ? await assetToDataUrl(data.qr_url) : '';
     const svgMarkup = side === 'front'
       ? frontSvg(data, { ...templateSource, parts: convertedParts }, imageHref)
-      : backSvg(data, { ...templateSource, parts: convertedParts });
+      : backSvg(data, { ...templateSource, parts: convertedParts }, imageHref, qrHref);
     const temp = document.createElement('div');
     temp.innerHTML = svgMarkup.trim();
     await exportSvgToPng(temp.firstElementChild, `${nameBase}-${side}.png`);
@@ -578,10 +457,11 @@
       ...part,
       asset_url: await assetToDataUrl(part.asset_url || ''),
     })));
-    const imageHref = side === 'front' ? await assetToDataUrl(data.image_url || '') : '';
+    const imageHref = data.image_url ? await assetToDataUrl(data.image_url || '') : '';
+    const qrHref = side === 'back' && data.qr_url ? await assetToDataUrl(data.qr_url) : '';
     const svgMarkup = side === 'front'
       ? frontSvg(data, { ...templateSource, parts: convertedParts }, imageHref)
-      : backSvg(data, { ...templateSource, parts: convertedParts });
+      : backSvg(data, { ...templateSource, parts: convertedParts }, imageHref, qrHref);
     const temp = document.createElement('div');
     temp.innerHTML = svgMarkup.trim();
     return svgToPngBlob(temp.firstElementChild);
@@ -595,9 +475,9 @@
         asset_url: MASTER_FRONT_FRAME,
       },
       back_template: {
-        name: `${kingdom}-back-master`,
+        name: `naturalist-back-v1`,
         version: '1.0.0',
-        asset_url: `/static/card_templates/${kingdom}/back-v1.svg`,
+        asset_url: MASTER_BACK_FRAME,
       },
     });
 

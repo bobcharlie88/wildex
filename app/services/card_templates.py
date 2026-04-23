@@ -54,6 +54,19 @@ BUILTIN_TEMPLATES = (
         "notes": "Single master front frame with fixed slot coordinates.",
     },
     {
+        "name": "naturalist-back-v1",
+        "kingdom": "universal",
+        "side": "back",
+        "asset_path": "/static/card_templates/shared/back_frame_main.png",
+        "version": "1.0.0",
+        "slug": "naturalist-back-v1",
+        "category": "naturalist",
+        "layout_key": "master-back",
+        "active": True,
+        "label": "Naturalist Back v1",
+        "notes": "Single master back frame with fixed slot coordinates.",
+    },
+    {
         "name": "reptile-front-master",
         "kingdom": "reptile",
         "side": "front",
@@ -229,7 +242,7 @@ def _builtin_lookup(kingdom: str, side: str, name: str | None = None, version: s
         if version and item["version"] != version:
             continue
         return _builtin_selection(item)
-    if side == "front" and normalized != "universal":
+    if side in {"front", "back"} and normalized != "universal":
         return _builtin_lookup("universal", side, name=name, version=version)
     if normalized != "mammal":
         return _builtin_lookup("mammal", side, name=None, version=None)

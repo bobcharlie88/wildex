@@ -60,8 +60,6 @@ def _merge_template_parts(*, kingdom_key: str, side_name: str, template: dict, f
     parts = [dict(item) for item in (template.get("parts") or [])]
     assigned_slots = {item.get("slot_name") for item in parts}
     dynamic_slots = []
-    if side_name == "back":
-        dynamic_slots = ["family_icon", "species_icon", "special_badge", "map_frame"]
     for slot_name in dynamic_slots:
         if slot_name in assigned_slots:
             continue
@@ -107,10 +105,10 @@ def build_render_card(source) -> dict:
         preferred_version="1.0.0",
     )
     back_template = select_template_payload(
-        kingdom=kingdom_key,
+        kingdom="universal",
         side="back",
-        preferred_name=_value(source, "back_template_name"),
-        preferred_version=_value(source, "back_template_version"),
+        preferred_name="naturalist-back-v1",
+        preferred_version="1.0.0",
     )
     capture_country = _value(source, "capture_country")
     range_mode, range_regions, local_markers = _range_mode(species_name, kingdom_key, capture_country)
@@ -133,6 +131,7 @@ def build_render_card(source) -> dict:
     )
 
     return {
+        "card_id": _value(source, "id"),
         "species_name": species_name,
         "scientific_name": scientific_name,
         "common_name": payload["common_name"],
@@ -152,6 +151,10 @@ def build_render_card(source) -> dict:
         "image_url": payload["primary_image_url"],
         "original_image_url": payload["original_image_url"] or _original_image(source),
         "sound_url": payload["sound_url"],
+        "captured_at": _value(source, "captured_at"),
+        "taxon_id": _value(source, "taxon_id"),
+        "inat_url": f"https://www.inaturalist.org/taxa/{int(_value(source, 'taxon_id'))}" if _value(source, "taxon_id") else None,
+        "qr_url": f"/cards/{int(_value(source, 'id'))}/inat-qr.png" if _value(source, "id") else None,
         "hp": payload["stats"]["hp"],
         "atk": payload["stats"]["atk"],
         "def": payload["stats"]["def"],

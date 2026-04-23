@@ -4,8 +4,8 @@
   gap: 12px;
   width: min(
     100%,
-    390px,
-    calc((100dvh - var(--wx-card-viewport-offset, 0px)) * 0.7159)
+    760px,
+    calc((100dvh - var(--wx-card-viewport-offset, 0px)) * 1.3587)
   );
   max-width: 100%;
   margin: 0 auto;
@@ -15,8 +15,8 @@
   position: relative;
   width: 100%;
   max-height: calc(100dvh - var(--wx-card-viewport-offset, 0px));
-  min-height: clamp(420px, 72vw, 545px);
-  aspect-ratio: 63 / 88;
+  min-height: clamp(260px, 52vw, 560px);
+  aspect-ratio: 1461 / 1076;
   perspective: 1600px;
 }
 

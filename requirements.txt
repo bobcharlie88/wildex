@@ -12,3 +12,4 @@ boto3
 pycountry
 python-multipart
 pycountry
+qrcode

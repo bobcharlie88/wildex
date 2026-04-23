@@ -1,10 +1,13 @@
 import json
 import os
 import tempfile
+from io import BytesIO
 from pathlib import Path
 
 import httpx
+import qrcode
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import desc
 
 from app.auth import require_user
@@ -121,6 +124,30 @@ def get_card(card_id: int, current_user: User = Depends(require_user)):
         if not row:
             raise HTTPException(404, "Card not found")
         return _card_dict(row)
+    finally:
+        db.close()
+
+
+@router.get("/cards/{card_id}/inat-qr.png")
+def get_card_inat_qr(card_id: int, current_user: User = Depends(require_user)):
+    if not db_available():
+        raise HTTPException(503, "Database unavailable")
+    db = SessionLocal()
+    try:
+        row = db.query(Card).filter(Card.id == card_id, Card.owner_id == current_user.id).first()
+        if not row:
+            raise HTTPException(404, "Card not found")
+        if row.taxon_id:
+            target_url = f"https://www.inaturalist.org/taxa/{int(row.taxon_id)}"
+        elif row.scientific_name:
+            target_url = f"https://www.inaturalist.org/taxa/search?q={row.scientific_name.replace(' ', '+')}"
+        else:
+            raise HTTPException(404, "No iNaturalist target available")
+        image = qrcode.make(target_url)
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        buffer.seek(0)
+        return StreamingResponse(buffer, media_type="image/png")
     finally:
         db.close()
 

@@ -10,6 +10,7 @@ httpx==0.28.1
 google-genai==1.73.1
 pycountry==26.2.16
 python-multipart==0.0.26
+qrcode==8.2
 a2wsgi
 starlette==1.0.0
 pydantic==2.13.0

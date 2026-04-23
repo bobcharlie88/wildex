@@ -1724,16 +1724,17 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
       if ($('template-slug').value.trim()) return;
       $('template-slug').value = $('template-name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     });
-    $('template-side').addEventListener('change', () => {
-      const side = $('template-side').value;
-      if (side === 'front') {
-        $('template-layout-key').value = 'master-front';
-        if (!$('template-asset-path').value.trim()) $('template-asset-path').value = '/static/card_templates/shared/front_frame_main.png';
-      } else {
-        $('template-layout-key').value = 'master-back';
-      }
-      populateSlotOptions();
-    });
+      $('template-side').addEventListener('change', () => {
+        const side = $('template-side').value;
+        if (side === 'front') {
+          $('template-layout-key').value = 'master-front';
+          if (!$('template-asset-path').value.trim()) $('template-asset-path').value = '/static/card_templates/shared/front_frame_main.png';
+        } else {
+          $('template-layout-key').value = 'master-back';
+          if (!$('template-asset-path').value.trim() || $('template-asset-path').value.includes('front_frame_main.png')) $('template-asset-path').value = '/static/card_templates/shared/back_frame_main.png';
+        }
+        populateSlotOptions();
+      });
 
     $('template-form').addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -1741,7 +1742,7 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
       const derivedSlug = $('template-slug').value.trim() || $('template-name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const side = $('template-side').value;
       const layoutKey = $('template-layout-key').value.trim() || (side === 'front' ? 'master-front' : 'master-back');
-      const assetPath = $('template-asset-path').value.trim() || (side === 'front' ? '/static/card_templates/shared/front_frame_main.png' : '');
+      const assetPath = $('template-asset-path').value.trim() || (side === 'front' ? '/static/card_templates/shared/front_frame_main.png' : '/static/card_templates/shared/back_frame_main.png');
       const payload = {
         id: state.selectedTemplateId,
         name: $('template-name').value.trim(),
