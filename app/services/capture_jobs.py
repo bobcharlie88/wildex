@@ -42,7 +42,7 @@ GROUP_TIME_WINDOW_SECONDS = 90
 GROUP_TIME_WINDOW_WITHOUT_GPS_SECONDS = 20
 GROUP_DISTANCE_METERS = 150
 WORKER_POLL_SECONDS = 3
-PROCESSING_STALE_MINUTES = 15
+PROCESSING_STALE_MINUTES = 3
 REVIEW_CONFIDENCE_THRESHOLD = 0.70
 FAIL_CONFIDENCE_THRESHOLD = 0.45
 
@@ -109,6 +109,9 @@ def serialize_capture_job(job: CaptureJob) -> dict:
 def list_capture_jobs_for_user(user_id: int, *, include_secondary: bool = False, limit: int = 40) -> dict:
     if not db_available() or SessionLocal is None:
         return {"items": [], "counts": {"queued": 0, "processing": 0, "complete": 0, "failed": 0, "needs_review": 0}}
+    # Self-heal after deploys or worker crashes so jobs do not sit in processing forever.
+    start_capture_worker()
+    _requeue_stale_jobs()
 
     db = SessionLocal()
     try:
