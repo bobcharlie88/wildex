@@ -307,25 +307,98 @@ def build_review_recommendation(payload: dict[str, Any]) -> ReviewAgentOutput:
 
 def build_dr_response(payload: dict[str, Any]) -> DrAgentOutput:
     card = payload.get("card") or {}
-    question = str(payload.get("question") or "").strip().lower()
-    species_name = card.get("species_name") or card.get("card_title") or "this find"
-    rarity = card.get("rarity_display") or card.get("rarity") or "Unknown"
-    habitat = card.get("habitat_text") or card.get("biome") or "its native habitat"
+    question = str(payload.get("question") or "").strip()
+    question_lower = question.lower()
+    requested_mode = str(payload.get("mode") or "").strip().lower()
+    mode = requested_mode or (
+        "feeding_advice" if any(token in question_lower for token in ("feed", "feeding", "hungry", "hunger")) else
+        "biome_tip" if any(token in question_lower for token in ("biome", "habitat", "where")) else
+        "what_next" if any(token in question_lower for token in ("next", "what should", "now what")) else
+        "read_aloud" if "read aloud" in question_lower else
+        "card_explain"
+    )
+    mode = mode if mode in {"card_explain", "feeding_advice", "biome_tip", "what_next", "read_aloud"} else "card_explain"
+
+    biome = payload.get("biome") or card.get("biome") or card.get("habitat_text")
+    player_region = payload.get("player_region") or card.get("region")
+    collection = payload.get("collection") or {}
+    hunger_state = payload.get("hunger_state")
+    feed_state = payload.get("feed_state")
+    species_name = card.get("species_name") or card.get("card_title")
+    scientific_name = card.get("scientific_name")
+    rarity = card.get("rarity_display") or card.get("rarity")
+    habitat = card.get("habitat_text") or card.get("biome")
+    diet = card.get("diet_text") or card.get("diet")
     fact = card.get("fact_text") or (card.get("fact_snippets") or [""])[0]
-    if "rare" in question:
-        reply = f"{species_name} rates as {rarity} because WildEx weighs observation scarcity, conservation signals, and how unusual the encounter is for the region."
-    elif "next" in question or "what should i do" in question:
-        reply = f"Keep capturing around {habitat}. Repeats still strengthen your log, but a new branch in the current region will move your Dex faster."
-    elif "what is this" in question or "why" in question:
-        reply = f"{species_name} is logged as a verified field encounter. The strongest clue was the species evidence already attached to this card."
+
+    missing_context: list[str] = []
+    if mode in {"card_explain", "read_aloud"} and not card:
+        missing_context.append("current card")
+    if mode == "biome_tip" and not biome:
+        missing_context.append("biome")
+    if mode == "what_next":
+        if not player_region:
+            missing_context.append("player region")
+        if not collection:
+            missing_context.append("collection summary")
+    if mode == "feeding_advice":
+        if not hunger_state:
+            missing_context.append("hunger state")
+        if not feed_state:
+            missing_context.append("feed state")
+        if not diet:
+            missing_context.append("card diet")
+
+    if missing_context:
+        reply = f"I need {', '.join(missing_context)} to answer in {mode.replace('_', ' ')} mode."
+        follow_up = "Send that context and I will keep the answer specific to this card."
+        suggested_actions: list[str] = []
     else:
-        reply = f"{species_name} is one of your WildEx field records. It is tuned around {habitat}, and one standout note is: {fact or 'its card data is ready for review.'}"
+        follow_up = None
+        suggested_actions = []
+        if mode == "card_explain":
+            reply_bits = [species_name or "This card"]
+            if rarity:
+                reply_bits.append(f"is logged as {rarity}")
+            if biome:
+                reply_bits.append(f"with a main biome of {biome}")
+            reply = " ".join(reply_bits) + "."
+            if fact:
+                follow_up = f"Best field note: {fact}"
+            suggested_actions = ["Flip to the card back for map and trait details"]
+        elif mode == "feeding_advice":
+            reply = f"Hunger is {hunger_state} and feed state is {feed_state}. Match feeding to the card diet: {diet}."
+            if habitat:
+                follow_up = f"This species is strongest around {habitat}, so use food or encounters that fit that environment."
+            suggested_actions = ["Check the card diet before feeding again"]
+        elif mode == "biome_tip":
+            region_text = f" in {player_region}" if player_region else ""
+            reply = f"Best biome lead{region_text}: {biome}."
+            if habitat:
+                follow_up = f"Look for similar conditions to {habitat} to improve your next encounter."
+            suggested_actions = ["Search nearby spots that match this biome"]
+        elif mode == "what_next":
+            captured = int(collection.get("captured_count") or 0)
+            unlocked = int(collection.get("regions_unlocked") or 0)
+            reply = f"You have {captured} captured cards across {unlocked} unlocked regions. Best next move: chase a new branch in {player_region} before repeating common finds."
+            if species_name:
+                follow_up = f"If you stay near {species_name}'s biome, use repeats only to strengthen evidence, not as your main progression."
+            suggested_actions = ["Open the regional Dex and target an uncaptured entry"]
+        else:
+            intro = species_name or "This record"
+            species_line = f" Scientific name: {scientific_name}." if scientific_name else ""
+            rarity_line = f" Rarity: {rarity}." if rarity else ""
+            biome_line = f" Biome: {biome}." if biome else ""
+            note_line = f" Field note: {fact}." if fact else ""
+            reply = f"{intro}.{species_line}{rarity_line}{biome_line}{note_line}".strip()
+            follow_up = "Open the back if you want the map, strengths, and weakness summary."
+            suggested_actions = ["Use the card back for the detailed field summary"]
     return DrAgentOutput(
-        reply=reply,
-        suggested_actions=[
-            "Open the card back to inspect map and biome details",
-            "Capture another species in the same unlocked region",
-        ],
+        mode=mode,
+        reply=reply.strip(),
+        follow_up=follow_up,
+        missing_context=missing_context,
+        suggested_actions=suggested_actions,
         referenced_card_id=payload.get("card_id"),
         referenced_capture_job_id=payload.get("capture_job_id"),
     )

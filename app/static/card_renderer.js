@@ -2,6 +2,7 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const CARD_W = 744;
   const CARD_H = 1039;
+  const MASTER_FRONT_FRAME = '/static/card_templates/shared/front_frame_main.png';
   const SLOT_LAYOUTS = {
     front: {
       base_frame: { x: 0, y: 0, w: 744, h: 1039 },
@@ -137,6 +138,16 @@
     return [];
   }
 
+  function frontBaseFramePart(template) {
+    const parts = templateParts(template);
+    const base = parts.find((part) => (part.slot_name || 'base_frame') === 'base_frame');
+    if (base?.asset_url) return base;
+    if (template?.asset_url) {
+      return { slot_name: 'base_frame', asset_url: template.asset_url, asset_type: 'template', sort_order: 0 };
+    }
+    return { slot_name: 'base_frame', asset_url: MASTER_FRONT_FRAME, asset_type: 'template', sort_order: 0 };
+  }
+
   function slotBox(side, slotName) {
     return SLOT_LAYOUTS[side]?.[slotName] || SLOT_LAYOUTS[side]?.base_frame || { x: 0, y: 0, w: CARD_W, h: CARD_H };
   }
@@ -221,12 +232,13 @@
     const infoLines = chunkText(flavorBlock.text || data.info_text, 52, 6);
     const factLines = chunkText(factText.text || data.fact_text, 56, 2);
     const artHref = imageHref || creatureArt.image_url || data.image_url || '';
+    const framePart = frontBaseFramePart(templateTemplate);
     return `
       <svg xmlns="${SVG_NS}" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}">
         <defs>
           <clipPath id="photoClip"><rect x="380" y="260" width="292" height="370" rx="14"></rect></clipPath>
         </defs>
-        ${svgPartLayers(templateTemplate, 'front', 'underlay')}
+        <image href="${esc(framePart.asset_url || MASTER_FRONT_FRAME)}" x="0" y="0" width="${CARD_W}" height="${CARD_H}" preserveAspectRatio="none"></image>
         <text x="99" y="102" text-anchor="middle" font-size="54" font-family="Georgia, serif" font-weight="700" fill="#f7eedb">${esc(numberBadge.text || data.card_number)}</text>
         <text x="208" y="101" font-size="42" font-weight="800" fill="#f7eedb" letter-spacing="5">${esc(titleBanner.text || 'WILDEX')}</text>
         <text x="630" y="100" text-anchor="middle" font-size="28" font-weight="700" fill="#f7eedb">${esc(kingdomBadge.text || data.banner_text)}</text>
@@ -234,7 +246,6 @@
         <text x="372" y="218" text-anchor="middle" font-size="28" font-family="Georgia, serif" font-style="italic" fill="#5a3d2a">${esc(namePlate.subtitle || data.scientific_name)}</text>
         ${infoContent}
         ${artHref ? `<image href="${artHref}" x="380" y="260" width="292" height="370" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"></image>` : ''}
-        ${svgPartLayers(templateTemplate, 'front', 'overlay')}
         <text x="148" y="696" text-anchor="middle" font-size="28" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(infoBanner.text || 'INFO')}</text>
         ${textLines(infoLines, 64, 748, 28, 24, 'fill="#2c1d13" font-family="Georgia, serif"')}
         <text x="88" y="972" font-size="26" font-weight="800" fill="#f7eedb" letter-spacing="2">${esc(factBanner.text || 'FACT')}</text>
@@ -360,9 +371,16 @@
     const infoText = slotContent(data, 'flavor_text_block', { text: data.info_text || '' });
     const factBanner = slotContent(data, 'fact_banner', { text: 'FACT' });
     const factText = slotContent(data, 'fact_text', { text: data.fact_text || '' });
+    const framePart = frontBaseFramePart(data.front_template);
     return `
       <div class="wx-template-frame">
-        ${htmlPartLayers(data.front_template, 'front')}
+        <img
+          class="wx-asset-layer slot-base_frame"
+          src="${esc(framePart.asset_url || MASTER_FRONT_FRAME)}"
+          alt=""
+          style="left:0;top:0;width:100%;height:100%;z-index:0"
+          data-slot="base_frame"
+        >
         <div class="wx-front-number">${esc(numberBadge.text || data.card_number)}</div>
         <div class="wx-front-wordmark">${esc(titleBanner.text || 'WILDEX')}</div>
         <div class="wx-front-banner">${esc(kingdomBadge.text || data.banner_text)}</div>
@@ -572,9 +590,9 @@
   function sampleCards() {
     const makeTemplates = (kingdom) => ({
       front_template: {
-        name: `${kingdom}-front-master`,
+        name: `naturalist-front-v1`,
         version: '1.0.0',
-        asset_url: `/static/card_templates/${kingdom}/front-v1.svg`,
+        asset_url: MASTER_FRONT_FRAME,
       },
       back_template: {
         name: `${kingdom}-back-master`,

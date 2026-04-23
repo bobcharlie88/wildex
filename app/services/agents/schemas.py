@@ -94,7 +94,10 @@ class ReviewAgentOutput(BaseModel):
 
 
 class DrAgentOutput(BaseModel):
+    mode: Literal["card_explain", "feeding_advice", "biome_tip", "what_next", "read_aloud"] = "card_explain"
     reply: str
+    follow_up: str | None = None
+    missing_context: list[str] = Field(default_factory=list)
     suggested_actions: list[str] = Field(default_factory=list)
     referenced_card_id: int | None = None
     referenced_capture_job_id: int | None = None

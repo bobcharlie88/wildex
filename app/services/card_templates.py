@@ -41,6 +41,19 @@ class TemplateSelection:
 
 BUILTIN_TEMPLATES = (
     {
+        "name": "naturalist-front-v1",
+        "kingdom": "universal",
+        "side": "front",
+        "asset_path": "/static/card_templates/shared/front_frame_main.png",
+        "version": "1.0.0",
+        "slug": "naturalist-front-v1",
+        "category": "naturalist",
+        "layout_key": "master-front",
+        "active": True,
+        "label": "Naturalist Front v1",
+        "notes": "Single master front frame with fixed slot coordinates.",
+    },
+    {
         "name": "reptile-front-master",
         "kingdom": "reptile",
         "side": "front",
@@ -216,9 +229,22 @@ def _builtin_lookup(kingdom: str, side: str, name: str | None = None, version: s
         if version and item["version"] != version:
             continue
         return _builtin_selection(item)
+    if side == "front" and normalized != "universal":
+        return _builtin_lookup("universal", side, name=name, version=version)
     if normalized != "mammal":
         return _builtin_lookup("mammal", side, name=None, version=None)
     return None
+
+
+def _mime_type_for_asset(path: str) -> str:
+    lowered = (path or "").lower()
+    if lowered.endswith(".png"):
+        return "image/png"
+    if lowered.endswith(".webp"):
+        return "image/webp"
+    if lowered.endswith(".jpg") or lowered.endswith(".jpeg"):
+        return "image/jpeg"
+    return "image/svg+xml"
 
 
 def _row_to_selection(row) -> TemplateSelection:
@@ -316,7 +342,7 @@ def ensure_builtin_templates(db) -> None:
                 slug=asset_slug,
                 asset_type="template",
                 file_path=item["asset_path"],
-                mime_type="image/svg+xml",
+                mime_type=_mime_type_for_asset(item["asset_path"]),
                 kingdom=item["kingdom"],
                 side=item["side"],
                 template_part="base_frame",
@@ -330,7 +356,7 @@ def ensure_builtin_templates(db) -> None:
             db.flush()
         else:
             asset_row.file_path = item["asset_path"]
-            asset_row.mime_type = "image/svg+xml"
+            asset_row.mime_type = _mime_type_for_asset(item["asset_path"])
             asset_row.asset_type = "template"
             asset_row.template_part = "base_frame"
             asset_row.side = item["side"]

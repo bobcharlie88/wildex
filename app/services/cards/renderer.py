@@ -59,9 +59,9 @@ def _range_mode(name: str, kingdom: str, capture_country: str | None) -> tuple[s
 def _merge_template_parts(*, kingdom_key: str, side_name: str, template: dict, family_key: str | None, environment_key: str | None) -> list[dict]:
     parts = [dict(item) for item in (template.get("parts") or [])]
     assigned_slots = {item.get("slot_name") for item in parts}
-    dynamic_slots = ["family_icon", "species_icon", "special_badge"]
+    dynamic_slots = []
     if side_name == "back":
-        dynamic_slots.append("map_frame")
+        dynamic_slots = ["family_icon", "species_icon", "special_badge", "map_frame"]
     for slot_name in dynamic_slots:
         if slot_name in assigned_slots:
             continue
@@ -101,10 +101,10 @@ def build_render_card(source) -> dict:
     kingdom_key = _kingdom(_value(source, "category"), _value(source, "sub_category"), _value(source, "iconic_taxon"))
     theme = THEMES[kingdom_key]
     front_template = select_template_payload(
-        kingdom=kingdom_key,
+        kingdom="universal",
         side="front",
-        preferred_name=_value(source, "front_template_name"),
-        preferred_version=_value(source, "front_template_version"),
+        preferred_name="naturalist-front-v1",
+        preferred_version="1.0.0",
     )
     back_template = select_template_payload(
         kingdom=kingdom_key,
@@ -143,6 +143,7 @@ def build_render_card(source) -> dict:
         "rarity": payload["rarity"],
         "threat_level": payload["threat_level"],
         "aggression": payload["aggression"],
+        "region": _value(source, "region"),
         "length_text": payload["length_text"],
         "habitat_text": payload["habitat_text"],
         "diet_text": payload["diet"],

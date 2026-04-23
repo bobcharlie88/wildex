@@ -623,8 +623,17 @@
       <div class="panel-head" style="padding:0">
         <div>
           <h2>The Dr</h2>
-          <p>Ask about rarity, card meaning, or what to chase next. If a card is open, The Dr uses that card as context.</p>
+          <p>Choose a response mode first. The Dr answers only from the active card, biome, region, collection, and feed context you provide.</p>
         </div>
+      </div>
+      <div class="action-row">
+        <select id="dr-mode" class="btn btn-secondary" style="justify-content:flex-start">
+          <option value="card_explain">Card Explain</option>
+          <option value="feeding_advice">Feeding Advice</option>
+          <option value="biome_tip">Biome Tip</option>
+          <option value="what_next">What Next</option>
+          <option value="read_aloud">Read Aloud</option>
+        </select>
       </div>
       <textarea id="dr-question" placeholder="Why is this rare? What should I do next? What does this card mean?"></textarea>
       <div class="action-row">
@@ -1028,7 +1037,8 @@
 
     async function askDr() {
       const question = document.getElementById('dr-question').value.trim();
-      if (!question) return;
+      const mode = document.getElementById('dr-mode').value;
+      if (!question && !mode) return;
       const responseNode = document.getElementById('dr-response');
       responseNode.textContent = 'The Dr is thinking...';
       try {
@@ -1038,12 +1048,23 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             question,
+            mode,
             card_id: state.activeEntry?.card?.id || null,
+            biome: state.activeEntry?.card?.render_card?.biome || null,
+            player_region: state.selectedRegion || state.activeEntry?.card?.region || null,
+            hunger_state: null,
+            feed_state: null,
           }),
         });
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok) throw new Error(data.detail || 'Could not reach The Dr');
-        responseNode.textContent = data.reply || 'The Dr has no answer right now.';
+        const segments = [];
+        if (data.reply) segments.push(data.reply);
+        if (Array.isArray(data.missing_context) && data.missing_context.length) {
+          segments.push(`Missing: ${data.missing_context.join(', ')}`);
+        }
+        if (data.follow_up) segments.push(`More: ${data.follow_up}`);
+        responseNode.textContent = segments.join('\n\n') || 'The Dr has no answer right now.';
       } catch (error) {
         responseNode.textContent = error.message || 'Could not reach The Dr';
       }
