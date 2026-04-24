@@ -847,8 +847,8 @@
       <section class="queue-panel">
         <div class="queue-head">
           <div>
-            <div class="queue-title">Background Queue</div>
-            <div class="job-meta" id="queue-summary">New captures return here immediately.</div>
+            <div class="queue-title">Recent Captures</div>
+            <div class="job-meta" id="queue-summary">Photos process in the background.</div>
           </div>
           <div class="queue-counts" id="queue-counts">0 active</div>
         </div>
@@ -861,7 +861,7 @@
       <input type="file" id="camera-input" accept="image/*" capture="environment"
              style="display:none">
 
-      <button class="btn btn-secondary" id="capture-btn">Queue Capture</button>
+      <button class="btn btn-secondary" id="capture-btn">Submit Photo</button>
     </div>
   </div>
 
@@ -1019,10 +1019,10 @@
     }
 
     function jobLabel(job) {
-      if (job.status === 'queued') return 'Queued';
-      if (job.status === 'processing') return 'Processing';
-      if (job.status === 'complete') return 'Ready';
-      if (job.status === 'needs_review') return 'Needs review';
+      if (job.status === 'queued') return 'Waiting';
+      if (job.status === 'processing') return 'Identifying…';
+      if (job.status === 'complete') return 'Done';
+      if (job.status === 'needs_review') return 'Choose species';
       return 'Failed';
     }
 
@@ -1038,8 +1038,8 @@
       }
       if (job.status === 'needs_review') return job.review_reason || 'The encounter needs manual review.';
       if (job.status === 'failed') return job.error_message || 'Processing failed.';
-      if (job.status === 'processing') return 'Species ID, card generation, and save are running in the background.';
-      return 'Uploaded and waiting for a worker.';
+      if (job.status === 'processing') return 'Identifying species and building your card…';
+      return 'Uploaded — identification starting soon.';
     }
 
 function renderJobQueue() {
@@ -1058,7 +1058,7 @@ function renderJobQueue() {
           : 'Finished captures clear from this queue automatically.';
 
       if (!activeItems.length && !reviewItems.length) {
-        $('job-list').innerHTML = '<div class="queue-empty">No active capture jobs. Finished captures have been cleared from the queue.</div>';
+        $('job-list').innerHTML = '<div class="queue-empty">Tap Take Photo above to start capturing wildlife.</div>';
         return;
       }
 
@@ -1097,7 +1097,7 @@ function renderJobQueue() {
       }).join('');
 
       $('job-list').innerHTML = `${activeMarkup}${reviewMarkup}`;
-      $$('[data-confirm-job]').forEach(btn => btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-confirm-job]').forEach(btn => btn.addEventListener('click', () => {
         confirmSpeciesForJob(Number(btn.dataset.confirmJob), btn.dataset.scientificName || '').catch(() => {});
       }));
     }
@@ -1472,6 +1472,7 @@ function renderJobQueue() {
       const url = URL.createObjectURL(f);
       $('placeholder').style.display = 'none';
       $('capture-btn').classList.add('visible');
+      $('capture-btn').textContent = f.type.startsWith('video/') ? 'Submit Video' : 'Submit Photo';
 
       if (f.type.startsWith('video/')) {
         const vid = $('preview-video');
@@ -1521,6 +1522,11 @@ function renderJobQueue() {
         }
 
         const data = await resp.json();
+        if (data.job) {
+          const previewUrl = capturedFile ? URL.createObjectURL(capturedFile) : null;
+          captureJobs = [{ ...data.job, image_url: data.job.image_url || previewUrl }, ...captureJobs.filter(j => j.id !== data.job.id)];
+          renderJobQueue();
+        }
         await refreshQueueStatus(data.message || 'Capture queued for background processing');
         await refreshCaptureJobs();
         resetCapture();
@@ -1534,7 +1540,7 @@ function renderJobQueue() {
         }
       } finally {
         $('capture-btn').disabled = false;
-        $('capture-btn').textContent = 'Queue Capture';
+        $('capture-btn').textContent = 'Submit Photo';
       }
     });
 
@@ -1627,178 +1633,7 @@ function renderJobQueue() {
     }
 
     function renderStyledCard(resp) {
-      // Legacy entrypoint retained only for compatibility.
-      // Shared renderer below is the maintained path.
       return renderRenderedCard(resp);
-      const c = resp.card;
-      const fallbackPhoto = capturedFile ? URL.createObjectURL(capturedFile) : '';
-      const displayPhoto = c.image_url || fallbackPhoto;
-      const kingdom = normalizeKingdom(c);
-      const theme = biomeTheme(c, kingdom);
-
-      const banner = resp.saved
-        ? `<div class="save-banner saved">&#10003; Saved to WildDex &mdash; card #${resp.card_id}</div>`
-        : `<div class="save-banner unsaved">&#9888; Card generated &mdash; database offline</div>`;
-
-      const badges = [];
-      const rarity = c.rarity_display || c.rarity_tier || '';
-      if (rarity) {
-        const rc = {'Legendary':'badge-amber','Rare':'badge-amber','Uncommon':'badge-amber'}[rarity] || 'badge-green';
-        badges.push(`<span class="badge ${rc}">${esc(rarity)}</span>`);
-      }
-      if (c.invasive_at_location) badges.push('<span class="badge badge-red">Invasive</span>');
-      if (c.provisional) badges.push('<span class="badge badge-amber">Provisional ID</span>');
-      if (c.iconic_taxon) badges.push(`<span class="badge badge-muted">${esc(c.iconic_taxon)}</span>`);
-
-      const pct = Math.round(c.confidence * 100);
-      const confColor = c.provisional ? 'var(--warn)' : 'var(--accent)';
-      const statRows = statRowsForCard(c.stats);
-      const frontFace = kingdom === 'reptile'
-        ? reptileFrontTemplate(c, theme, pct, displayPhoto)
-        : `
-              <section class="card-face front">
-                <div class="card-front-photo">
-                  <img id="result-photo-live" src="${esc(displayPhoto)}" alt="">
-                  <div class="card-front-overlay"></div>
-                  <div class="card-ribbon"><span class="card-ribbon-icon">${theme.icon}</span><span>${esc(theme.label)}</span></div>
-                  <div class="card-front-title">
-                    <div class="name-block">
-                      <div class="common-name">${esc(c.species_name)}</div>
-                      <div class="sci-name">${esc(c.scientific_name)}</div>
-                    </div>
-                    <div class="score-chip">
-                      <strong>${pct}%</strong>
-                      <span>${c.provisional ? 'uncertain' : 'verified'}</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="card-face-body">
-                  <div class="card-meta-row">
-                    <div class="card-title-kicker">${esc(theme.habitat)}</div>
-                    <div class="card-rank-pill">${esc((c.rank || 'unknown').replace(/_/g, ' '))}</div>
-                  </div>
-                  ${badges.length ? `<div class="badges">${badges.join('')}</div>` : ''}
-                  <div class="conf-row">
-                    <div class="conf-label">
-                      <span>Confidence</span>
-                      <span>${pct}%${c.provisional ? ' â€” uncertain' : ''}</span>
-                    </div>
-                    <div class="conf-track">
-                      <div class="conf-fill" id="conf-fill-live" style="width:0;background:${confColor}"></div>
-                    </div>
-                  </div>
-                  <div class="stats-card">
-                    <div class="stats-title">Field Stats</div>
-                    ${statRows}
-                  </div>
-                </div>
-              </section>`;
-
-      const details = [];
-      if (c.conservation_status) details.push(detailRow('Conservation', c.conservation_status));
-      if (c.observations_count) details.push(detailRow('iNat sightings', c.observations_count.toLocaleString()));
-      if (c.taxon_id) details.push(detailRow('Taxon ID', c.taxon_id));
-      if (c.latitude != null) details.push(detailRow('Captured at', `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`));
-      if (resp.identification_error && c.species_name === 'Pending identification') {
-        details.push(detailRow('ID status', resp.identification_error));
-      }
-      if (resp.db_error) {
-        details.push(detailRow('Save status', resp.db_error));
-      }
-
-      $('result-body').innerHTML = `
-        ${banner}
-        <div class="card-display">
-          <div class="flip-card ${theme.frame}" id="result-flip-card">
-            <div class="flip-card-inner">
-              <section class="card-face front">
-                <div class="card-front-photo">
-                  <img id="result-photo-live" src="${esc(displayPhoto)}" alt="">
-                  <div class="card-front-overlay"></div>
-                  <div class="card-ribbon"><span class="card-ribbon-icon">${theme.icon}</span><span>${esc(theme.label)}</span></div>
-                  <div class="card-front-title">
-                    <div class="name-block">
-                      <div class="common-name">${esc(c.species_name)}</div>
-                      <div class="sci-name">${esc(c.scientific_name)}</div>
-                    </div>
-                    <div class="score-chip">
-                      <strong>${pct}%</strong>
-                      <span>${c.provisional ? 'uncertain' : 'verified'}</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="card-face-body">
-                  <div class="card-meta-row">
-                    <div class="card-title-kicker">${esc(theme.habitat)}</div>
-                    <div class="card-rank-pill">${esc((c.rank || 'unknown').replace(/_/g, ' '))}</div>
-                  </div>
-                  ${badges.length ? `<div class="badges">${badges.join('')}</div>` : ''}
-                  <div class="conf-row">
-                    <div class="conf-label">
-                      <span>Confidence</span>
-                      <span>${pct}%${c.provisional ? ' â€” uncertain' : ''}</span>
-                    </div>
-                    <div class="conf-track">
-                      <div class="conf-fill" id="conf-fill-live" style="width:0;background:${confColor}"></div>
-                    </div>
-                  </div>
-                  <div class="stats-card">
-                    <div class="stats-title">Field Stats</div>
-                    ${statRows}
-                  </div>
-                </div>
-              </section>
-              <section class="card-face back">
-                <div class="card-face-body">
-                  <div class="card-back-top">
-                    <div>
-                      <div class="card-title-kicker">WildEx Collector Back</div>
-                      <div class="common-name">${esc(c.species_name)}</div>
-                      <div class="sci-name">${esc(c.scientific_name)}</div>
-                    </div>
-                    <div class="card-back-icon">${theme.icon}</div>
-                  </div>
-                  ${c.blurb ? `<div class="blurb">${esc(c.blurb)}</div>` : ''}
-                  <div class="card-back-grid">
-                    ${metaChip('Biome Theme', theme.habitat)}
-                    ${metaChip('Capture Zone', theme.location)}
-                    ${metaChip('Rarity', c.rarity_display || c.rarity_tier || 'Unknown')}
-                    ${metaChip('Rank', (c.rank || 'unknown').replace(/_/g, ' '))}
-                    ${metaChip('Confidence', `${pct}%`)}
-                    ${metaChip('Status', c.provisional ? 'Provisional' : 'Confirmed')}
-                  </div>
-                  ${details.length ? `<div class="detail-card">${details.join('')}</div>` : ''}
-                </div>
-              </section>
-            </div>
-          </div>
-          <div class="flip-actions">
-            <button class="btn btn-secondary" onclick="flipResultCard()">Flip Card</button>
-            <button class="btn btn-secondary" onclick="printResultCard()">Print / Save PDF</button>
-          </div>
-        </div>
-        <button class="btn btn-secondary" onclick="resetCapture()">Capture Another</button>
-        <a class="btn btn-secondary" href="/wildex" style="text-align:center;text-decoration:none;display:block;padding:15px">View WildDex</a>
-      `;
-
-      if (kingdom === 'reptile') {
-        const inner = document.querySelector('#result-flip-card .flip-card-inner');
-        if (inner && inner.firstElementChild) {
-          inner.firstElementChild.outerHTML = reptileFrontTemplate(c, theme, pct, displayPhoto);
-        }
-      }
-
-      bindCardImageOrientation('result-photo-live', '.card-front-photo', fallbackPhoto);
-
-      show('result-screen');
-
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        const fill = $('conf-fill-live');
-        if (fill) fill.style.width = pct + '%';
-        document.querySelectorAll('.stat-fill').forEach(el => {
-          el.style.width = el.dataset.val + '%';
-        });
-      }));
     }
 
     function showError(msg) {
@@ -1856,7 +1691,7 @@ function renderJobQueue() {
       vid.src = ''; vid.classList.remove('visible');
       $('placeholder').style.display = '';
       $('capture-btn').disabled = false;
-      $('capture-btn').textContent = 'Queue Capture';
+      $('capture-btn').textContent = 'Submit Photo';
       $('capture-btn').classList.remove('visible');
       show('capture-screen');
     }

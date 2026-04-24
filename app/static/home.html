@@ -405,6 +405,10 @@
       flex-wrap: wrap;
       gap: 8px;
     }
+    .modal-export {
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
     .card-stage {
       display: grid;
       gap: 12px;
@@ -596,7 +600,7 @@
       <div class="hero-head">
         <div>
           <div class="wordmark">WildEx</div>
-          <p class="tagline">Capture stays the main action. The map, unlocked regions, and nested index are now the heart of discovery.</p>
+          <p class="tagline">Photograph real wildlife to unlock regions, collect species cards, and build your personal WildDex.</p>
         </div>
         <div class="status-pills">
           <div class="pill"><strong id="captures-count">0</strong> captures</div>
@@ -609,8 +613,8 @@
         <a class="btn btn-primary" href="/capture">Capture</a>
         <a class="btn btn-secondary" href="/submissions">Submit Photo</a>
         <button class="btn btn-secondary" id="share-app-btn" type="button">Share App</button>
-        <button class="btn btn-secondary" id="open-first-unlocked" type="button">Open Index</button>
-        <button class="btn btn-danger" id="logout-link" type="button">Sign Out</button>
+        <button class="btn btn-secondary" id="open-first-unlocked" type="button">Open Collection</button>
+        <button class="btn btn-secondary" id="logout-link" type="button">Sign Out</button>
       </div>
       <div class="stats-row">
         <div class="stat-card"><strong id="captured-total">0</strong><span>Captured entries</span></div>
@@ -631,7 +635,7 @@
       <div class="panel-head" style="padding:0">
         <div>
           <h2>The Dr</h2>
-          <p>Choose a response mode first. The Dr answers only from the active card, biome, region, collection, and feed context you provide.</p>
+          <p>Ask anything about your collection, a specific card, or what to do next. Select a mode, then type your question.</p>
         </div>
       </div>
       <div class="action-row">
@@ -751,7 +755,7 @@
         <div class="panel-head">
           <div>
             <h2>Regional Index</h2>
-            <p>Kingdom → category → family → numbered entries</p>
+            <p>Browse your captured species by group. Unlock a region first by capturing something there.</p>
           </div>
         </div>
         <div class="explorer">
@@ -770,7 +774,7 @@
           <div class="selector-group">
             <h3>Entries</h3>
             <div class="entry-list" id="entry-list"></div>
-            <p class="hint hidden" id="entry-hint">Unlock a region on the map to view its Dex branches.</p>
+            <p class="hint hidden" id="entry-hint">Head to Capture, photograph some wildlife, and your first region will unlock automatically.</p>
           </div>
         </div>
       </section>
@@ -784,19 +788,21 @@
           <strong id="modal-title">Card</strong>
           <div class="hint" id="modal-subtitle"></div>
         </div>
-        <div class="modal-actions">
-          <button class="btn btn-secondary small" type="button" id="flip-btn">Flip</button>
-          <button class="btn btn-secondary small" type="button" id="print-btn">Print</button>
-          <button class="btn btn-secondary small" type="button" id="download-front-btn">Front PNG</button>
-          <button class="btn btn-secondary small" type="button" id="download-back-btn">Back PNG</button>
-          <button class="btn btn-secondary small" type="button" id="download-both-btn">Both PNG</button>
-          <button class="btn btn-secondary small hidden" type="button" id="play-call-btn">Play Call</button>
-          <button class="btn btn-secondary small" type="button" id="share-card-btn">Share Card</button>
-          <button class="btn btn-secondary small" type="button" id="favorite-btn">Set Favorite</button>
-          <button class="btn btn-secondary small hidden" type="button" id="reid-btn">Re-ID</button>
-          <button class="btn btn-danger small" type="button" id="release-btn">Release</button>
-          <button class="btn btn-secondary small" type="button" id="close-btn">Close</button>
-        </div>
+        <button class="btn btn-secondary small" type="button" id="close-btn">✕ Close</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary small" type="button" id="flip-btn">Flip Card</button>
+        <button class="btn btn-secondary small hidden" type="button" id="play-call-btn">♪ Play Call</button>
+        <button class="btn btn-secondary small" type="button" id="favorite-btn">★ Favourite</button>
+        <button class="btn btn-secondary small" type="button" id="share-card-btn">Share</button>
+      </div>
+      <div class="modal-actions modal-export">
+        <button class="btn btn-secondary small" type="button" id="download-front-btn">Front PNG</button>
+        <button class="btn btn-secondary small" type="button" id="download-back-btn">Back PNG</button>
+        <button class="btn btn-secondary small" type="button" id="download-both-btn">Both PNG</button>
+        <button class="btn btn-secondary small" type="button" id="print-btn">Print</button>
+        <button class="btn btn-secondary small hidden" type="button" id="reid-btn">Re-ID</button>
+        <button class="btn btn-danger small" type="button" id="release-btn">Release</button>
       </div>
       <div class="card-stage">
         <div id="detail-card-host"></div>
@@ -941,6 +947,7 @@
       document.getElementById('unknown-total').textContent = unknown;
       document.getElementById('regions-count').textContent = regions.length;
       document.getElementById('processing-count').textContent = activeJobs;
+      document.getElementById('processing-count').closest('.pill').style.display = activeJobs ? '' : 'none';
     }
 
     function renderMap() {
@@ -1010,7 +1017,7 @@
       const kingdoms = [...new Set(regionEntries.map(kingdomRoot))];
       document.getElementById('kingdom-row').innerHTML = kingdoms.map(label => `
         <button class="chip ${label === state.selectedKingdom ? 'active' : ''}" type="button" data-kingdom="${escapeHtml(label)}">${escapeHtml(label)}</button>
-      `).join('') || '<div class="hint">No unlocked regions yet.</div>';
+      `).join('') || '<div class="hint">No regions unlocked yet — <a href="/capture" style="color:var(--accent)">capture something first</a>.</div>';
 
       const categoryEntries = regionEntries.filter(entry => !state.selectedKingdom || kingdomRoot(entry) === state.selectedKingdom);
       const categories = [...new Set(categoryEntries.map(categoryLabel))];
@@ -1043,7 +1050,7 @@
           <button class="entry-row ${locked ? 'locked' : ''} ${entry.evolution_chain_id ? 'evolution' : ''}" type="button" data-entry="${entry.id}">
             <div class="entry-top">
               <div class="entry-id">${escapeHtml(entry.dex_id)}</div>
-              <div class="entry-state ${entry.discovery_state.toLowerCase()}">${escapeHtml(entry.discovery_state)}</div>
+              <div class="entry-state ${entry.discovery_state.toLowerCase()}">${({ CAPTURED: 'Captured', SEEN: 'Seen', UNKNOWN: 'Undiscovered' }[entry.discovery_state] ?? escapeHtml(entry.discovery_state))}</div>
             </div>
             <div class="entry-name">${escapeHtml(title)}</div>
             <div class="entry-meta">${escapeHtml(subtitle)}</div>
@@ -1376,8 +1383,12 @@
       }
     });
 
-    queuedCount().then(count => { document.getElementById('queue-count').textContent = count; }).catch(() => {});
+    queuedCount().then(count => {
+      document.getElementById('queue-count').textContent = count;
+      document.getElementById('queue-count').closest('.pill').style.display = count ? '' : 'none';
+    }).catch(() => {});
     window.setInterval(() => { refreshCaptureJobs().catch(() => {}); }, 5000);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
     loadHub().catch(() => {});
   </script>
 </body>

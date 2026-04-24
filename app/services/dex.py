@@ -5,7 +5,7 @@ from datetime import datetime
 import logging
 import re
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models import Card, DexEntry, UserDexDiscovery
@@ -663,6 +663,23 @@ def sync_card_to_dex(db: Session, card: Card) -> tuple[DexEntry, str]:
 
 
 def backfill_user_cards(db: Session, user_id: int) -> None:
+    needs_work = (
+        db.query(Card.id)
+        .filter(
+            Card.owner_id == user_id,
+            or_(
+                Card.dex_entry_id.is_(None),
+                Card.render_status.is_(None),
+                Card.render_status != "ready",
+                Card.region.notin_(WORLD_REGIONS),
+            ),
+        )
+        .limit(1)
+        .first()
+    )
+    if needs_work is None:
+        return
+
     rows = (
         db.query(Card)
         .filter(
@@ -713,6 +730,7 @@ def backfill_user_cards(db: Session, user_id: int) -> None:
             row.render_status = "ready"
             row.front_template_id = render_data.get("front_template", {}).get("id")
             row.back_template_id = render_data.get("back_template", {}).get("id")
+            row.render_card_json = json.dumps(render_data)
             changed = True
     if changed:
         db.commit()

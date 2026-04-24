@@ -10,6 +10,7 @@ from app.services.capture_jobs import (
     ALLOWED_TYPES,
     confirm_capture_job_species,
     create_capture_job,
+    get_capture_job_for_user,
     list_capture_jobs_for_user,
 )
 
@@ -56,6 +57,14 @@ def capture_jobs(
     current_user: User = Depends(require_user),
 ):
     return list_capture_jobs_for_user(current_user.id, include_secondary=include_secondary, limit=limit)
+
+
+@router.get("/capture/jobs/{job_id}")
+def get_capture_job(job_id: int, current_user: User = Depends(require_user)):
+    job = get_capture_job_for_user(current_user.id, job_id)
+    if job is None:
+        raise HTTPException(404, "Capture job not found")
+    return job
 
 
 @router.post("/capture/jobs/{job_id}/confirm-species")

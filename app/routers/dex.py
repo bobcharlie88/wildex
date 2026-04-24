@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-import json
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -9,7 +8,7 @@ from pydantic import BaseModel
 from app.auth import require_user
 from app.database import SessionLocal, db_available
 from app.models import Card, DexEntry, User, UserDexDiscovery
-from app.services.card_render import build_render_card
+from app.utils.card_serializer import card_to_dict as _card_dict_shared
 from app.services.dex import (
     DISCOVERY_CAPTURED,
     DISCOVERY_SEEN,
@@ -22,13 +21,6 @@ from app.services.taxonomy import REGION_LABELS, taxonomy_for_entry
 
 router = APIRouter()
 
-RARITY_DISPLAY = {
-    "common": "Common",
-    "uncommon": "Uncommon",
-    "rare": "Rare",
-    "very_rare": "Legendary",
-}
-
 
 class SeenEntryPayload(BaseModel):
     species_name: str
@@ -40,63 +32,7 @@ class SeenEntryPayload(BaseModel):
 
 
 def _card_dict(c: Card) -> dict:
-    primary_image_url = c.primary_card_image_url or c.image_url
-    original_image_url = c.original_image_url or primary_image_url
-    return {
-        "id": c.id,
-        "species_name": c.species_name,
-        "scientific_name": c.scientific_name,
-        "rank": c.rank,
-        "confidence": round(c.confidence, 4) if c.confidence else None,
-        "provisional": c.provisional,
-        "rarity_tier": c.rarity_tier,
-        "rarity_display": c.rarity_display or RARITY_DISPLAY.get(c.rarity_tier or "", "Unknown"),
-        "invasive_at_location": c.invasive_at_location,
-        "iconic_taxon": c.iconic_taxon,
-        "conservation_status": c.conservation_status,
-        "observations_count": c.observations_count,
-        "taxon_id": c.taxon_id,
-        "gbif_key": c.gbif_key,
-        "category": c.category,
-        "sub_category": c.sub_category,
-        "blurb": c.blurb,
-        "stats": {
-            "speed": c.speed,
-            "attack": c.attack,
-            "defence": c.defence,
-            "hp": c.hp,
-            "stamina_regen": c.stamina_regen,
-        },
-        "threat_level": c.threat_level,
-        "aggression": c.aggression,
-        "biome": c.biome,
-        "biome_bonus": c.biome_bonus,
-        "strength_name": c.strength_name,
-        "strength_effect": c.strength_effect,
-        "weakness_name": c.weakness_name,
-        "weakness_effect": c.weakness_effect,
-        "sound_url": c.sound_url,
-        "captured_at": c.captured_at.isoformat() if c.captured_at else None,
-        "latitude": c.latitude,
-        "longitude": c.longitude,
-        "capture_country": c.capture_country,
-        "original_image_url": original_image_url,
-        "primary_card_image_url": primary_image_url,
-        "image_url": primary_image_url,
-        "supporting_image_urls": json.loads(c.supporting_image_urls) if c.supporting_image_urls else [],
-        "front_template_name": c.front_template_name,
-        "front_template_version": c.front_template_version,
-        "back_template_name": c.back_template_name,
-        "back_template_version": c.back_template_version,
-        "dex_id": c.dex_id,
-        "discovery_state": c.discovery_state,
-        "region": c.region,
-        "kingdom": c.kingdom,
-        "group_code": c.group_code,
-        "evolution_chain_id": c.evolution_chain_id,
-        "evolution_stage": c.evolution_stage,
-        "render_card": build_render_card(c),
-    }
+    return _card_dict_shared(c)
 
 
 @router.get("/wilddex/entries")

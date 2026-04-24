@@ -54,5 +54,8 @@ def list_template_payloads() -> list[dict]:
             "notes": selection.notes,
             "parts": [dict(item) for item in (selection.parts or [])],
         }
-        items.append(validate_template_parts(template).model_dump(mode="json"))
+        try:
+            items.append(validate_template_parts(template).model_dump(mode="json"))
+        except Exception:
+            items.append(template)
     return items

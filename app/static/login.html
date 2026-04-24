@@ -106,6 +106,28 @@
       font-size: 1rem;
     }
 
+    .field-wrap {
+      position: relative;
+    }
+    .field-wrap input {
+      padding-right: 60px;
+    }
+    .reveal-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .reveal-btn:hover { color: var(--text); }
+    button[type="submit"]:disabled { opacity: 0.62; cursor: not-allowed; }
     .note {
       margin-top: 14px;
       color: var(--muted);
@@ -167,7 +189,10 @@
 
     <form id="auth-form">
       <input id="email" type="email" autocomplete="email" placeholder="Email address" required>
-      <input id="password" type="password" autocomplete="current-password" placeholder="Password" minlength="8" required>
+      <div class="field-wrap">
+        <input id="password" type="password" autocomplete="current-password" placeholder="Password" minlength="8" required>
+        <button type="button" class="reveal-btn" id="reveal-password" aria-label="Show password">Show</button>
+      </div>
       <button type="submit" id="submit-btn">Sign In</button>
     </form>
 
@@ -186,6 +211,18 @@
     const submitBtn = document.getElementById('submit-btn');
     const errorBox = document.getElementById('error-box');
     const statusBox = document.getElementById('status-box');
+
+    document.getElementById('reveal-password').addEventListener('click', () => {
+      const input = document.getElementById('password');
+      const btn = document.getElementById('reveal-password');
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Hide';
+      } else {
+        input.type = 'password';
+        btn.textContent = 'Show';
+      }
+    });
 
     async function boot() {
       const me = await fetch('/auth/me', { credentials: 'same-origin' }).catch(() => null);
@@ -222,16 +259,22 @@
         password: document.getElementById('password').value,
       };
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(payload),
-      }).catch(() => null);
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Please wait…';
 
-      if (!response) {
+      let response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload),
+        });
+      } catch (_) {
         errorBox.textContent = 'Could not reach the server.';
         errorBox.classList.add('visible');
+        submitBtn.disabled = false;
+        submitBtn.textContent = mode === 'login' ? 'Sign In' : 'Create Account';
         return;
       }
 
@@ -239,6 +282,8 @@
         const err = await response.json().catch(() => ({ detail: 'Request failed' }));
         errorBox.textContent = err.detail || 'Request failed';
         errorBox.classList.add('visible');
+        submitBtn.disabled = false;
+        submitBtn.textContent = mode === 'login' ? 'Sign In' : 'Create Account';
         return;
       }
 

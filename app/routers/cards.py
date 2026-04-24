@@ -17,6 +17,7 @@ from app.pipeline.card_generator import generate_card
 from app.pipeline.species_data import get_species_data
 from app.pipeline.species_id import TemporaryIdentificationError, identify_species, is_temporary_identification_error
 from app.services.card_render import apply_render_fields, build_card_payload, build_render_card
+from app.utils.card_serializer import card_to_dict as _card_to_dict
 from app.services.dex import DISCOVERY_CAPTURED, DISCOVERY_SEEN, sync_card_to_dex
 
 router = APIRouter()
@@ -38,68 +39,7 @@ RARITY_DISPLAY = {
 
 
 def _card_dict(c: Card) -> dict:
-    primary_image_url = c.primary_card_image_url or c.image_url
-    original_image_url = c.original_image_url or primary_image_url
-    return {
-        "id":                   c.id,
-        "species_name":         c.species_name,
-        "scientific_name":      c.scientific_name,
-        "rank":                 c.rank,
-        "confidence":           round(c.confidence, 4) if c.confidence else None,
-        "provisional":          c.provisional,
-        "rarity_tier":          c.rarity_tier,
-        "rarity_display":       c.rarity_display or RARITY_DISPLAY.get(c.rarity_tier or "", "Unknown"),
-        "invasive_at_location": c.invasive_at_location,
-        "iconic_taxon":         c.iconic_taxon,
-        "conservation_status":  c.conservation_status,
-        "observations_count":   c.observations_count,
-        "taxon_id":             c.taxon_id,
-        "gbif_key":             c.gbif_key,
-        "category":             c.category,
-        "sub_category":         c.sub_category,
-        "blurb":                c.blurb,
-        "stats": {
-            "speed":         c.speed,
-            "attack":        c.attack,
-            "defence":       c.defence,
-            "hp":            c.hp,
-            "stamina_regen": c.stamina_regen,
-        },
-        "threat_level":     c.threat_level,
-        "aggression":       c.aggression,
-        "biome":            c.biome,
-        "biome_bonus":      c.biome_bonus,
-        "strength_name":    c.strength_name,
-        "strength_effect":  c.strength_effect,
-        "weakness_name":    c.weakness_name,
-        "weakness_effect":  c.weakness_effect,
-        "sound_url":        c.sound_url,
-        "captured_at":     c.captured_at.isoformat() if c.captured_at else None,
-        "latitude":        c.latitude,
-        "longitude":       c.longitude,
-        "capture_country": c.capture_country,
-        "original_image_url": original_image_url,
-        "primary_card_image_url": primary_image_url,
-        "image_url":       primary_image_url,
-        "supporting_image_urls": json.loads(c.supporting_image_urls) if c.supporting_image_urls else [],
-        "card_payload": json.loads(c.card_payload_json) if c.card_payload_json else None,
-        "card_payload_version": c.card_payload_version,
-        "render_status": c.render_status,
-        "front_template_name": c.front_template_name,
-        "front_template_version": c.front_template_version,
-        "front_template_id": c.front_template_id,
-        "back_template_name": c.back_template_name,
-        "back_template_version": c.back_template_version,
-        "back_template_id": c.back_template_id,
-        "dex_id":          c.dex_id,
-        "discovery_state": c.discovery_state,
-        "region":          c.region,
-        "kingdom":         c.kingdom,
-        "group_code":      c.group_code,
-        "evolution_chain_id": c.evolution_chain_id,
-        "evolution_stage": c.evolution_stage,
-        "render_card":     build_render_card(c),
-    }
+    return _card_to_dict(c)
 
 
 @router.get("/cards")
@@ -137,7 +77,7 @@ def get_card_inat_qr(card_id: int, current_user: User = Depends(require_user)):
         row = db.query(Card).filter(Card.id == card_id, Card.owner_id == current_user.id).first()
         if not row:
             raise HTTPException(404, "Card not found")
-        if row.taxon_id:
+        if row.taxon_id and str(row.taxon_id).isdigit():
             target_url = f"https://www.inaturalist.org/taxa/{int(row.taxon_id)}"
         elif row.scientific_name:
             target_url = f"https://www.inaturalist.org/taxa/search?q={row.scientific_name.replace(' ', '+')}"
@@ -337,6 +277,7 @@ def reidentify_card(card_id: int, current_user: User = Depends(require_user)):
                     "attack": card.stats.attack,
                     "defence": card.stats.defence,
                     "hp": card.stats.hp,
+                    "stamina_regen": card.stats.stamina_regen,
                 },
                 "category": species.category,
                 "sub_category": species.sub_category,

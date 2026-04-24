@@ -5,6 +5,7 @@ import logging
 import os
 import tempfile
 import threading
+import time
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -48,6 +49,8 @@ FAIL_CONFIDENCE_THRESHOLD = 0.45
 
 _worker_thread: threading.Thread | None = None
 _worker_stop = threading.Event()
+_last_stale_requeue: float = 0.0
+_STALE_REQUEUE_INTERVAL = 60.0
 
 
 def _utcnow() -> datetime:
@@ -106,24 +109,42 @@ def serialize_capture_job(job: CaptureJob) -> dict:
     return _job_payload(job)
 
 
+def get_capture_job_for_user(user_id: int, job_id: int) -> dict | None:
+    if not db_available() or SessionLocal is None:
+        return None
+    db = SessionLocal()
+    try:
+        job = db.query(CaptureJob).filter(CaptureJob.id == job_id, CaptureJob.owner_id == user_id).first()
+        return serialize_capture_job(job) if job else None
+    finally:
+        db.close()
+
+
 def list_capture_jobs_for_user(user_id: int, *, include_secondary: bool = False, limit: int = 40) -> dict:
     if not db_available() or SessionLocal is None:
         return {"items": [], "counts": {"queued": 0, "processing": 0, "complete": 0, "failed": 0, "needs_review": 0}}
     # Self-heal after deploys or worker crashes so jobs do not sit in processing forever.
     start_capture_worker()
-    _requeue_stale_jobs()
+    # Throttle stale-job requeue to once per minute to avoid hammering the DB on every poll.
+    global _last_stale_requeue
+    now = time.monotonic()
+    if now - _last_stale_requeue >= _STALE_REQUEUE_INTERVAL:
+        _last_stale_requeue = now
+        _requeue_stale_jobs()
 
     db = SessionLocal()
     try:
+        query = db.query(CaptureJob).filter(CaptureJob.owner_id == user_id)
+        # Apply secondary filter in SQL so the LIMIT is applied after filtering,
+        # not before (previous bug: limit ran first, leaving too few primary jobs).
+        if not include_secondary:
+            query = query.filter(CaptureJob.primary_job_id.is_(None))
         rows = (
-            db.query(CaptureJob)
-            .filter(CaptureJob.owner_id == user_id)
+            query
             .order_by(CaptureJob.created_at.desc(), CaptureJob.id.desc())
             .limit(limit)
             .all()
         )
-        if not include_secondary:
-            rows = [row for row in rows if row.primary_job_id is None]
         counts = {
             "queued": 0,
             "processing": 0,
@@ -384,7 +405,9 @@ def start_capture_worker() -> None:
 def stop_capture_worker() -> None:
     _worker_stop.set()
     if _worker_thread and _worker_thread.is_alive():
-        _worker_thread.join(timeout=2)
+        _worker_thread.join(timeout=20)
+        if _worker_thread.is_alive():
+            log.warning("Capture worker did not stop cleanly within 20 s — will recover stale jobs on next start")
 
 
 def _worker_loop() -> None:
@@ -404,17 +427,26 @@ def _worker_loop() -> None:
 def _requeue_stale_jobs() -> None:
     if SessionLocal is None:
         return
+    from sqlalchemy import or_
     db = SessionLocal()
     try:
         cutoff = _utcnow() - timedelta(minutes=PROCESSING_STALE_MINUTES)
         rows = (
             db.query(CaptureJob)
-            .filter(CaptureJob.status == "processing", CaptureJob.started_at < cutoff)
+            .filter(
+                CaptureJob.status == "processing",
+                or_(
+                    CaptureJob.started_at < cutoff,
+                    CaptureJob.started_at.is_(None),  # catch rows stuck without a start timestamp
+                ),
+            )
             .all()
         )
         if not rows:
             return
+        log.warning("Requeuing %d stale processing job(s)", len(rows))
         for row in rows:
+            log.warning("Requeuing stale job id=%s encounter_id=%s started_at=%s", row.id, row.encounter_id, row.started_at)
             row.status = "queued"
             row.started_at = None
             row.encounter_id = None
@@ -696,6 +728,7 @@ def _save_completed_card(
     row.render_status = "ready"
     row.front_template_id = render_data.get("front_template", {}).get("id")
     row.back_template_id = render_data.get("back_template", {}).get("id")
+    row.render_card_json = json.dumps(render_data)
     db.add(row)
     db.flush()
     log.info(
@@ -1150,16 +1183,22 @@ def _process_seed_job(seed_id: int) -> None:
         log.exception("Capture job %s failed", seed_id)
         row = db.query(CaptureJob).filter(CaptureJob.id == seed_id).first()
         if row:
-            rows = (
-                db.query(CaptureJob)
-                .filter(
-                    CaptureJob.owner_id == row.owner_id,
-                    CaptureJob.status == "processing",
-                    CaptureJob.encounter_id == row.encounter_id,
-                )
-                .all()
-            ) or [row]
-            for item in rows:
+            if row.encounter_id:
+                # Only fail jobs that belong to the same encounter group.
+                failed_rows = (
+                    db.query(CaptureJob)
+                    .filter(
+                        CaptureJob.owner_id == row.owner_id,
+                        CaptureJob.status == "processing",
+                        CaptureJob.encounter_id == row.encounter_id,
+                    )
+                    .all()
+                ) or [row]
+            else:
+                # encounter_id not yet assigned — only fail the seed job itself to
+                # avoid incorrectly failing other unrelated in-flight jobs.
+                failed_rows = [row]
+            for item in failed_rows:
                 item.status = "failed"
                 item.error_message = str(exc)
                 item.completed_at = _utcnow()

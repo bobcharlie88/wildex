@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from app.services.card_assets import select_context_asset
 from app.services.cards.builder import THEMES, build_card_payload
 from app.services.cards.templates import select_template_payload
 from app.services.cards.validators import validate_template_parts
@@ -58,35 +57,6 @@ def _range_mode(name: str, kingdom: str, capture_country: str | None) -> tuple[s
 
 def _merge_template_parts(*, kingdom_key: str, side_name: str, template: dict, family_key: str | None, environment_key: str | None) -> list[dict]:
     parts = [dict(item) for item in (template.get("parts") or [])]
-    assigned_slots = {item.get("slot_name") for item in parts}
-    dynamic_slots = []
-    for slot_name in dynamic_slots:
-        if slot_name in assigned_slots:
-            continue
-        dynamic_asset = select_context_asset(
-            asset_type="icon" if "icon" in slot_name or "badge" in slot_name else "map_asset",
-            template_part=slot_name,
-            side=side_name,
-            kingdom=kingdom_key,
-            family=family_key,
-            environment=environment_key,
-        )
-        if dynamic_asset is None:
-            continue
-        parts.append({
-            "id": dynamic_asset.id,
-            "asset_id": dynamic_asset.id,
-            "slot_name": slot_name,
-            "asset_url": dynamic_asset.asset_url,
-            "asset_type": dynamic_asset.asset_type,
-            "template_part": dynamic_asset.template_part,
-            "mime_type": dynamic_asset.mime_type,
-            "name": dynamic_asset.name,
-            "slug": dynamic_asset.slug,
-            "version": dynamic_asset.version,
-            "sort_order": dynamic_asset.sort_order,
-            "active": dynamic_asset.active,
-        })
     template["parts"] = sorted(parts, key=lambda item: (int(item.get("sort_order") or 100), item.get("slot_name") or ""))
     validate_template_parts(template)
     return template["parts"]
@@ -153,7 +123,7 @@ def build_render_card(source) -> dict:
         "sound_url": payload["sound_url"],
         "captured_at": _value(source, "captured_at"),
         "taxon_id": _value(source, "taxon_id"),
-        "inat_url": f"https://www.inaturalist.org/taxa/{int(_value(source, 'taxon_id'))}" if _value(source, "taxon_id") else None,
+        "inat_url": f"https://www.inaturalist.org/taxa/{int(_value(source, 'taxon_id'))}" if _value(source, "taxon_id") and str(_value(source, "taxon_id")).isdigit() else None,
         "qr_url": f"/cards/{int(_value(source, 'id'))}/inat-qr.png" if _value(source, "id") else None,
         "hp": payload["stats"]["hp"],
         "atk": payload["stats"]["atk"],

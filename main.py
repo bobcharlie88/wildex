@@ -93,6 +93,7 @@ def startup():
                     ("back_template_version", "VARCHAR(32)"),
                     ("front_template_id", "INTEGER"),
                     ("back_template_id", "INTEGER"),
+                    ("render_card_json", "TEXT"),
                 ]:
                     try:
                         conn.execute(text(f"ALTER TABLE cards ADD COLUMN IF NOT EXISTS {col} {typedef}"))

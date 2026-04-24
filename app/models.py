@@ -123,6 +123,7 @@ class Card(Base):
     group_code: Mapped[str | None] = mapped_column(String(32))
     evolution_chain_id: Mapped[str | None] = mapped_column(String(255))
     evolution_stage: Mapped[int | None] = mapped_column(Integer)
+    render_card_json: Mapped[str | None] = mapped_column(Text)
 
     owner: Mapped[User | None] = relationship(
         back_populates="cards",

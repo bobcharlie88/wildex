@@ -99,7 +99,14 @@ async def auth_login(request: Request):
 @router.post("/auth/logout")
 def auth_logout():
     response = JSONResponse({"ok": True})
-    response.delete_cookie(session_cookie_settings()["key"], path="/")
+    settings = session_cookie_settings()
+    response.delete_cookie(
+        key=settings["key"],
+        path=settings["path"],
+        httponly=settings["httponly"],
+        samesite=settings["samesite"],
+        secure=settings["secure"],
+    )
     return response
 
 

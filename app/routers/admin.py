@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import FileResponse, RedirectResponse
 
 from app.auth import get_current_user, require_admin_user
+from app.config import ADMIN_EMAILS
 from app.database import SessionLocal, db_available
 from app.models import Card, CardAsset, CardTemplate, CaptureJob, SubmissionRequest, TemplatePartAssignment, User
 from app.services.agents.orchestrator import get_agent_dashboard, run_agent_task
@@ -195,9 +196,9 @@ def admin_login_page():
 
 @router.get("")
 def admin_dashboard(request: Request):
-    if get_current_user(request) is None:
+    user = get_current_user(request)
+    if user is None or user.email.lower() not in ADMIN_EMAILS:
         return RedirectResponse("/admin/login", status_code=303)
-    require_admin_user(request)
     return FileResponse("app/static/admin.html")
 
 
@@ -401,7 +402,7 @@ async def upsert_template(request: Request, current_user: User = Depends(require
         row.category = (payload.get("category") or "").strip().lower() or None
         row.family = (payload.get("family") or "").strip().lower() or None
         row.environment = (payload.get("environment") or "").strip().lower() or None
-        row.layout_key = (payload.get("layout_key") or "master-front" if row.side == "front" else "master-back")
+        row.layout_key = payload.get("layout_key") or ("master-front" if row.side == "front" else "master-back")
         row.config_json = json.dumps(payload.get("config") or {"layout_key": row.layout_key})
         row.label = (payload.get("label") or "").strip() or None
         row.notes = (payload.get("notes") or "").strip() or None
