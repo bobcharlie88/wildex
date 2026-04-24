@@ -27,7 +27,7 @@ from app.config import GEMINI_API_KEY, GOOGLE_VISION_API_KEY, INATURALIST_API_KE
 
 log = logging.getLogger("wildex.species_id")
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-2.0-flash"
 INAT_TAXA_URL = "https://api.inaturalist.org/v1/taxa"
 INAT_CV_URL = "https://api.inaturalist.org/v1/computervision/score_image"
 INAT_OBSERVATIONS_URL = "https://api.inaturalist.org/v1/observations"
