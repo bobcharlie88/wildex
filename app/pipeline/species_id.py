@@ -15,6 +15,7 @@ import base64
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -559,6 +560,14 @@ def _inat_headers() -> dict[str, str]:
 
 
 def identify_with_gemini(image_path: str, *, location_hint: dict | None = None) -> SpeciesResult:
+    key_present = bool(GEMINI_API_KEY) and not (GEMINI_API_KEY or "").startswith("your_")
+    path = Path(image_path)
+    file_size = path.stat().st_size if path.exists() else 0
+    log.info(
+        "gemini_start image=%s size=%d key_present=%s model=%s",
+        image_path, file_size, key_present, GEMINI_MODEL,
+    )
+
     if not GEMINI_API_KEY or GEMINI_API_KEY.startswith("your_"):
         raise EnvironmentError(
             "GEMINI_API_KEY not set. Get a key at https://aistudio.google.com/apikey "
@@ -569,15 +578,28 @@ def identify_with_gemini(image_path: str, *, location_hint: dict | None = None) 
     with path.open("rb") as fh:
         image_bytes = fh.read()
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=[
-            types.Part.from_bytes(data=image_bytes, mime_type=_file_mime(path)),
-            _build_gemini_prompt(location_hint),
-        ],
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
-    )
+    t0 = time.monotonic()
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type=_file_mime(path)),
+                _build_gemini_prompt(location_hint),
+            ],
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
+        )
+    except Exception as exc:
+        elapsed = time.monotonic() - t0
+        log.warning(
+            "gemini_fail elapsed=%.2fs error_type=%s error=%s",
+            elapsed, type(exc).__name__, str(exc)[:400],
+        )
+        raise
+
+    elapsed = time.monotonic() - t0
+    text_len = len(response.text or "")
+    log.info("gemini_ok elapsed=%.2fs text_len=%d", elapsed, text_len)
 
     data = _parse_gemini_json(response.text)
     result = _build_result(
@@ -600,15 +622,30 @@ def identify_with_gemini(image_path: str, *, location_hint: dict | None = None) 
 
 def identify_with_inat_cv(image_path: str) -> SpeciesResult:
     path = Path(image_path)
-    with path.open("rb") as fh:
-        files = {"file": (path.name, fh, _file_mime(path))}
-        response = httpx.post(
-            INAT_CV_URL,
-            headers=_inat_headers(),
-            files=files,
-            timeout=30.0,
+    file_size = path.stat().st_size if path.exists() else 0
+    inat_key_present = bool(INATURALIST_API_KEY)
+    log.info("inat_cv_start image=%s size=%d key_present=%s", image_path, file_size, inat_key_present)
+    t0 = time.monotonic()
+    try:
+        with path.open("rb") as fh:
+            files = {"file": (path.name, fh, _file_mime(path))}
+            response = httpx.post(
+                INAT_CV_URL,
+                headers=_inat_headers(),
+                files=files,
+                timeout=30.0,
+            )
+        elapsed = time.monotonic() - t0
+        log.info("inat_cv_response elapsed=%.2fs status=%d", elapsed, response.status_code)
+        response.raise_for_status()
+    except Exception as exc:
+        elapsed = time.monotonic() - t0
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        log.warning(
+            "inat_cv_fail elapsed=%.2fs status=%s error_type=%s error=%s",
+            elapsed, status, type(exc).__name__, str(exc)[:300],
         )
-    response.raise_for_status()
+        raise
     data = response.json()
 
     results = data.get("results") or []
@@ -659,6 +696,8 @@ def identify_with_inat_cv(image_path: str) -> SpeciesResult:
 
 
 def identify_with_google_vision(image_path: str) -> SpeciesResult:
+    gv_key_present = bool(GOOGLE_VISION_API_KEY) and not (GOOGLE_VISION_API_KEY or "").startswith("your_")
+    log.info("google_vision_start image=%s key_present=%s", image_path, gv_key_present)
     if not GOOGLE_VISION_API_KEY or GOOGLE_VISION_API_KEY.startswith("your_"):
         raise EnvironmentError("GOOGLE_VISION_API_KEY not set.")
 
@@ -758,6 +797,7 @@ def identify_with_google_vision(image_path: str) -> SpeciesResult:
 
 
 def identify_with_google_web(image_path: str) -> SpeciesResult:
+    log.info("google_web_start image=%s key_present=%s", image_path, bool(GOOGLE_VISION_API_KEY) and not (GOOGLE_VISION_API_KEY or "").startswith("your_"))
     if not GOOGLE_VISION_API_KEY or GOOGLE_VISION_API_KEY.startswith("your_"):
         raise EnvironmentError("GOOGLE_VISION_API_KEY not set.")
 
@@ -933,6 +973,7 @@ _CATEGORY_ICONIC = {
 
 
 def identify_species(image_path: str, lat: float | None = None, lon: float | None = None) -> SpeciesResult:
+    log.info("identify_species start image=%s lat=%s lon=%s", image_path, lat, lon)
     provider_errors: list[str] = []
     skipped_providers: list[str] = []
     temporary_failures: list[str] = []
@@ -968,6 +1009,10 @@ def identify_species(image_path: str, lat: float | None = None, lon: float | Non
             log.warning("Species identification provider failed: %s", provider_errors[-1])
     else:
         message = "All identification providers failed: " + " | ".join(provider_errors)
+        log.error(
+            "identify_species all_failed skipped=%s temporary=%s hard=%s details=%s",
+            skipped_providers, temporary_failures, hard_failures, message[:400],
+        )
         if temporary_failures and not hard_failures:
             raise TemporaryIdentificationError(message)
         raise RuntimeError(message)
@@ -999,6 +1044,7 @@ def identify_species(image_path: str, lat: float | None = None, lon: float | Non
 
 
 def identify_species_candidates(image_path: str, lat: float | None = None, lon: float | None = None) -> list[SpeciesResult]:
+    log.info("identify_species_candidates start image=%s lat=%s lon=%s", image_path, lat, lon)
     provider_errors: list[str] = []
     temporary_failures: list[str] = []
     hard_failures: list[str] = []
@@ -1048,10 +1094,15 @@ def identify_species_candidates(image_path: str, lat: float | None = None, lon: 
 
     if not collected:
         message = "All identification providers failed: " + " | ".join(provider_errors)
+        log.error(
+            "identify_species_candidates all_failed skipped providers not in lists, temporary=%s hard=%s details=%s",
+            temporary_failures, hard_failures, message[:400],
+        )
         if temporary_failures and not hard_failures:
             raise TemporaryIdentificationError(message)
         raise RuntimeError(message)
 
+    log.info("identify_species_candidates collected=%d from providers", len(collected))
     by_key: dict[str, SpeciesResult] = {}
     support_counts: dict[str, int] = {}
     for result in collected:

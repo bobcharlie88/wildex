@@ -46,6 +46,8 @@ WORKER_POLL_SECONDS = 3
 PROCESSING_STALE_MINUTES = 3
 REVIEW_CONFIDENCE_THRESHOLD = 0.70
 FAIL_CONFIDENCE_THRESHOLD = 0.45
+MAX_TEMPORARY_ID_RETRIES = 3
+TEMPORARY_ID_RETRY_DELAY_SECONDS = 60
 
 _worker_thread: threading.Thread | None = None
 _worker_stop = threading.Event()
@@ -462,13 +464,19 @@ def _claim_seed_job_id() -> int | None:
         return None
     db = SessionLocal()
     try:
+        from sqlalchemy import or_
         ready_before = _utcnow() - timedelta(seconds=READY_AGE_SECONDS)
+        now = _utcnow()
         row = (
             db.query(CaptureJob)
             .filter(
                 CaptureJob.status == "queued",
                 CaptureJob.primary_job_id.is_(None),
                 CaptureJob.created_at <= ready_before,
+                or_(
+                    CaptureJob.started_at.is_(None),
+                    CaptureJob.started_at <= now,
+                ),
             )
             .order_by(CaptureJob.created_at.asc(), CaptureJob.id.asc())
             .first()
@@ -563,6 +571,16 @@ def _repeat_state_from_previous(previous_state: str) -> str:
 
 def _looks_temporary_failure(message: str) -> bool:
     return is_temporary_identification_error(RuntimeError(message))
+
+
+def _get_id_retry_count(error_message: str | None) -> int:
+    msg = (error_message or "").strip()
+    if msg.startswith("id_retry:"):
+        try:
+            return int(msg.split(":")[1])
+        except (IndexError, ValueError):
+            pass
+    return 0
 
 
 def _persist_species_result(
@@ -855,17 +873,28 @@ def _process_seed_job(seed_id: int) -> None:
             job.plant_group_id = plant_group_id
         db.commit()
 
+        log.info(
+            "Processing seed job_id=%s owner_id=%s image=%s retry_count=%d grouped_with=%d",
+            seed.id, seed.owner_id, seed.image_url,
+            _get_id_retry_count(seed.error_message), len(selected_candidates),
+        )
         working_set = [seed] + selected_candidates
         raw_identifications = []
         failures: list[str] = []
+        failures_temporary: list[bool] = []
         shot_inputs: list[dict[str, object]] = []
         for job in working_set:
             if not job.image_url:
-                log.warning("Capture job missing primary image before identification job_id=%s original=%s", job.id, job.original_image_url)
+                log.warning(
+                    "Capture job missing image job_id=%s owner_id=%s original=%s",
+                    job.id, job.owner_id, job.original_image_url,
+                )
                 failures.append(f"Capture #{job.id} has no stored image.")
+                failures_temporary.append(False)
                 continue
             try:
                 image_path, should_delete = _materialize_image(job.image_url)
+                log.info("Materialized image job_id=%s url=%s path=%s tmp=%s", job.id, job.image_url, image_path, should_delete)
                 if should_delete:
                     tmp_paths.append(image_path)
                 shot_inputs.append(
@@ -877,14 +906,34 @@ def _process_seed_job(seed_id: int) -> None:
                         "longitude": job.longitude,
                     }
                 )
-            except EnvironmentError as exc:
-                failures.append(str(exc))
             except Exception as exc:
+                log.error(
+                    "Materialize image failed job_id=%s url=%s error_type=%s error=%s",
+                    job.id, job.image_url, type(exc).__name__, str(exc)[:300],
+                )
                 failures.append(str(exc))
+                failures_temporary.append(_looks_temporary_failure(str(exc)))
 
         if not shot_inputs:
-            failure_text = "; ".join(failures) or "Identification failed for all images in this encounter."
-            temporary = failures and all(_looks_temporary_failure(message) for message in failures)
+            failure_text = "; ".join(failures) or "No loadable images in this encounter."
+            temporary = bool(failures_temporary) and all(failures_temporary)
+            log.error(
+                "No shot_inputs for job_id=%s temporary=%s failure=%s",
+                seed.id, temporary, failure_text[:300],
+            )
+            retry_count = _get_id_retry_count(seed.error_message)
+            if temporary and retry_count < MAX_TEMPORARY_ID_RETRIES:
+                retry_at = _utcnow() + timedelta(seconds=TEMPORARY_ID_RETRY_DELAY_SECONDS)
+                log.warning(
+                    "Re-queuing job_id=%s attempt=%d/%d retry_after=%s",
+                    seed.id, retry_count + 1, MAX_TEMPORARY_ID_RETRIES, retry_at,
+                )
+                for job in working_set:
+                    job.status = "queued"
+                    job.started_at = retry_at
+                    job.error_message = f"id_retry:{retry_count + 1}: {failure_text[:200]}"
+                db.commit()
+                return
             _set_jobs_terminal(
                 db,
                 working_set,
@@ -897,22 +946,56 @@ def _process_seed_job(seed_id: int) -> None:
             db.commit()
             return
 
+        from app.pipeline.species_id import TemporaryIdentificationError as _TempIDError
         for shot in shot_inputs:
+            log.info("Identifying species job_id=%s image=%s", shot["job_id"], shot.get("image_url"))
             try:
                 raw_result = identify_group_candidates(
                     [shot],
                     lat=shot.get("latitude"),
                     lon=shot.get("longitude"),
                 )[0]
+                log.info(
+                    "Identification success job_id=%s top=%s confidence=%.2f",
+                    shot["job_id"], raw_result.top_species.scientific_name, raw_result.top_species.confidence,
+                )
                 raw_identifications.append(raw_result)
+            except _TempIDError as exc:
+                log.warning("Identification temporary failure job_id=%s error=%s", shot["job_id"], str(exc)[:300])
+                failures.append(str(exc))
+                failures_temporary.append(True)
             except EnvironmentError as exc:
+                log.warning("Identification provider not configured job_id=%s error=%s", shot["job_id"], str(exc)[:200])
                 failures.append(str(exc))
+                failures_temporary.append(False)
             except Exception as exc:
+                log.error(
+                    "Identification hard failure job_id=%s error_type=%s error=%s",
+                    shot["job_id"], type(exc).__name__, str(exc)[:400],
+                )
                 failures.append(str(exc))
+                failures_temporary.append(is_temporary_identification_error(exc))
 
         if not raw_identifications:
             failure_text = "; ".join(failures) or "Identification failed for all images in this encounter."
-            temporary = failures and all(_looks_temporary_failure(message) for message in failures)
+            temporary = bool(failures_temporary) and all(failures_temporary)
+            log.error(
+                "All identification attempts failed job_id=%s temporary=%s failure=%s",
+                seed.id, temporary, failure_text[:400],
+            )
+            retry_count = _get_id_retry_count(seed.error_message)
+            if temporary and retry_count < MAX_TEMPORARY_ID_RETRIES:
+                retry_at = _utcnow() + timedelta(seconds=TEMPORARY_ID_RETRY_DELAY_SECONDS)
+                log.warning(
+                    "Re-queuing job_id=%s attempt=%d/%d retry_after=%s",
+                    seed.id, retry_count + 1, MAX_TEMPORARY_ID_RETRIES, retry_at,
+                )
+                for job in working_set:
+                    job.status = "queued"
+                    job.started_at = retry_at
+                    job.error_message = f"id_retry:{retry_count + 1}: {failure_text[:200]}"
+                db.commit()
+                return
             _set_jobs_terminal(
                 db,
                 working_set,

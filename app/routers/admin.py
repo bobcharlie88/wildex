@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
+import tempfile
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 
 from app.auth import get_current_user, require_admin_user
-from app.config import ADMIN_EMAILS
+from app.config import ADMIN_EMAILS, GEMINI_API_KEY, GOOGLE_VISION_API_KEY, INATURALIST_API_KEY
 from app.database import SessionLocal, db_available
 from app.models import Card, CardAsset, CardTemplate, CaptureJob, SubmissionRequest, TemplatePartAssignment, User
 from app.services.agents.orchestrator import get_agent_dashboard, run_agent_task
@@ -886,3 +889,111 @@ async def admin_agent_task(request: Request, current_user: User = Depends(requir
         capture_job_id=capture_job_id,
     )
     return {"ok": True, "task": result}
+
+
+@router.post("/test-identification")
+async def test_identification(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin_user),
+):
+    from app.pipeline.species_id import (
+        TemporaryIdentificationError,
+        identify_with_gemini,
+        identify_with_google_vision,
+        identify_with_google_web,
+        identify_with_inat_cv,
+        is_temporary_identification_error,
+    )
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Empty upload")
+
+    content_type = file.content_type or "image/jpeg"
+    if "png" in content_type:
+        suffix = ".png"
+    elif "webp" in content_type:
+        suffix = ".webp"
+    else:
+        suffix = ".jpg"
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+
+        key_status = {
+            "gemini": bool(GEMINI_API_KEY) and not (GEMINI_API_KEY or "").startswith("your_"),
+            "google_vision": bool(GOOGLE_VISION_API_KEY) and not (GOOGLE_VISION_API_KEY or "").startswith("your_"),
+            "inaturalist": bool(INATURALIST_API_KEY),
+        }
+
+        providers: list[tuple[str, object]] = [
+            ("gemini", lambda path: identify_with_gemini(path)),
+            ("inaturalist_cv", identify_with_inat_cv),
+            ("google_vision", identify_with_google_vision),
+            ("google_web", identify_with_google_web),
+        ]
+
+        provider_results = []
+        for name, fn in providers:
+            t0 = time.monotonic()
+            try:
+                r = fn(tmp_path)
+                elapsed = round(time.monotonic() - t0, 2)
+                provider_results.append({
+                    "provider": name,
+                    "status": "ok",
+                    "elapsed_s": elapsed,
+                    "result": {
+                        "scientific_name": r.scientific_name,
+                        "common_name": r.common_name,
+                        "confidence": round(r.confidence, 3),
+                        "category": r.category,
+                        "provisional": r.provisional,
+                    },
+                })
+            except EnvironmentError as exc:
+                elapsed = round(time.monotonic() - t0, 2)
+                provider_results.append({
+                    "provider": name,
+                    "status": "skipped",
+                    "elapsed_s": elapsed,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "temporary": False,
+                })
+            except Exception as exc:
+                elapsed = round(time.monotonic() - t0, 2)
+                temporary = isinstance(exc, TemporaryIdentificationError) or is_temporary_identification_error(exc)
+                provider_results.append({
+                    "provider": name,
+                    "status": "error",
+                    "elapsed_s": elapsed,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc)[:400],
+                    "temporary": temporary,
+                })
+
+        any_ok = any(r["status"] == "ok" for r in provider_results)
+        all_temporary = all(
+            r["status"] in ("ok", "skipped") or r.get("temporary") is True
+            for r in provider_results
+        )
+        return {
+            "ok": any_ok,
+            "file_size": len(data),
+            "api_keys": key_status,
+            "providers": provider_results,
+            "summary": (
+                "At least one provider succeeded."
+                if any_ok
+                else "All providers temporarily unavailable — will auto-retry."
+                if all_temporary
+                else "All providers failed."
+            ),
+        }
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
