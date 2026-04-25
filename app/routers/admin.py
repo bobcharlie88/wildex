@@ -249,7 +249,26 @@ def debug_latest_card_urls():
                 "original_image_url": row.original_image_url,
                 "render_status": row.render_status,
             }
-        return {"r2": r2_status, "latest_card": card}
+        jobs = (
+            db.query(CaptureJob)
+            .order_by(CaptureJob.id.desc())
+            .limit(5)
+            .all()
+        )
+        return {
+            "r2": r2_status,
+            "latest_card": card,
+            "recent_jobs": [
+                {
+                    "id": j.id,
+                    "status": j.status,
+                    "image_url": j.image_url,
+                    "error_message": j.error_message,
+                    "created_at": j.created_at.isoformat() if j.created_at else None,
+                }
+                for j in jobs
+            ],
+        }
     finally:
         db.close()
 
