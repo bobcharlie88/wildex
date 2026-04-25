@@ -211,6 +211,15 @@ def debug_latest_card_urls():
             )
             client.head_bucket(Bucket=R2_BUCKET_NAME)
             r2_status["connection"] = "ok"
+            import io as _io
+            client.upload_fileobj(
+                _io.BytesIO(b"wildex-r2-test"),
+                R2_BUCKET_NAME,
+                "_debug_write_test.txt",
+                ExtraArgs={"ContentType": "text/plain"},
+            )
+            client.delete_object(Bucket=R2_BUCKET_NAME, Key="_debug_write_test.txt")
+            r2_status["write"] = "ok"
         else:
             r2_status["connection"] = "skipped - not fully configured"
             r2_status["missing"] = [
