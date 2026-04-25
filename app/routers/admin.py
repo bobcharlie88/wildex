@@ -194,20 +194,53 @@ def _card_source(card: Card) -> dict:
 
 @router.get("/debug/latest-card-urls")
 def debug_latest_card_urls():
+    from app.utils.storage import r2_enabled
+    from app.config import R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL
+
+    r2_status = {"enabled": r2_enabled()}
+    try:
+        import boto3
+        if r2_enabled():
+            endpoint = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+            client = boto3.client(
+                "s3",
+                endpoint_url=endpoint,
+                aws_access_key_id=R2_ACCESS_KEY_ID,
+                aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+                region_name="auto",
+            )
+            client.head_bucket(Bucket=R2_BUCKET_NAME)
+            r2_status["connection"] = "ok"
+        else:
+            r2_status["connection"] = "skipped - not fully configured"
+            r2_status["missing"] = [
+                k for k, v in {
+                    "R2_ACCOUNT_ID": R2_ACCOUNT_ID,
+                    "R2_ACCESS_KEY_ID": R2_ACCESS_KEY_ID,
+                    "R2_SECRET_ACCESS_KEY": R2_SECRET_ACCESS_KEY,
+                    "R2_BUCKET_NAME": R2_BUCKET_NAME,
+                    "R2_PUBLIC_BASE_URL": R2_PUBLIC_BASE_URL,
+                }.items() if not v
+            ]
+    except Exception as exc:
+        r2_status["connection"] = "failed"
+        r2_status["error"] = str(exc)[:400]
+
     if not db_available():
-        return {"error": "db unavailable"}
+        return {"r2": r2_status, "error": "db unavailable"}
     db = SessionLocal()
     try:
         row = db.query(Card).order_by(Card.id.desc()).first()
-        if not row:
-            return {"error": "no cards"}
-        return {
-            "card_id": row.id,
-            "image_url": row.image_url,
-            "primary_card_image_url": row.primary_card_image_url,
-            "original_image_url": row.original_image_url,
-            "render_status": row.render_status,
-        }
+        card = None
+        if row:
+            card = {
+                "card_id": row.id,
+                "image_url": row.image_url,
+                "primary_card_image_url": row.primary_card_image_url,
+                "original_image_url": row.original_image_url,
+                "render_status": row.render_status,
+            }
+        return {"r2": r2_status, "latest_card": card}
     finally:
         db.close()
 
