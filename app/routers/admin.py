@@ -192,6 +192,26 @@ def _card_source(card: Card) -> dict:
     }
 
 
+@router.get("/debug/latest-card-urls")
+def debug_latest_card_urls():
+    if not db_available():
+        return {"error": "db unavailable"}
+    db = SessionLocal()
+    try:
+        row = db.query(Card).order_by(Card.id.desc()).first()
+        if not row:
+            return {"error": "no cards"}
+        return {
+            "card_id": row.id,
+            "image_url": row.image_url,
+            "primary_card_image_url": row.primary_card_image_url,
+            "original_image_url": row.original_image_url,
+            "render_status": row.render_status,
+        }
+    finally:
+        db.close()
+
+
 @router.get("/login")
 def admin_login_page():
     return FileResponse("app/static/admin_login.html")
