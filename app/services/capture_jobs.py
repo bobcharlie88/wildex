@@ -512,6 +512,9 @@ def _candidate_is_near(seed: CaptureJob, candidate: CaptureJob) -> bool:
     return gap <= GROUP_TIME_WINDOW_SECONDS and distance is not None and distance <= GROUP_DISTANCE_METERS
 
 
+MAX_ID_IMAGE_PX = 1024
+
+
 def _materialize_image(image_url: str) -> tuple[str, bool]:
     if image_url.startswith("/uploads/"):
         local_path = Path("uploads") / Path(image_url).name
@@ -519,13 +522,40 @@ def _materialize_image(image_url: str) -> tuple[str, bool]:
             log.warning("Missing local image during processing: %s", image_url)
             raise FileNotFoundError("Saved capture image is missing")
         return str(local_path), False
-    response = httpx.get(image_url, timeout=30.0, follow_redirects=True)
-    response.raise_for_status()
-    content_type = (response.headers.get("content-type") or "").lower()
-    suffix = ".png" if "png" in content_type else ".webp" if "webp" in content_type else ".jpg"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(response.content)
+    with httpx.stream("GET", image_url, timeout=30.0, follow_redirects=True) as response:
+        response.raise_for_status()
+        content_type = (response.headers.get("content-type") or "").lower()
+        suffix = ".png" if "png" in content_type else ".webp" if "webp" in content_type else ".jpg"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            for chunk in response.iter_bytes(chunk_size=65536):
+                tmp.write(chunk)
+            return tmp.name, True
+
+
+def _resize_for_identification(image_path: str) -> tuple[str, bool]:
+    from PIL import Image
+    path = Path(image_path)
+    original_size = path.stat().st_size
+    try:
+        with Image.open(path) as img:
+            w, h = img.size
+            if max(w, h) <= MAX_ID_IMAGE_PX:
+                log.info("Image already within limit w=%d h=%d size=%d bytes", w, h, original_size)
+                return image_path, False
+            ratio = MAX_ID_IMAGE_PX / max(w, h)
+            new_w, new_h = int(w * ratio), int(h * ratio)
+            resized = img.convert("RGB").resize((new_w, new_h), Image.LANCZOS)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            resized.save(tmp.name, "JPEG", quality=85, optimize=True)
+            new_size = Path(tmp.name).stat().st_size
+        log.info(
+            "Resized image for identification %dx%d->%dx%d size=%d->%d bytes",
+            w, h, new_w, new_h, original_size, new_size,
+        )
         return tmp.name, True
+    except Exception as exc:
+        log.warning("Image resize failed, using original: %s", exc)
+        return image_path, False
 
 
 def _species_from_candidate(candidate: dict[str, object], *, confidence: float, reasoning: str, provisional: bool) -> SpeciesResult:
@@ -897,11 +927,14 @@ def _process_seed_job(seed_id: int) -> None:
                 log.info("Materialized image job_id=%s url=%s path=%s tmp=%s", job.id, job.image_url, image_path, should_delete)
                 if should_delete:
                     tmp_paths.append(image_path)
+                resized_path, should_delete_resized = _resize_for_identification(image_path)
+                if should_delete_resized:
+                    tmp_paths.append(resized_path)
                 shot_inputs.append(
                     {
                         "job_id": job.id,
                         "image_url": job.image_url,
-                        "image_path": image_path,
+                        "image_path": resized_path,
                         "latitude": job.latitude,
                         "longitude": job.longitude,
                     }
