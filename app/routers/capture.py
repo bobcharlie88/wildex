@@ -12,6 +12,7 @@ from app.services.capture_jobs import (
     create_capture_job,
     get_capture_job_for_user,
     list_capture_jobs_for_user,
+    retry_capture_job,
 )
 
 router = APIRouter()
@@ -84,6 +85,17 @@ async def confirm_capture_species(
     except RuntimeError as exc:
         raise HTTPException(503, str(exc))
     return {"ok": True, **result}
+
+
+@router.post("/capture/jobs/{job_id}/retry")
+def retry_capture_species(job_id: int, current_user: User = Depends(require_user)):
+    try:
+        job = retry_capture_job(user_id=current_user.id, job_id=job_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+    return {"ok": True, "job": job}
 
 
 @router.post("/identify")

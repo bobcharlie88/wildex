@@ -1079,18 +1079,21 @@ function renderJobQueue() {
       const reviewMarkup = reviewItems.map(job => {
         const thumb = job.image_url ? `<img class="job-thumb" src="${esc(job.image_url)}" alt="">` : '<div class="job-thumb"></div>';
         const alternatives = (job.alternatives || []).slice(0, 3);
+        const hasSpecies = job.species_name || job.scientific_name;
         const buttons = alternatives.length
           ? alternatives.map((candidate, idx) => `
             <button type="button" class="${idx === 0 ? 'primary' : ''}" data-confirm-job="${job.id}" data-scientific-name="${esc(candidate.scientific_name || '')}">
               ${esc(candidate.common_name || candidate.label || candidate.scientific_name || 'Possible match')}
             </button>`).join('')
-          : `<button type="button" class="primary" data-confirm-job="${job.id}" data-scientific-name="${esc(job.scientific_name || '')}">Confirm current result</button>`;
+          : hasSpecies
+            ? `<button type="button" class="primary" data-confirm-job="${job.id}" data-scientific-name="${esc(job.scientific_name || '')}">Confirm current result</button>`
+            : `<button type="button" class="primary" data-retry-job="${job.id}">Retry Identification</button>`;
         return `
           <div class="job-row review">
             ${thumb}
             <div>
-              <div class="job-title">${esc(job.species_name || 'Species confirmation needed')}</div>
-              <div class="job-meta">${esc(job.identification_reasoning || job.review_reason || 'Multiple possible species were found. Choose the best match to finish this capture.')}</div>
+              <div class="job-title">${esc(job.species_name || (hasSpecies ? 'Species confirmation needed' : 'Identification failed — tap to retry'))}</div>
+              <div class="job-meta">${esc(job.identification_reasoning || job.review_reason || (hasSpecies ? 'Multiple possible species were found. Choose the best match to finish this capture.' : 'The identification service was unavailable. Tap retry to try again.'))}</div>
               <div class="review-actions">${buttons}</div>
             </div>
           </div>`;
@@ -1099,6 +1102,9 @@ function renderJobQueue() {
       $('job-list').innerHTML = `${activeMarkup}${reviewMarkup}`;
       document.querySelectorAll('[data-confirm-job]').forEach(btn => btn.addEventListener('click', () => {
         confirmSpeciesForJob(Number(btn.dataset.confirmJob), btn.dataset.scientificName || '').catch(() => {});
+      }));
+      document.querySelectorAll('[data-retry-job]').forEach(btn => btn.addEventListener('click', () => {
+        retryIdentificationForJob(Number(btn.dataset.retryJob)).catch(() => {});
       }));
     }
 
@@ -1117,6 +1123,20 @@ function renderJobQueue() {
       if (data.card_id) {
         location.href = `/wildex?card=${data.card_id}`;
       }
+    }
+
+    async function retryIdentificationForJob(jobId) {
+      const btn = document.querySelector(`[data-retry-job="${jobId}"]`);
+      if (btn) { btn.disabled = true; btn.textContent = 'Retrying…'; }
+      const res = await fetch(`/capture/jobs/${jobId}/retry`, {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      if (!res.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Retry Identification'; }
+        return;
+      }
+      await refreshCaptureJobs();
     }
 
     function showToast(job) {

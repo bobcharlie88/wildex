@@ -162,6 +162,37 @@ def list_capture_jobs_for_user(user_id: int, *, include_secondary: bool = False,
         db.close()
 
 
+def retry_capture_job(*, user_id: int, job_id: int) -> dict:
+    if not db_available() or SessionLocal is None:
+        raise RuntimeError("Database unavailable")
+    db = SessionLocal()
+    try:
+        job = (
+            db.query(CaptureJob)
+            .filter(CaptureJob.id == job_id, CaptureJob.owner_id == user_id)
+            .first()
+        )
+        if job is None:
+            raise ValueError("Capture job not found")
+        if job.status not in ("needs_review", "failed"):
+            raise ValueError("Only failed or needs-review captures can be retried")
+        if not (job.image_url or job.primary_image_url or job.original_image_url):
+            raise ValueError("No image available to retry identification")
+        job.status = "queued"
+        job.started_at = None
+        job.error_message = None
+        job.review_reason = None
+        job.encounter_id = None
+        job.primary_job_id = None
+        db.commit()
+        db.refresh(job)
+        log.info("Re-queued job_id=%s for retry by user_id=%s", job.id, user_id)
+        start_capture_worker()
+        return serialize_capture_job(job)
+    finally:
+        db.close()
+
+
 def confirm_capture_job_species(*, user_id: int, job_id: int, scientific_name: str | None = None) -> dict:
     if not db_available() or SessionLocal is None:
         raise RuntimeError("Database unavailable")
