@@ -699,6 +699,27 @@ def activate_template(template_id: int, current_user: User = Depends(require_adm
         db.close()
 
 
+@router.patch("/templates/{template_id}/zones")
+async def save_template_zones(template_id: int, request: Request, current_user: User = Depends(require_admin_user)):
+    if not db_available():
+        raise HTTPException(503, "Database unavailable")
+    payload = await request.json()
+    zones = payload.get("zones") or {}
+    if not isinstance(zones, dict):
+        raise HTTPException(400, "zones must be a dict")
+    db = SessionLocal()
+    try:
+        row = _load_template_row(db, template_id)
+        existing = json.loads(row.config_json) if row.config_json else {}
+        existing["zones"] = zones
+        row.config_json = json.dumps(existing)
+        db.commit()
+        clear_template_cache()
+        return {"ok": True, "template_id": template_id, "zones": zones}
+    finally:
+        db.close()
+
+
 @router.get("/review-queue")
 def review_queue(current_user: User = Depends(require_admin_user)):
     return {"items": get_agent_dashboard().get("review_queue", [])}

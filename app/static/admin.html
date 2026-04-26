@@ -493,6 +493,7 @@
 
     <section class="admin-nav" id="admin-nav">
       <button class="nav-chip active" type="button" data-nav="templates">Template Lab</button>
+      <button class="nav-chip" type="button" data-nav="card-editor">Card Editor</button>
       <button class="nav-chip" type="button" data-nav="agents">Agent Lab</button>
       <button class="nav-chip" type="button" data-nav="submissions">Submission Queue</button>
       <button class="nav-chip" type="button" data-nav="assets">Asset Library</button>
@@ -672,6 +673,47 @@
               <div class="code-box" id="builder-payload-box">Select a saved card to inspect its structured payload.</div>
             </div>
           </details>
+        </section>
+
+        <section class="panel" id="card-editor-panel">
+          <div class="panel-head">
+            <div>
+              <h2>Card Editor</h2>
+              <p class="muted">Drag zones to reposition them. Changes save to the active template config and take effect immediately.</p>
+            </div>
+            <div class="actions">
+              <select id="editor-card-select" style="min-width:180px">
+                <option value="">— Sample card —</option>
+              </select>
+              <button class="btn btn-secondary" id="editor-flip-btn" type="button">Flip Card</button>
+              <button class="btn btn-primary" id="editor-save-btn" type="button">Save Layout</button>
+            </div>
+          </div>
+          <div class="status-box" id="editor-status"></div>
+          <div class="error-box" id="editor-error"></div>
+
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start">
+            <!-- Card preview + draggable overlay -->
+            <div>
+              <div id="editor-card-wrap" style="position:relative;width:100%;max-width:440px;margin:0 auto;touch-action:none">
+                <div id="editor-card-host"></div>
+                <div id="editor-zones-overlay" style="position:absolute;inset:0;pointer-events:none"></div>
+              </div>
+              <div class="toolbar" style="justify-content:center;margin-top:12px">
+                <button class="btn btn-secondary" id="editor-reset-btn" type="button">Reset to Default</button>
+                <button class="btn btn-secondary" id="editor-export-front-btn" type="button">Export Front PNG</button>
+                <button class="btn btn-secondary" id="editor-export-back-btn" type="button">Export Back PNG</button>
+              </div>
+            </div>
+
+            <!-- Zone list sidebar -->
+            <div class="stack">
+              <div class="subhead">Draggable Zones</div>
+              <div id="editor-zone-list" class="stack" style="gap:8px"></div>
+              <div class="subhead" style="margin-top:8px">Zone Config (JSON)</div>
+              <pre id="editor-zone-json" style="background:rgba(0,0,0,0.3);border-radius:12px;padding:12px;font-size:.72rem;overflow:auto;max-height:240px;color:#90b8a0;margin:0"></pre>
+            </div>
+          </div>
         </section>
 
         <section class="panel" id="agent-lab-panel">
@@ -1308,6 +1350,7 @@
     function openAdminNav(target) {
       const mapping = {
         templates: 'template-lab-panel',
+        'card-editor': 'card-editor-panel',
         agents: 'agent-lab-panel',
         submissions: 'submission-queue-panel',
         assets: 'assets-panel',
@@ -1839,6 +1882,272 @@ ${esc(JSON.stringify(item.decision_history || [], null, 2))}
       $('template-error').textContent = error.message || 'Could not load admin dashboard';
       $('template-error').classList.add('visible');
     });
+
+    /* ── Card Editor ─────────────────────────────────────────────── */
+    (function () {
+      const CW = WildExCardRenderer.CARD_W || 750;
+      const CH = WildExCardRenderer.CARD_H || 1050;
+
+      const DEFAULT_ZONES = {
+        front: {
+          photo:      { x: 28/CW,       y: 88/CH,    w: 698/CW,  h: 384/CH,  label: 'Photo',      color: '#c07830' },
+          name:       { x: 375/CW,      y: 530/CH,   w: 660/CW,  h: 50/CH,   label: 'Name',        color: '#e0c050' },
+          stats:      { x: 38/CW,       y: 580/CH,   w: 674/CW,  h: 120/CH,  label: 'Stats',       color: '#50b8e8' },
+          abilities:  { x: 38/CW,       y: 690/CH,   w: 674/CW,  h: 170/CH,  label: 'Abilities',   color: '#90d860' },
+          minimap:    { x: 522/CW,      y: 852/CH,   w: 204/CW,  h: 124/CH,  label: 'Mini Map',    color: '#a888e8' },
+        },
+        back: {
+          thumb:      { x: 524/CW,      y: 88/CH,    w: 204/CW,  h: 224/CH,  label: 'Thumbnail',   color: '#c07830' },
+          about:      { x: 36/CW,       y: 96/CH,    w: 480/CW,  h: 140/CH,  label: 'About Text',  color: '#e0c050' },
+          diet:       { x: 36/CW,       y: 340/CH,   w: 674/CW,  h: 120/CH,  label: 'Diet/Habitat',color: '#50b8e8' },
+          strength:   { x: 36/CW,       y: 462/CH,   w: 674/CW,  h: 90/CH,   label: 'Str/Weak',   color: '#f08080' },
+          stats:      { x: 36/CW,       y: 560/CH,   w: 280/CW,  h: 168/CH,  label: 'Stats',       color: '#90d860' },
+          rangemap:   { x: 530/CW,      y: 560/CH,   w: 204/CW,  h: 174/CH,  label: 'Range Map',   color: '#a888e8' },
+          quote:      { x: 36/CW,       y: 756/CH,   w: 674/CW,  h: 80/CH,   label: 'Fact Quote',  color: '#e888b8' },
+        },
+      };
+
+      let editorSide = 'front';
+      let editorCardData = null;
+      let editorZones = { front: {}, back: {} };
+      let dragState = null;
+      let editorTemplateId = null;
+
+      function getEffectiveZones(side) {
+        const merged = {};
+        const defaults = DEFAULT_ZONES[side] || {};
+        const saved = editorZones[side] || {};
+        for (const key of Object.keys(defaults)) {
+          merged[key] = { ...defaults[key], ...(saved[key] || {}) };
+        }
+        return merged;
+      }
+
+      function pxToFrac(side, pxX, pxY) {
+        const wrap = $('editor-card-wrap');
+        const rect = wrap.getBoundingClientRect();
+        return { x: pxX / rect.width, y: pxY / rect.height };
+      }
+
+      function renderZoneOverlay(side) {
+        const overlay = $('editor-zones-overlay');
+        const wrap = $('editor-card-wrap');
+        const W = wrap.offsetWidth || 440;
+        const H = wrap.offsetHeight || 616;
+        overlay.innerHTML = '';
+        overlay.style.pointerEvents = 'none';
+
+        const zones = getEffectiveZones(side);
+        for (const [key, zone] of Object.entries(zones)) {
+          const el = document.createElement('div');
+          const x = zone.x * W;
+          const y = zone.y * H;
+          const w = (zone.w || 0.1) * W;
+          const h = (zone.h || 0.04) * H;
+          el.style.cssText = [
+            `position:absolute`,
+            `left:${x}px`, `top:${y}px`,
+            `width:${w}px`, `height:${h}px`,
+            `border:2px solid ${zone.color}`,
+            `border-radius:6px`,
+            `background:${zone.color}18`,
+            `cursor:move`,
+            `pointer-events:auto`,
+            `box-sizing:border-box`,
+          ].join(';');
+          el.title = zone.label;
+          const label = document.createElement('span');
+          label.textContent = zone.label;
+          label.style.cssText = `font-size:9px;font-weight:700;color:${zone.color};background:rgba(0,0,0,0.7);border-radius:4px;padding:1px 4px;pointer-events:none;white-space:nowrap;user-select:none`;
+          el.appendChild(label);
+
+          el.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            el.setPointerCapture(e.pointerId);
+            const rect = wrap.getBoundingClientRect();
+            dragState = {
+              key, el,
+              startClientX: e.clientX, startClientY: e.clientY,
+              startX: zone.x * rect.width, startY: zone.y * rect.height,
+              W: rect.width, H: rect.height,
+            };
+          });
+          el.addEventListener('pointermove', (e) => {
+            if (!dragState || dragState.key !== key) return;
+            const dx = e.clientX - dragState.startClientX;
+            const dy = e.clientY - dragState.startClientY;
+            const newX = Math.max(0, Math.min(1 - (zone.w || 0), (dragState.startX + dx) / dragState.W));
+            const newY = Math.max(0, Math.min(1 - (zone.h || 0), (dragState.startY + dy) / dragState.H));
+            if (!editorZones[side]) editorZones[side] = {};
+            if (!editorZones[side][key]) editorZones[side][key] = { ...DEFAULT_ZONES[side][key] };
+            editorZones[side][key].x = newX;
+            editorZones[side][key].y = newY;
+            el.style.left = `${newX * dragState.W}px`;
+            el.style.top  = `${newY * dragState.H}px`;
+            updateZoneJson();
+          });
+          el.addEventListener('pointerup', () => { dragState = null; });
+
+          overlay.appendChild(el);
+        }
+        renderZoneList(side);
+      }
+
+      function renderZoneList(side) {
+        const zones = getEffectiveZones(side);
+        $('editor-zone-list').innerHTML = Object.entries(zones).map(([key, z]) =>
+          `<div style="display:flex;align-items:center;gap:8px;font-size:.82rem">
+            <span style="width:10px;height:10px;border-radius:2px;background:${z.color};flex-shrink:0"></span>
+            <span style="font-weight:700;color:var(--text);flex:1">${z.label}</span>
+            <span style="color:var(--muted)">${Math.round((editorZones[side]?.[key]?.x ?? z.x)*100)}%, ${Math.round((editorZones[side]?.[key]?.y ?? z.y)*100)}%</span>
+          </div>`
+        ).join('');
+      }
+
+      function updateZoneJson() {
+        const merged = { front: {}, back: {} };
+        for (const side of ['front', 'back']) {
+          const eff = getEffectiveZones(side);
+          for (const [key, z] of Object.entries(eff)) {
+            const ov = editorZones[side]?.[key] || {};
+            merged[side][key] = {
+              x: parseFloat((ov.x ?? z.x).toFixed(4)),
+              y: parseFloat((ov.y ?? z.y).toFixed(4)),
+              w: parseFloat((ov.w ?? z.w ?? 0.1).toFixed(4)),
+              h: parseFloat((ov.h ?? z.h ?? 0.04).toFixed(4)),
+            };
+          }
+        }
+        $('editor-zone-json').textContent = JSON.stringify(merged, null, 2);
+      }
+
+      function loadEditorCard() {
+        const cardData = editorCardData || (WildExCardRenderer.sampleCards && WildExCardRenderer.sampleCards()[0]);
+        if (!cardData) return;
+        WildExCardRenderer.buildCard($('editor-card-host'), cardData);
+        setTimeout(() => {
+          if (editorSide === 'back') {
+            WildExCardRenderer.flip($('editor-card-host'));
+          }
+          renderZoneOverlay(editorSide);
+          updateZoneJson();
+        }, 60);
+      }
+
+      function populateEditorCardSelect() {
+        const select = $('editor-card-select');
+        const samples = (WildExCardRenderer.sampleCards && WildExCardRenderer.sampleCards()) || [];
+        select.innerHTML = samples.map((c, i) =>
+          `<option value="sample:${i}">${esc(c.species_name)}</option>`
+        ).join('') + (state.samples || []).map(c =>
+          `<option value="card:${c.id}">${esc(c.species_name || c.common_name || `Card #${c.id}`)}</option>`
+        ).join('');
+        select.addEventListener('change', async () => {
+          const val = select.value;
+          if (!val) return;
+          if (val.startsWith('sample:')) {
+            const idx = parseInt(val.split(':')[1], 10);
+            editorCardData = (WildExCardRenderer.sampleCards())[idx] || null;
+            editorTemplateId = null;
+          } else {
+            const cardId = parseInt(val.split(':')[1], 10);
+            try {
+              const data = await fetchJson(`/admin/templates/preview`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sample_card_id: cardId }),
+              });
+              editorCardData = data.render_card || null;
+              const tpl = state.templates.find(t => t.side === 'front' && t.active);
+              editorTemplateId = tpl?.id || null;
+              if (data.render_card?.front_template?.config?.zones) {
+                editorZones.front = data.render_card.front_template.config.zones.front || {};
+              }
+              if (data.render_card?.back_template?.config?.zones) {
+                editorZones.back = data.render_card.back_template.config.zones.back || {};
+              }
+            } catch (err) {
+              $('editor-error').textContent = err.message || 'Could not load card';
+              $('editor-error').classList.add('visible');
+            }
+          }
+          loadEditorCard();
+        });
+      }
+
+      function initCardEditor() {
+        if (!WildExCardRenderer) return;
+        editorCardData = (WildExCardRenderer.sampleCards && WildExCardRenderer.sampleCards()[0]) || null;
+        populateEditorCardSelect();
+        loadEditorCard();
+
+        $('editor-flip-btn').addEventListener('click', () => {
+          editorSide = editorSide === 'front' ? 'back' : 'front';
+          WildExCardRenderer.flip($('editor-card-host'));
+          setTimeout(() => renderZoneOverlay(editorSide), 60);
+        });
+
+        $('editor-reset-btn').addEventListener('click', () => {
+          editorZones = { front: {}, back: {} };
+          loadEditorCard();
+        });
+
+        $('editor-save-btn').addEventListener('click', async () => {
+          $('editor-error').classList.remove('visible');
+          const tplId = editorTemplateId || state.templates.find(t => t.side === 'front' && t.active)?.id;
+          if (!tplId) {
+            $('editor-error').textContent = 'No active template to save to. Select a real card from the picker.';
+            $('editor-error').classList.add('visible');
+            return;
+          }
+          const zones = {};
+          for (const side of ['front', 'back']) {
+            zones[side] = {};
+            const eff = getEffectiveZones(side);
+            for (const [key, z] of Object.entries(eff)) {
+              const ov = editorZones[side]?.[key] || {};
+              zones[side][key] = {
+                x: parseFloat((ov.x ?? z.x).toFixed(4)),
+                y: parseFloat((ov.y ?? z.y).toFixed(4)),
+                w: parseFloat((ov.w ?? z.w ?? 0.1).toFixed(4)),
+                h: parseFloat((ov.h ?? z.h ?? 0.04).toFixed(4)),
+              };
+            }
+          }
+          try {
+            await fetchJson(`/admin/templates/${tplId}/zones`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ zones }),
+            });
+            showBox('editor-status', 'Layout saved to template config');
+          } catch (err) {
+            $('editor-error').textContent = err.message || 'Could not save layout';
+            $('editor-error').classList.add('visible');
+          }
+        });
+
+        $('editor-export-front-btn').addEventListener('click', async () => {
+          if (!$('editor-card-host').__wxData) return;
+          await WildExCardRenderer.exportFace($('editor-card-host'), 'front', 'wildex-card');
+        });
+
+        $('editor-export-back-btn').addEventListener('click', async () => {
+          if (!$('editor-card-host').__wxData) return;
+          await WildExCardRenderer.exportFace($('editor-card-host'), 'back', 'wildex-card');
+        });
+
+        window.addEventListener('resize', () => {
+          if ($('card-editor-panel').offsetParent !== null) {
+            renderZoneOverlay(editorSide);
+          }
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initCardEditor, 400);
+      });
+    })();
   </script>
 </body>
 </html>
