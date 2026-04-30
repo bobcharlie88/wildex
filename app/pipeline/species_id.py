@@ -23,11 +23,11 @@ import httpx
 from google import genai
 from google.genai import types
 
-from app.config import GEMINI_API_KEY, GOOGLE_VISION_API_KEY, INATURALIST_API_KEY
+from app.config import GEMINI_API_KEY, GEMINI_FALLBACK_MODELS, GEMINI_MODEL, GOOGLE_VISION_API_KEY, INATURALIST_API_KEY
 
 log = logging.getLogger("wildex.species_id")
 
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODELS = tuple(dict.fromkeys([GEMINI_MODEL, *GEMINI_FALLBACK_MODELS]))
 INAT_TAXA_URL = "https://api.inaturalist.org/v1/taxa"
 INAT_CV_URL = "https://api.inaturalist.org/v1/computervision/score_image"
 INAT_OBSERVATIONS_URL = "https://api.inaturalist.org/v1/observations"
@@ -564,8 +564,8 @@ def identify_with_gemini(image_path: str, *, location_hint: dict | None = None) 
     path = Path(image_path)
     file_size = path.stat().st_size if path.exists() else 0
     log.info(
-        "gemini_start image=%s size=%d key_present=%s model=%s",
-        image_path, file_size, key_present, GEMINI_MODEL,
+        "gemini_start image=%s size=%d key_present=%s models=%s",
+        image_path, file_size, key_present, ",".join(GEMINI_MODELS),
     )
 
     if not GEMINI_API_KEY or GEMINI_API_KEY.startswith("your_"):
@@ -578,28 +578,34 @@ def identify_with_gemini(image_path: str, *, location_hint: dict | None = None) 
     with path.open("rb") as fh:
         image_bytes = fh.read()
 
-    t0 = time.monotonic()
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type=_file_mime(path)),
-                _build_gemini_prompt(location_hint),
-            ],
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
-    except Exception as exc:
-        elapsed = time.monotonic() - t0
-        log.warning(
-            "gemini_fail elapsed=%.2fs error_type=%s error=%s",
-            elapsed, type(exc).__name__, str(exc)[:400],
-        )
-        raise
-
-    elapsed = time.monotonic() - t0
-    text_len = len(response.text or "")
-    log.info("gemini_ok elapsed=%.2fs text_len=%d", elapsed, text_len)
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    prompt = _build_gemini_prompt(location_hint)
+    last_exc: Exception | None = None
+    response = None
+    for model_name in GEMINI_MODELS:
+        t0 = time.monotonic()
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type=_file_mime(path)),
+                    prompt,
+                ],
+                config=types.GenerateContentConfig(response_mime_type="application/json"),
+            )
+            elapsed = time.monotonic() - t0
+            text_len = len(response.text or "")
+            log.info("gemini_ok model=%s elapsed=%.2fs text_len=%d", model_name, elapsed, text_len)
+            break
+        except Exception as exc:
+            elapsed = time.monotonic() - t0
+            last_exc = exc
+            log.warning(
+                "gemini_fail model=%s elapsed=%.2fs error_type=%s error=%s",
+                model_name, elapsed, type(exc).__name__, str(exc)[:400],
+            )
+    if response is None:
+        raise last_exc or RuntimeError("Gemini identification failed without returning a response")
 
     data = _parse_gemini_json(response.text)
     result = _build_result(

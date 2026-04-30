@@ -187,6 +187,34 @@ def test_gemini_prompt_includes_location_context():
         os.unlink(tmp)
 
 
+def test_gemini_retries_fallback_model_when_primary_model_fails():
+    mock_response = MagicMock()
+    mock_response.text = json.dumps(MOCK_GEMINI_KOALA)
+
+    fake_image = b"\xff\xd8\xff" + b"\x00" * 64
+
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+        f.write(fake_image)
+        tmp = f.name
+
+    try:
+        with patch("app.pipeline.species_id.GEMINI_API_KEY", "fake_key_abc123"):
+            with patch("app.pipeline.species_id.GEMINI_MODELS", ("bad-model", "gemini-2.0-flash-001")):
+                with patch("google.genai.Client") as MockClient:
+                    MockClient.return_value.models.generate_content.side_effect = [
+                        RuntimeError("404 model not found"),
+                        mock_response,
+                    ]
+                    result = identify_with_gemini(tmp)
+
+        calls = MockClient.return_value.models.generate_content.call_args_list
+        assert result.scientific_name == "Phascolarctos cinereus"
+        assert calls[0].kwargs["model"] == "bad-model"
+        assert calls[1].kwargs["model"] == "gemini-2.0-flash-001"
+    finally:
+        os.unlink(tmp)
+
+
 def test_inat_enrichment_with_mocked_response():
     result = SpeciesResult(
         scientific_name="Phascolarctos cinereus",

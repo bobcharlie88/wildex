@@ -19,11 +19,11 @@ from dataclasses import dataclass, field
 from google import genai
 from google.genai import types
 
-from app.config import GEMINI_API_KEY
+from app.config import GEMINI_API_KEY, GEMINI_MODEL
 from app.pipeline.species_id import SpeciesResult
 from app.pipeline.species_data import SpeciesData
 
-GEMINI_MODEL = "gemini-2.5-flash"
+CARD_GEMINI_MODEL = GEMINI_MODEL
 log = logging.getLogger("wildex.card_generator")
 
 STAT_PROMPT_ANIMAL = """\
@@ -250,7 +250,7 @@ def _call_gemini(prompt: str) -> dict:
         )
     client   = genai.Client(api_key=GEMINI_API_KEY)
     response = client.models.generate_content(
-        model    = GEMINI_MODEL,
+        model    = CARD_GEMINI_MODEL,
         contents = [prompt],
         config   = types.GenerateContentConfig(
             response_mime_type = "application/json",
