@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>WildEx — Capture</title>
+  <link rel="stylesheet" href="/static/card_renderer.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080f14;
+      --surface:  #0e1a24;
+      --surface2: #152130;
+      --accent:   #22c55e;
+      --accent2:  #16a34a;
+      --warn:     #f59e0b;
+      --danger:   #ef4444;
+      --text:     #e8f0e9;
+      --muted:    #5a7a62;
+      --radius:   16px;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden; }
+
+    /* ── Screens ─────────────────────────────────────────────── */
+    .screen {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column; align-items: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+    }
+    .screen.active { opacity: 1; pointer-events: all; }
+
+    /* ── Back button (top-left, all screens) ─────────────────── */
+    .back-btn {
+      position: absolute; top: 14px; left: 14px; z-index: 30;
+      color: var(--accent); font-size: 0.9rem; font-weight: 600;
+      text-decoration: none; padding: 8px 10px;
+      background: rgba(8,15,20,0.6); border-radius: 10px;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Capture screen ──────────────────────────────────────── */
+    #preview-bg {
+      position: absolute; inset: 0; background: var(--surface); overflow: hidden;
+    }
+    #preview-img {
+      width: 100%; height: 100%; object-fit: cover;
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    #preview-img.visible { opacity: 1; }
+    #preview-video {
+      width: 100%; height: 100%; object-fit: cover;
+      display: none;
+    }
+    #preview-video.visible { display: block; }
+
+    .placeholder {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; color: var(--muted);
+    }
+    .placeholder svg { opacity: 0.35; }
+    .placeholder p { font-size: 0.9rem; text-align: center; padding: 0 32px; line-height: 1.5; }
+
+    .capture-bar {
+      position: relative; z-index: 10; width: 100%;
+      padding: 20px 24px 44px;
+      background: linear-gradient(to top, rgba(8,15,20,0.96) 65%, transparent);
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      margin-top: auto;
+    }
+
+    /* ── Mode toggle (Photo / Video) ──────────────────────────── */
+    .mode-toggle {
+      display: flex; background: var(--surface2); border-radius: 10px;
+      padding: 3px; gap: 2px;
+    }
+    .mode-btn {
+      padding: 7px 18px; border: none; border-radius: 8px;
+      font-size: 0.82rem; font-weight: 600; cursor: pointer;
+      background: transparent; color: var(--muted);
+      transition: background 0.2s, color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mode-btn.active { background: var(--surface); color: var(--text); }
+
+    #wordmark { font-size: 1rem; font-weight: 700; letter-spacing: 0.14em;
+      color: var(--accent); text-transform: uppercase; }
+    #gps-status { font-size: 0.75rem; color: var(--muted); display: flex;
+      align-items: center; gap: 6px; }
+    #gps-dot { width: 7px; height: 7px; border-radius: 50%;
+      background: var(--muted); flex-shrink: 0; transition: background 0.4s; }
+    #gps-dot.acquired { background: var(--accent); }
+    #sync-status {
+      display: none;
+      width: 100%;
+      max-width: 340px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(21,33,48,0.92);
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.4;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    #sync-status.visible { display: block; }
+    .queue-panel {
+      width: 100%;
+      max-width: 340px;
+      border-radius: 16px;
+      background: rgba(10,18,27,0.92);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 16px 36px rgba(0,0,0,0.22);
+    }
+    .queue-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .queue-title {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .queue-counts {
+      font-size: 0.78rem;
+      color: var(--text);
+      text-align: right;
+      line-height: 1.4;
+    }
+    .queue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 26vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-right: 2px;
+    }
+    .queue-empty {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.5;
+      padding: 4px 0;
+    }
+    .job-row {
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 48px 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+    .job-row.review {
+      grid-template-columns: 48px 1fr;
+      align-items: start;
+    }
+    .job-thumb {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      object-fit: cover;
+      background: rgba(255,255,255,0.06);
+    }
+    .job-title {
+      font-size: 0.84rem;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .job-meta {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+    .job-status {
+      padding: 6px 8px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+    .job-status.queued { background: rgba(245,158,11,0.14); color: #fcd34d; }
+    .job-status.processing { background: rgba(96,165,250,0.14); color: #93c5fd; }
+    .job-status.complete { background: rgba(34,197,94,0.14); color: #86efac; }
+    .job-status.needs_review { background: rgba(245,158,11,0.14); color: #fbbf24; }
+    .job-status.failed { background: rgba(239,68,68,0.14); color: #fca5a5; }
+    .review-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .review-actions button {
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+    .review-actions button.primary {
+      background: rgba(34,197,94,0.18);
+      color: #b7f7c8;
+      border-color: rgba(34,197,94,0.3);
+    }
+    #toast-stack {
+      position: fixed;
+      top: 16px;
+      right: 12px;
+      left: 12px;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      border-radius: 16px;
+      background: rgba(8,15,20,0.96);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 16px 36px rgba(0,0,0,0.24);
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+    .toast strong {
+      display: block;
+      font-size: 0.84rem;
+      margin-bottom: 3px;
+    }
+    .toast span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.74rem;
+      line-height: 1.35;
+    }
+    .toast button {
+      border: none;
+      background: var(--accent);
+      color: #041009;
+      font-weight: 700;
+      border-radius: 12px;
+      padding: 10px 12px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      width: 100%; max-width: 340px; padding: 15px; border: none;
+      border-radius: var(--radius); font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: transform 0.1s, opacity 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.97); opacity: 0.88; }
+    .btn-primary   { background: var(--accent); color: #000; }
+    .btn-secondary { background: var(--surface2); color: var(--text);
+      border: 1px solid rgba(255,255,255,0.07); }
+
+    #capture-btn { display: none; }
+    #capture-btn.visible { display: block; }
+
+    /* ── Loading screen ──────────────────────────────────────── */
+    #loading-screen { background: var(--bg); justify-content: center; gap: 32px; }
+    .spinner { width: 52px; height: 52px; border: 3px solid var(--surface2);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.75s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .steps { display: flex; flex-direction: column; gap: 10px; }
+    .step { display: flex; align-items: center; gap: 10px;
+      font-size: 0.85rem; color: var(--muted); transition: color 0.35s; }
+    .step.active { color: var(--text); }
+    .step.done   { color: var(--accent); }
+    .step-dot { width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor; flex-shrink: 0; }
+
+    /* ── Result screen ───────────────────────────────────────── */
+    #result-screen { background: var(--bg); justify-content: flex-start;
+      overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+    #result-photo { display: none; }
+
+    .result-body { width: 100%; padding: 20px 18px 52px;
+      display: flex; flex-direction: column; gap: 18px; }
+    .card-display {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+    }
+    #result-card-host {
+      width: 100%;
+      display: grid;
+      justify-items: center;
+      --wx-card-viewport-offset: 270px;
+    }
+    .flip-card {
+      perspective: 1400px;
+    }
+    .flip-card-inner {
+      position: relative;
+      width: 100%;
+      min-height: 620px;
+      transform-style: preserve-3d;
+      transition: transform 0.7s ease;
+    }
+    .flip-card.flipped .flip-card-inner {
+      transform: rotateY(180deg);
+    }
+    .card-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 28px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 22px 60px rgba(0,0,0,0.42);
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(180deg, rgba(8,15,20,0.95), rgba(8,15,20,1));
+    }
+    .card-face.back {
+      transform: rotateY(180deg);
+    }
+    .card-front-photo {
+      position: relative;
+      min-height: 290px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.04);
+    }
+    .card-front-photo.landscape {
+      min-height: 220px;
+    }
+    .card-front-photo img {
+      width: 100%;
+      height: 100%;
+      min-height: 290px;
+      object-fit: cover;
+      display: block;
+    }
+    .card-front-photo.landscape img {
+      min-height: 220px;
+    }
+    .card-front-overlay {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(0,0,0,0.08), transparent 34%, rgba(0,0,0,0.72)),
+        radial-gradient(circle at top right, rgba(255,255,255,0.16), transparent 30%);
+      pointer-events: none;
+    }
+    .card-ribbon {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(8,15,20,0.72);
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .card-ribbon-icon {
+      font-size: 0.95rem;
+    }
+    .card-front-title {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      z-index: 2;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 14px;
+    }
+    .card-front-title .name-block {
+      min-width: 0;
+    }
+    .card-front-title .common-name {
+      font-size: 1.9rem;
+      text-shadow: 0 4px 18px rgba(0,0,0,0.48);
+    }
+    .card-front-title .sci-name {
+      color: rgba(232,240,233,0.76);
+    }
+    .score-chip {
+      min-width: 82px;
+      padding: 10px 12px;
+      border-radius: 18px;
+      background: rgba(8,15,20,0.78);
+      border: 1px solid rgba(255,255,255,0.12);
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .score-chip strong {
+      display: block;
+      font-size: 1.05rem;
+    }
+    .score-chip span {
+      display: block;
+      margin-top: 3px;
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(232,240,233,0.68);
+    }
+    .card-face-body {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 18px;
+      flex: 1;
+    }
+    .card-face-body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.06), transparent 36%),
+        linear-gradient(180deg, transparent, rgba(255,255,255,0.03));
+      pointer-events: none;
+    }
+    .card-face-body > * {
+      position: relative;
+      z-index: 1;
+    }
+    .card-meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .card-title-kicker {
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(232,240,233,0.74);
+    }
+    .card-rank-pill {
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .card-back-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .card-back-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      font-size: 1.5rem;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.1);
+      flex-shrink: 0;
+    }
+    .card-back-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .meta-chip {
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .meta-chip .label {
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(232,240,233,0.62);
+    }
+    .meta-chip .value {
+      margin-top: 6px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .flip-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .flip-actions .btn {
+      max-width: none;
+    }
+    .theme-reptile {
+      background:
+        linear-gradient(160deg, rgba(104,36,18,0.98), rgba(43,17,11,0.98)),
+        radial-gradient(circle at top left, rgba(255,180,98,0.18), transparent 32%);
+    }
+    .theme-reptile .card-face-body {
+      background:
+        linear-gradient(180deg, rgba(40,17,8,0.58), rgba(16,10,8,0.9)),
+        repeating-linear-gradient(135deg, rgba(255,255,255,0.02) 0 8px, transparent 8px 16px);
+    }
+    .theme-mammal {
+      background:
+        linear-gradient(160deg, rgba(51,63,35,0.98), rgba(21,27,19,0.98)),
+        radial-gradient(circle at top right, rgba(181,142,96,0.18), transparent 30%);
+    }
+    .theme-bird {
+      background:
+        linear-gradient(160deg, rgba(24,62,92,0.98), rgba(15,28,44,0.98)),
+        radial-gradient(circle at top center, rgba(167,220,255,0.22), transparent 34%);
+    }
+    .theme-fish {
+      background:
+        linear-gradient(160deg, rgba(7,74,99,0.98), rgba(5,28,44,0.98)),
+        radial-gradient(circle at top right, rgba(102,233,255,0.2), transparent 34%);
+    }
+    .theme-plant {
+      background:
+        linear-gradient(160deg, rgba(97,83,47,0.98), rgba(51,44,24,0.98)),
+        radial-gradient(circle at top left, rgba(240,226,173,0.18), transparent 34%);
+    }
+    .theme-fungi {
+      background:
+        linear-gradient(160deg, rgba(76,40,54,0.98), rgba(32,18,28,0.98)),
+        radial-gradient(circle at top left, rgba(255,190,214,0.16), transparent 34%);
+    }
+    .theme-terrain {
+      background:
+        linear-gradient(160deg, rgba(65,60,52,0.98), rgba(26,24,23,0.98)),
+        radial-gradient(circle at top left, rgba(233,204,164,0.14), transparent 30%);
+    }
+    .theme-pending {
+      background:
+        linear-gradient(160deg, rgba(35,35,49,0.98), rgba(14,14,24,0.98)),
+        radial-gradient(circle at top right, rgba(135,146,255,0.18), transparent 34%);
+    }
+    .reptile-template {
+      color: #322117;
+      background:
+        linear-gradient(180deg, rgba(103,59,38,0.22), transparent 18%),
+        linear-gradient(180deg, #d3bc9c 0%, #c9b08a 42%, #b89973 100%);
+    }
+    .reptile-template::before {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border: 3px solid rgba(77,45,28,0.85);
+      border-radius: 22px;
+      pointer-events: none;
+      box-shadow: inset 0 0 0 2px rgba(213,182,139,0.35);
+    }
+    .reptile-template .card-face-body {
+      background: transparent;
+      gap: 12px;
+    }
+    .reptile-template .card-face-body::before {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(255,255,255,0.18), transparent 18%),
+        radial-gradient(circle at 86% 88%, rgba(255,160,76,0.24), transparent 12%),
+        repeating-linear-gradient(0deg, rgba(58,36,24,0.05) 0 2px, transparent 2px 14px);
+      opacity: 0.85;
+    }
+    .reptile-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 14px 0;
+      color: #f4e5cf;
+    }
+    .reptile-level {
+      width: 54px;
+      height: 54px;
+      clip-path: polygon(25% 6%, 75% 6%, 96% 50%, 75% 94%, 25% 94%, 4% 50%);
+      background: linear-gradient(180deg, #295f37, #163820);
+      border: 3px solid #ccb793;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 1.45rem;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.35);
+      flex-shrink: 0;
+    }
+    .reptile-banner {
+      flex: 1;
+      min-height: 44px;
+      border-radius: 10px;
+      border: 2px solid rgba(80,48,30,0.95);
+      background: linear-gradient(180deg, #6b4834, #4f3125);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      box-shadow: inset 0 0 0 2px rgba(223,194,151,0.18);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .reptile-banner strong {
+      font-size: 1.05rem;
+    }
+    .reptile-banner span {
+      font-size: 0.88rem;
+      color: #f6d9b0;
+    }
+    .reptile-title {
+      padding: 0 18px;
+      text-align: left;
+    }
+    .reptile-title .common-name {
+      font-size: 1.85rem;
+      line-height: 1.05;
+      color: #4a2a1a;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      text-shadow: none;
+    }
+    .reptile-title .sci-name {
+      color: #5e3f2e;
+      font-size: 1.02rem;
+    }
+    .reptile-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(150px, 0.95fr);
+      gap: 14px;
+      align-items: start;
+    }
+    .reptile-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+    .reptile-row {
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(74,42,26,0.16);
+    }
+    .reptile-row .label {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: #4d2f1f;
+    }
+    .reptile-row .value {
+      margin-top: 3px;
+      font-size: 0.94rem;
+      line-height: 1.35;
+      color: #3d291e;
+    }
+    .reptile-photo-frame {
+      border-radius: 14px;
+      padding: 8px;
+      background: linear-gradient(180deg, rgba(112,73,50,0.95), rgba(73,47,34,0.98));
+      border: 2px solid rgba(80,48,30,0.95);
+      box-shadow: inset 0 0 0 2px rgba(223,194,151,0.18);
+    }
+    .reptile-photo-frame img {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      object-fit: cover;
+      display: block;
+      border-radius: 10px;
+      border: 1px solid rgba(222,197,161,0.42);
+    }
+    .reptile-section-tag {
+      align-self: flex-start;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 2px solid rgba(96,58,39,0.95);
+      background: linear-gradient(180deg, #d2b083, #b98d61);
+      color: #4b2b1a;
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .reptile-lore {
+      font-size: 0.98rem;
+      line-height: 1.55;
+      color: #382418;
+    }
+    .reptile-fact {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #513226, #362017);
+      border: 2px solid rgba(89,55,38,0.98);
+      color: #f2dec2;
+    }
+    .reptile-fact strong {
+      display: block;
+      font-size: 0.84rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      color: #f6cf95;
+    }
+    .reptile-fact span {
+      font-size: 0.92rem;
+      line-height: 1.4;
+      font-style: italic;
+    }
+    @media (max-width: 420px) {
+      .flip-card-inner { min-height: 580px; }
+      .card-back-grid { grid-template-columns: 1fr; }
+      .card-front-title .common-name { font-size: 1.65rem; }
+      .reptile-body { grid-template-columns: 1fr; }
+    }
+    @media print {
+      body { background: #fff; }
+      .back-btn, .btn, .save-banner { display: none !important; }
+      .screen { position: static; opacity: 1 !important; pointer-events: all !important; }
+      #capture-screen, #loading-screen { display: none !important; }
+      #result-screen { overflow: visible; }
+      #result-card-host { --wx-card-viewport-offset: 220px; }
+      .result-body { padding: 0; }
+      .flip-card { perspective: none; }
+      .flip-card-inner { transform: none !important; min-height: auto; display: grid; gap: 16px; }
+      .card-face { position: relative; transform: none !important; page-break-inside: avoid; }
+      .flip-actions { display: none !important; }
+    }
+
+    .save-banner {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; border-radius: 12px; font-size: 0.88rem; font-weight: 600;
+    }
+    .save-banner.saved { background: rgba(34,197,94,0.12); color: var(--accent);
+      border: 1px solid rgba(34,197,94,0.25); }
+    .save-banner.unsaved { background: rgba(245,158,11,0.1); color: var(--warn);
+      border: 1px solid rgba(245,158,11,0.2); }
+
+    .name-block { display: flex; flex-direction: column; gap: 3px; }
+    .common-name { font-size: 1.7rem; font-weight: 700; line-height: 1.15; }
+    .sci-name { font-size: 0.9rem; font-style: italic; color: var(--muted); }
+
+    .badges { display: flex; flex-wrap: wrap; gap: 7px; }
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.74rem;
+      font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+    .badge-green  { background: rgba(34,197,94,0.14);  color: var(--accent); }
+    .badge-amber  { background: rgba(245,158,11,0.14); color: var(--warn); }
+    .badge-red    { background: rgba(239,68,68,0.14);  color: var(--danger); }
+    .badge-muted  { background: var(--surface2); color: var(--muted); }
+
+    .conf-row { display: flex; flex-direction: column; gap: 7px; }
+    .conf-label { display: flex; justify-content: space-between; font-size: 0.8rem; }
+    .conf-label span:first-child { color: var(--muted); }
+    .conf-label span:last-child  { font-weight: 700; }
+    .conf-track { height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .conf-fill  { height: 100%; border-radius: 3px;
+      transition: width 0.7s cubic-bezier(0.34,1.56,0.64,1); }
+
+    .stats-card { background: var(--surface); border-radius: var(--radius);
+      padding: 16px; display: flex; flex-direction: column; gap: 11px; }
+    .stats-title { font-size: 0.72rem; font-weight: 700; color: var(--muted);
+      letter-spacing: 0.1em; text-transform: uppercase; }
+    .stat-row { display: flex; align-items: center; gap: 10px; }
+    .stat-label { font-size: 0.72rem; font-weight: 700; color: var(--muted);
+      letter-spacing: 0.06em; width: 32px; flex-shrink: 0; }
+    .stat-track { flex: 1; height: 6px; background: var(--surface2);
+      border-radius: 3px; overflow: hidden; }
+    .stat-fill  { height: 100%; border-radius: 3px;
+      transition: width 0.65s cubic-bezier(0.34,1.56,0.64,1); }
+    .stat-val   { font-size: 0.8rem; font-weight: 700; width: 26px;
+      text-align: right; flex-shrink: 0; }
+
+    .blurb { font-size: 0.9rem; line-height: 1.6; color: var(--muted);
+      padding: 14px 16px; background: var(--surface); border-radius: var(--radius);
+      border-left: 2px solid var(--accent2); }
+
+    .detail-card { background: var(--surface); border-radius: var(--radius);
+      padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .detail-row { display: flex; justify-content: space-between;
+      align-items: flex-start; gap: 10px; font-size: 0.84rem; }
+    .detail-key { color: var(--muted); flex-shrink: 0; }
+    .detail-val { color: var(--text); font-weight: 500; text-align: right; }
+
+    .error-box { background: rgba(239,68,68,0.07);
+      border: 1px solid rgba(239,68,68,0.2); border-radius: var(--radius);
+      padding: 20px; text-align: center; color: var(--danger);
+      font-size: 0.88rem; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div id="toast-stack"></div>
+
+  <!-- ── Capture screen ────────────────────────────────────────── -->
+  <div class="screen active" id="capture-screen">
+    <a class="back-btn" href="/">&#8592; Back</a>
+
+    <div id="preview-bg">
+      <img id="preview-img" alt="">
+      <video id="preview-video" playsinline muted loop></video>
+      <div class="placeholder" id="placeholder">
+        <svg width="60" height="60" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.4">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <p>Point at any animal, plant, fungi, or terrain</p>
+      </div>
+    </div>
+
+    <div class="capture-bar">
+      <div id="wordmark">WildEx</div>
+
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="mode-photo" onclick="setMode('photo')">📷 Photo</button>
+        <button class="mode-btn" id="mode-video" onclick="setMode('video')">🎬 Video</button>
+      </div>
+
+      <div id="gps-status">
+        <div id="gps-dot"></div>
+        <span id="gps-text">Acquiring GPS...</span>
+      </div>
+      <div id="sync-status"></div>
+      <section class="queue-panel">
+        <div class="queue-head">
+          <div>
+            <div class="queue-title">Recent Captures</div>
+            <div class="job-meta" id="queue-summary">Photos process in the background.</div>
+          </div>
+          <div class="queue-counts" id="queue-counts">0 active</div>
+        </div>
+        <div class="queue-list" id="job-list">
+          <div class="queue-empty">No capture jobs yet.</div>
+        </div>
+      </section>
+
+      <label class="btn btn-primary" id="open-label" for="camera-input">Take Photo</label>
+      <input type="file" id="camera-input" accept="image/*" capture="environment"
+             style="display:none">
+
+      <button class="btn btn-secondary" id="capture-btn">Submit Photo</button>
+    </div>
+  </div>
+
+  <!-- ── Loading screen ──────────────────────────────────────── -->
+  <div class="screen" id="loading-screen">
+    <div class="spinner"></div>
+    <div class="steps">
+      <div class="step" id="s0"><div class="step-dot"></div>Extracting best frame</div>
+      <div class="step active" id="s1"><div class="step-dot"></div>Identifying subject</div>
+      <div class="step"        id="s2"><div class="step-dot"></div>Looking up species data</div>
+      <div class="step"        id="s3"><div class="step-dot"></div>Getting rarity &amp; range</div>
+      <div class="step"        id="s4"><div class="step-dot"></div>Writing card</div>
+      <div class="step"        id="s5"><div class="step-dot"></div>Saving to WildDex</div>
+    </div>
+  </div>
+
+  <!-- ── Result screen ─────────────────────────────────────────── -->
+  <div class="screen" id="result-screen">
+    <a class="back-btn" href="/">&#8592; Back</a>
+    <img id="result-photo" alt="">
+    <div class="result-body" id="result-body"></div>
+  </div>
+
+  <script src="/static/card_renderer.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    const screens = ['capture-screen','loading-screen','result-screen'].map($);
+    const QUEUE_DB_NAME = 'wildex-offline';
+    const QUEUE_STORE = 'capture_queue';
+    const TERMINAL_STATUSES = new Set(['complete', 'failed', 'needs_review']);
+    const JOB_NOTICE_STORE = 'wildex_capture_notices_v1';
+    let syncInFlight = false;
+    let captureJobs = [];
+
+    fetch('/auth/me', { credentials: 'same-origin' }).then(resp => {
+      if (resp.status === 401) location.href = '/login';
+    }).catch(() => {});
+
+    function openQueueDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(QUEUE_DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(QUEUE_STORE)) {
+            db.createObjectStore(QUEUE_STORE, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('IndexedDB unavailable'));
+      });
+    }
+
+    async function queueTx(mode, handler) {
+      const db = await openQueueDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(QUEUE_STORE, mode);
+        const store = tx.objectStore(QUEUE_STORE);
+        let result;
+        try {
+          result = handler(store, tx);
+        } catch (err) {
+          db.close();
+          reject(err);
+          return;
+        }
+        tx.oncomplete = () => {
+          db.close();
+          resolve(result);
+        };
+        tx.onerror = () => {
+          db.close();
+          reject(tx.error || new Error('Queue transaction failed'));
+        };
+      });
+    }
+
+    async function enqueueCapture(file, coords) {
+      await queueTx('readwrite', store => {
+        store.add({
+          created_at: Date.now(),
+          file,
+          lat: coords?.lat ?? null,
+          lon: coords?.lon ?? null,
+        });
+      });
+      await refreshQueueStatus();
+    }
+
+    async function listQueuedCaptures() {
+      const db = await openQueueDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(QUEUE_STORE, 'readonly');
+        const req = tx.objectStore(QUEUE_STORE).getAll();
+        req.onsuccess = () => {
+          db.close();
+          resolve((req.result || []).sort((a, b) => a.id - b.id));
+        };
+        req.onerror = () => {
+          db.close();
+          reject(req.error || new Error('Could not read queue'));
+        };
+      });
+    }
+
+    async function deleteQueuedCapture(id) {
+      await queueTx('readwrite', store => store.delete(id));
+    }
+
+    async function queuedCount() {
+      const db = await openQueueDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(QUEUE_STORE, 'readonly');
+        const req = tx.objectStore(QUEUE_STORE).count();
+        req.onsuccess = () => {
+          db.close();
+          resolve(req.result || 0);
+        };
+        req.onerror = () => {
+          db.close();
+          reject(req.error || new Error('Could not count queue'));
+        };
+      });
+    }
+
+    async function refreshQueueStatus(message = '') {
+      try {
+        const count = await queuedCount();
+        if (!count && !message) {
+          $('sync-status').classList.remove('visible');
+          $('sync-status').textContent = '';
+          return;
+        }
+        const parts = [];
+        if (message) parts.push(message);
+        if (count) parts.push(`${count} capture${count === 1 ? '' : 's'} queued for upload`);
+        $('sync-status').textContent = parts.join(' • ');
+        $('sync-status').classList.add('visible');
+      } catch (_) {
+        $('sync-status').classList.remove('visible');
+      }
+    }
+
+    function seenNoticeIds() {
+      try {
+        return JSON.parse(localStorage.getItem(JOB_NOTICE_STORE) || '[]');
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function markNoticeSeen(id) {
+      const seen = new Set(seenNoticeIds());
+      seen.add(id);
+      localStorage.setItem(JOB_NOTICE_STORE, JSON.stringify([...seen].slice(-200)));
+    }
+
+    function jobLabel(job) {
+      if (job.status === 'queued') return 'Waiting';
+      if (job.status === 'processing') return 'Identifying…';
+      if (job.status === 'complete') return 'Done';
+      if (job.status === 'needs_review') return 'Choose species';
+      return 'Failed';
+    }
+
+    function repeatLabel(job) {
+      if (job.repeat_state === 'repeat_capture') return 'Previously caught species found again';
+      if (job.repeat_state === 'first_capture_after_seen') return 'Seen before, now captured';
+      return 'New species captured';
+    }
+
+    function jobSummary(job) {
+      if (job.status === 'complete') {
+        return `${repeatLabel(job)}${job.grouped_count > 1 ? ` • ${job.grouped_count} shots grouped` : ''}${job.region_unlocked ? ' • region unlocked' : ''}`;
+      }
+      if (job.status === 'needs_review') return job.review_reason || 'The encounter needs manual review.';
+      if (job.status === 'failed') return job.error_message || 'Processing failed.';
+      if (job.status === 'processing') return 'Identifying species and building your card…';
+      return 'Uploaded — identification starting soon.';
+    }
+
+function renderJobQueue() {
+      const items = captureJobs.filter(job => !job.is_grouped_secondary);
+      const activeItems = items.filter(job => job.status === 'queued' || job.status === 'processing');
+      const reviewItems = items.filter(job => job.status === 'needs_review');
+      const active = activeItems.length;
+      const complete = items.filter(job => job.status === 'complete').length;
+      const review = reviewItems.length;
+      const failed = items.filter(job => job.status === 'failed').length;
+      $('queue-counts').textContent = `${active} active`;
+      $('queue-summary').textContent = active
+        ? `${complete} completed recently • ${review} review • ${failed} failed`
+        : review
+          ? `${review} capture${review === 1 ? '' : 's'} waiting for species confirmation`
+          : 'Finished captures clear from this queue automatically.';
+
+      if (!activeItems.length && !reviewItems.length) {
+        $('job-list').innerHTML = '<div class="queue-empty">Tap Take Photo above to start capturing wildlife.</div>';
+        return;
+      }
+
+      const activeMarkup = activeItems.map(job => {
+        const title = job.species_name || (job.status === 'queued' ? 'Capture queued' : job.status === 'processing' ? 'Processing capture' : 'Capture update');
+        const thumb = job.image_url ? `<img class="job-thumb" src="${esc(job.image_url)}" alt="">` : '<div class="job-thumb"></div>';
+        return `
+          <div class="job-row" ${job.card_id ? `data-card-id="${job.card_id}"` : ''}>
+            ${thumb}
+            <div>
+              <div class="job-title">${esc(title)}</div>
+              <div class="job-meta">${esc(jobSummary(job))}</div>
+            </div>
+            <div class="job-status ${esc(job.status)}">${esc(jobLabel(job))}</div>
+          </div>`;
+      }).join('');
+
+      const reviewMarkup = reviewItems.map(job => {
+        const thumb = job.image_url ? `<img class="job-thumb" src="${esc(job.image_url)}" alt="">` : '<div class="job-thumb"></div>';
+        const alternatives = (job.alternatives || []).slice(0, 3);
+        const hasSpecies = job.species_name || job.scientific_name;
+        const buttons = alternatives.length
+          ? alternatives.map((candidate, idx) => `
+            <button type="button" class="${idx === 0 ? 'primary' : ''}" data-confirm-job="${job.id}" data-scientific-name="${esc(candidate.scientific_name || '')}">
+              ${esc(candidate.common_name || candidate.label || candidate.scientific_name || 'Possible match')}
+            </button>`).join('')
+          : hasSpecies
+            ? `<button type="button" class="primary" data-confirm-job="${job.id}" data-scientific-name="${esc(job.scientific_name || '')}">Confirm current result</button>`
+            : `<button type="button" class="primary" data-retry-job="${job.id}">Retry Identification</button>`;
+        return `
+          <div class="job-row review">
+            ${thumb}
+            <div>
+              <div class="job-title">${esc(job.species_name || (hasSpecies ? 'Species confirmation needed' : 'Identification failed — tap to retry'))}</div>
+              <div class="job-meta">${esc(job.identification_reasoning || job.review_reason || (hasSpecies ? 'Multiple possible species were found. Choose the best match to finish this capture.' : 'The identification service was unavailable. Tap retry to try again.'))}</div>
+              <div class="review-actions">${buttons}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+      $('job-list').innerHTML = `${activeMarkup}${reviewMarkup}`;
+      document.querySelectorAll('[data-confirm-job]').forEach(btn => btn.addEventListener('click', () => {
+        confirmSpeciesForJob(Number(btn.dataset.confirmJob), btn.dataset.scientificName || '').catch(() => {});
+      }));
+      document.querySelectorAll('[data-retry-job]').forEach(btn => btn.addEventListener('click', () => {
+        retryIdentificationForJob(Number(btn.dataset.retryJob)).catch(() => {});
+      }));
+    }
+
+    async function confirmSpeciesForJob(jobId, scientificName) {
+      const res = await fetch(`/capture/jobs/${jobId}/confirm-species`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scientific_name: scientificName || null }),
+      });
+      if (!res.ok) {
+        throw new Error(`Could not confirm species (${res.status})`);
+      }
+      const data = await res.json();
+      await refreshCaptureJobs();
+      if (data.card_id) {
+        location.href = `/wildex?card=${data.card_id}`;
+      }
+    }
+
+    async function retryIdentificationForJob(jobId) {
+      const btn = document.querySelector(`[data-retry-job="${jobId}"]`);
+      if (btn) { btn.disabled = true; btn.textContent = 'Retrying…'; }
+      const res = await fetch(`/capture/jobs/${jobId}/retry`, {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      if (!res.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Retry Identification'; }
+        return;
+      }
+      await refreshCaptureJobs();
+    }
+
+    function showToast(job) {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      const title = job.status === 'complete'
+        ? repeatLabel(job)
+        : job.status === 'needs_review'
+          ? 'Capture needs review'
+          : 'Capture failed';
+      const body = job.status === 'complete'
+        ? `${job.grouped_count > 1 ? `${job.grouped_count} shots grouped` : 'Card saved'}${job.region_unlocked ? ' • region unlocked' : ''}`
+        : (job.review_reason || job.error_message || 'Processing finished with an issue.');
+      const action = job.card_id
+        ? `<button type="button" data-open-card="${job.card_id}">Open card</button>`
+        : '<button type="button" data-dismiss-toast="1">Dismiss</button>';
+      toast.innerHTML = `<div><strong>${esc(title)}</strong><span>${esc(body)}</span></div>${action}`;
+      $('toast-stack').appendChild(toast);
+      const actionBtn = toast.querySelector('button');
+      actionBtn.addEventListener('click', () => {
+        if (job.card_id) {
+          location.href = `/wildex?card=${job.card_id}`;
+        } else {
+          toast.remove();
+        }
+      });
+      window.setTimeout(() => toast.remove(), 9000);
+    }
+
+    function notifyTerminalJobs() {
+      const seen = new Set(seenNoticeIds());
+      captureJobs
+        .filter(job => !job.is_grouped_secondary && TERMINAL_STATUSES.has(job.status))
+        .forEach(job => {
+          const noticeId = `${job.id}:${job.status}:${job.completed_at || ''}`;
+          if (seen.has(noticeId)) return;
+          markNoticeSeen(noticeId);
+          showToast(job);
+        });
+    }
+
+    async function refreshCaptureJobs() {
+      try {
+        const resp = await fetch('/capture/jobs', { credentials: 'same-origin' });
+        if (resp.status === 401) {
+          location.href = '/login';
+          return;
+        }
+        if (!resp.ok) return;
+        const data = await resp.json();
+        captureJobs = data.items || [];
+        renderJobQueue();
+        notifyTerminalJobs();
+      } catch (_) {}
+    }
+
+    async function uploadQueuedCapture(entry) {
+      const file = entry.file instanceof File
+        ? entry.file
+        : new File([entry.file], entry.file?.name || 'offline-capture.jpg', { type: entry.file?.type || 'application/octet-stream' });
+      const form = new FormData();
+      form.append('file', file, file.name || 'offline-capture');
+      if (entry.lat != null && entry.lon != null) {
+        form.append('lat', entry.lat);
+        form.append('lon', entry.lon);
+      }
+      const resp = await fetch('/capture', {
+        method: 'POST',
+        body: form,
+        credentials: 'same-origin',
+      });
+      if (resp.status === 401) {
+        location.href = '/login';
+        throw new Error('Authentication required');
+      }
+      if (!resp.ok) {
+        throw new Error(`Queued upload failed (${resp.status})`);
+      }
+      return resp.json();
+    }
+
+    async function processQueuedCaptures() {
+      if (syncInFlight || !navigator.onLine) {
+        await refreshQueueStatus(navigator.onLine ? '' : 'Offline mode active');
+        return;
+      }
+      syncInFlight = true;
+      try {
+        const queue = await listQueuedCaptures();
+        if (!queue.length) {
+          await refreshQueueStatus('');
+          return;
+        }
+        await refreshQueueStatus('Connection restored • syncing queued captures');
+        for (const entry of queue) {
+          await uploadQueuedCapture(entry);
+          await deleteQueuedCapture(entry.id);
+          await refreshQueueStatus('Queued capture uploaded');
+          await refreshCaptureJobs();
+        }
+      } catch (err) {
+        await refreshQueueStatus(navigator.onLine ? 'Sync paused until upload succeeds' : 'Offline mode active');
+      } finally {
+        syncInFlight = false;
+      }
+    }
+
+    function show(id) {
+      screens.forEach(s => s.classList.remove('active'));
+      $(id).classList.add('active');
+    }
+
+    // ── GPS ─────────────────────────────────────────────────────────
+    let gpsCoords = null;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          gpsCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+          $('gps-dot').classList.add('acquired');
+          $('gps-text').textContent =
+            `GPS locked (${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lon.toFixed(4)})`;
+        },
+        () => { $('gps-text').textContent = 'GPS unavailable — invasive check skipped'; },
+        { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false }
+      );
+    } else {
+      $('gps-text').textContent = 'GPS not available';
+    }
+
+    // ── Mode toggle (photo / video) ─────────────────────────────────
+    let currentMode = 'photo';
+
+    function setMode(mode) {
+      currentMode = mode;
+      $('mode-photo').classList.toggle('active', mode === 'photo');
+      $('mode-video').classList.toggle('active', mode === 'video');
+
+      const input = $('camera-input');
+      const label = $('open-label');
+      if (mode === 'photo') {
+        input.accept = 'image/*';
+        label.textContent = 'Take Photo';
+      } else {
+        input.accept = 'video/*';
+        label.textContent = 'Record Video (3–5 sec)';
+      }
+      // Reset preview when switching mode
+      resetPreview();
+    }
+
+    function resetPreview() {
+      $('camera-input').value = '';
+      capturedFile = null;
+      $('preview-img').src = '';
+      $('preview-img').classList.remove('visible');
+      const vid = $('preview-video');
+      vid.src = ''; vid.classList.remove('visible');
+      $('placeholder').style.display = '';
+      $('capture-btn').classList.remove('visible');
+    }
+
+    function renderQueuedCapture(file, coords) {
+      const fallbackPhoto = file ? URL.createObjectURL(file) : '';
+      $('result-photo').onerror = null;
+      $('result-photo').src = fallbackPhoto;
+      const locationBits = [];
+      if (coords?.lat != null && coords?.lon != null) {
+        locationBits.push(detailRow('Queued at', `${coords.lat.toFixed(4)}, ${coords.lon.toFixed(4)}`));
+      }
+      locationBits.push(detailRow('Status', 'Stored offline and will upload automatically'));
+      $('result-body').innerHTML = `
+        <div class="save-banner unsaved">&#9888; Capture queued offline &mdash; it will upload when reception returns</div>
+        <div class="name-block">
+          <div class="common-name">Capture queued</div>
+          <div class="sci-name">WildEx will finish identification after sync</div>
+        </div>
+        <div class="blurb">This photo or video is saved on this device. Leave WildEx installed and signed in, then reopen the app or regain reception to let the queue sync.</div>
+        <div class="detail-card">${locationBits.join('')}</div>
+        <button class="btn btn-secondary" onclick="resetCapture()">Capture Another</button>
+        <a class="btn btn-secondary" href="/" style="text-align:center;text-decoration:none;display:block;padding:15px">Back Home</a>
+      `;
+      show('result-screen');
+    }
+
+    function normalizeKingdom(c) {
+      const category = (c.category || '').toLowerCase();
+      const sub = (c.sub_category || '').toLowerCase();
+      const iconic = (c.iconic_taxon || '').toLowerCase();
+      if ((c.species_name || '').toLowerCase() === 'pending identification') return 'pending';
+      if (category === 'plant' || iconic === 'plantae') return 'plant';
+      if (category === 'fungi' || iconic === 'fungi') return 'fungi';
+      if (category === 'terrain' || iconic === 'terrain') return 'terrain';
+      if (sub === 'reptile' || iconic === 'reptilia') return 'reptile';
+      if (sub === 'bird' || iconic === 'aves') return 'bird';
+      if (sub === 'fish' || sub === 'marine' || iconic === 'actinopterygii') return 'fish';
+      if (category === 'animal' || iconic === 'mammalia') return 'mammal';
+      return 'mammal';
+    }
+
+    function biomeTheme(c, kingdom) {
+      const location = c.capture_country || (c.latitude != null && c.longitude != null ? `${c.latitude.toFixed(2)}, ${c.longitude.toFixed(2)}` : 'Unknown range');
+      const map = {
+        reptile: { label: 'Rocky Escarpment', icon: '🐉', frame: 'theme-reptile', habitat: 'Arid / rocky biome', location },
+        mammal: { label: 'Woodland Run', icon: '🐾', frame: 'theme-mammal', habitat: 'Earth / grassland biome', location },
+        bird: { label: 'Canopy Draft', icon: '🪶', frame: 'theme-bird', habitat: 'Sky / cliff biome', location },
+        fish: { label: 'Estuary Current', icon: '🌊', frame: 'theme-fish', habitat: 'Ocean / reef biome', location },
+        plant: { label: 'Herbarium Plate', icon: '🌿', frame: 'theme-plant', habitat: 'Botanical archive', location },
+        fungi: { label: 'Forest Floor', icon: '🍄', frame: 'theme-fungi', habitat: 'Shade / decay biome', location },
+        terrain: { label: 'Geostrata', icon: '🪨', frame: 'theme-terrain', habitat: 'Landform record', location },
+        pending: { label: 'Field Archive', icon: '⏳', frame: 'theme-pending', habitat: 'Awaiting classification', location },
+      };
+      return map[kingdom] || map.mammal;
+    }
+
+    function statRowsForCard(stats) {
+      const STAT_COLORS = { speed:'#38bdf8', attack:'#f87171', defence:'#a78bfa', hp:'#34d399', stamina_regen:'#fb923c' };
+      const STAT_LABELS = { speed:'SPD', attack:'ATK', defence:'DEF', hp:'HP', stamina_regen:'STM' };
+      return Object.entries(stats).map(([k, v]) => `
+        <div class="stat-row">
+          <span class="stat-label">${STAT_LABELS[k]}</span>
+          <div class="stat-track">
+            <div class="stat-fill" data-val="${v}" style="width:0;background:${STAT_COLORS[k]}"></div>
+          </div>
+          <span class="stat-val">${v}</span>
+        </div>`).join('');
+    }
+
+    function metaChip(label, value) {
+      return `<div class="meta-chip"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div></div>`;
+    }
+
+    function factTextForCard(c, theme) {
+      if (c.invasive_at_location) return `${c.species_name} is flagged as invasive at this capture location.`;
+      if (c.conservation_status) return `Conservation status: ${c.conservation_status}.`;
+      if (c.observations_count) return `${c.species_name} has ${c.observations_count.toLocaleString()} recorded iNaturalist sightings.`;
+      return `${c.species_name} is catalogued in ${theme.habitat.toLowerCase()} conditions.`;
+    }
+
+    function reptileFrontTemplate(c, theme, pct, displayPhoto) {
+      const locationText = c.capture_country || (c.latitude != null && c.longitude != null
+        ? `${c.latitude.toFixed(2)}, ${c.longitude.toFixed(2)}`
+        : 'Unknown zone');
+      const lengthText = c.rank ? `${c.rank.replace(/_/g, ' ')} record` : `${pct}% match confidence`;
+      const statusText = c.provisional ? 'Provisional field identification' : (c.rarity_display || 'Confirmed field record');
+      return `
+        <section class="card-face front reptile-template">
+          <div class="reptile-header">
+            <div class="reptile-level">${Math.max(1, Math.min(99, Math.round(pct / 6) || 17))}</div>
+            <div class="reptile-banner">
+              <strong>WildEx</strong>
+              <span>Dragon</span>
+            </div>
+          </div>
+          <div class="card-face-body">
+            <div class="reptile-title">
+              <div class="common-name">${esc(c.species_name)}</div>
+              <div class="sci-name">${esc(c.scientific_name)}</div>
+            </div>
+            <div class="reptile-body">
+              <div class="reptile-stats">
+                <div class="reptile-row">
+                  <div class="label">Common Name:</div>
+                  <div class="value">${esc(c.species_name)}</div>
+                </div>
+                <div class="reptile-row">
+                  <div class="label">Scientific Name:</div>
+                  <div class="value"><em>${esc(c.scientific_name)}</em></div>
+                </div>
+                <div class="reptile-row">
+                  <div class="label">Record Type:</div>
+                  <div class="value">${esc(lengthText)}</div>
+                </div>
+                <div class="reptile-row">
+                  <div class="label">Habitat:</div>
+                  <div class="value">${esc(theme.habitat)}<br>${esc(locationText)}</div>
+                </div>
+                <div class="reptile-row">
+                  <div class="label">Status:</div>
+                  <div class="value">${esc(statusText)}</div>
+                </div>
+              </div>
+              <div class="reptile-photo-frame">
+                <img id="result-photo-live" src="${esc(displayPhoto)}" alt="">
+              </div>
+            </div>
+            <div class="reptile-section-tag">Info</div>
+            <div class="reptile-lore">${esc(c.blurb || `${c.species_name} was captured as a reptile field record in WildEx.`)}</div>
+            <div class="reptile-fact">
+              <strong>Fact</strong>
+              <span>${esc(factTextForCard(c, theme))}</span>
+            </div>
+          </div>
+        </section>`;
+    }
+
+    function applyOrientationClass(container, width, height) {
+      if (!container || !width || !height) return;
+      container.classList.remove('landscape', 'portrait', 'square');
+      const ratio = width / height;
+      if (ratio > 1.18) container.classList.add('landscape');
+      else if (ratio < 0.85) container.classList.add('portrait');
+      else container.classList.add('square');
+    }
+
+    function bindCardImageOrientation(imgId, containerSelector, fallbackPhoto) {
+      const img = $(imgId);
+      if (!img) return;
+      const container = img.closest(containerSelector);
+      const apply = () => applyOrientationClass(container, img.naturalWidth, img.naturalHeight);
+      img.onload = apply;
+      img.onerror = () => {
+        img.onerror = null;
+        if (fallbackPhoto && img.src !== fallbackPhoto) {
+          img.src = fallbackPhoto;
+          return;
+        }
+        applyOrientationClass(container, 1, 1);
+      };
+      if (img.complete) apply();
+    }
+
+    let currentResultExportName = 'wildex-card';
+
+    function flipResultCard() {
+      WildExCardRenderer.flip($('result-card-host'));
+    }
+
+    function printResultCard() {
+      WildExCardRenderer.printNode($('result-card-host'));
+    }
+
+    function downloadResultFace(side) {
+      WildExCardRenderer.exportFace($('result-card-host'), side, currentResultExportName).catch(() => {});
+    }
+
+    function downloadResultBoth() {
+      WildExCardRenderer.exportBoth($('result-card-host'), currentResultExportName).catch(() => {});
+    }
+
+    function playResultCall() {
+      const sound = $('result-card-host')?.__wxData?.sound_url;
+      if (!sound) return;
+      new Audio(sound).play().catch(() => {});
+    }
+
+    // ── File selection ──────────────────────────────────────────────
+    let capturedFile = null;
+
+    $('camera-input').addEventListener('change', () => {
+      const f = $('camera-input').files[0];
+      if (!f) return;
+      capturedFile = f;
+      const url = URL.createObjectURL(f);
+      $('placeholder').style.display = 'none';
+      $('capture-btn').classList.add('visible');
+      $('capture-btn').textContent = f.type.startsWith('video/') ? 'Submit Video' : 'Submit Photo';
+
+      if (f.type.startsWith('video/')) {
+        const vid = $('preview-video');
+        vid.src = url; vid.play();
+        vid.classList.add('visible');
+        $('preview-img').classList.remove('visible');
+      } else {
+        $('preview-img').src = url;
+        $('preview-img').classList.add('visible');
+        $('preview-video').classList.remove('visible');
+      }
+    });
+
+    // ── Submit ──────────────────────────────────────────────────────
+    $('capture-btn').addEventListener('click', async () => {
+      if (!capturedFile) return;
+
+      const queuedCoords = gpsCoords ? { ...gpsCoords } : null;
+      const form = new FormData();
+      form.append('file', capturedFile);
+      if (queuedCoords) {
+        form.append('lat', queuedCoords.lat);
+        form.append('lon', queuedCoords.lon);
+      }
+
+      $('capture-btn').disabled = true;
+      $('capture-btn').textContent = 'Uploading...';
+
+      if (!navigator.onLine) {
+        await enqueueCapture(capturedFile, queuedCoords);
+        await refreshQueueStatus('Offline capture stored on this device');
+        resetCapture();
+        return;
+      }
+
+      try {
+        const resp = await fetch('/capture', { method: 'POST', body: form, credentials: 'same-origin' });
+        if (resp.status === 401) {
+          location.href = '/login';
+          return;
+        }
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ detail: `Server error ${resp.status}` }));
+          await refreshQueueStatus(err.detail || `Capture failed (${resp.status})`);
+          return;
+        }
+
+        const data = await resp.json();
+        if (data.job) {
+          const previewUrl = capturedFile ? URL.createObjectURL(capturedFile) : null;
+          captureJobs = [{ ...data.job, image_url: data.job.image_url || previewUrl }, ...captureJobs.filter(j => j.id !== data.job.id)];
+          renderJobQueue();
+        }
+        await refreshQueueStatus(data.message || 'Capture queued for background processing');
+        await refreshCaptureJobs();
+        resetCapture();
+      } catch (e) {
+        try {
+          await enqueueCapture(capturedFile, queuedCoords);
+          await refreshQueueStatus('Connection lost • capture saved offline');
+          resetCapture();
+        } catch (_) {
+          await refreshQueueStatus('Could not reach server. Check your connection.');
+        }
+      } finally {
+        $('capture-btn').disabled = false;
+        $('capture-btn').textContent = 'Submit Photo';
+      }
+    });
+
+    // ── Render card ─────────────────────────────────────────────────
+    function renderCard(resp) {
+      const c = resp.card;
+      const fallbackPhoto = capturedFile ? URL.createObjectURL(capturedFile) : '';
+      $('result-photo').onerror = () => {
+        $('result-photo').onerror = null;
+        $('result-photo').src = fallbackPhoto;
+      };
+      $('result-photo').src = c.image_url || fallbackPhoto;
+
+      const banner = resp.saved
+        ? `<div class="save-banner saved">&#10003; Saved to WildDex</div>`
+        : `<div class="save-banner unsaved">&#9888; Card generated &mdash; database offline</div>`;
+
+      const badges = [];
+      const rarity = c.rarity_display || c.rarity_tier || '';
+      if (rarity) {
+        const rc = {'Legendary':'badge-amber','Rare':'badge-amber','Uncommon':'badge-amber'}[rarity] || 'badge-green';
+        badges.push(`<span class="badge ${rc}">${esc(rarity)}</span>`);
+      }
+      if (c.invasive_at_location) badges.push('<span class="badge badge-red">Invasive</span>');
+      if (c.provisional)          badges.push('<span class="badge badge-amber">Provisional ID</span>');
+      if (c.iconic_taxon)         badges.push(`<span class="badge badge-muted">${esc(c.iconic_taxon)}</span>`);
+
+      const pct = Math.round(c.confidence * 100);
+      const confColor = c.provisional ? 'var(--warn)' : 'var(--accent)';
+
+      const STAT_COLORS = { speed:'#38bdf8', attack:'#f87171', defence:'#a78bfa', hp:'#34d399', stamina_regen:'#fb923c' };
+      const STAT_LABELS = { speed:'SPD', attack:'ATK', defence:'DEF', hp:'HP', stamina_regen:'STM' };
+
+      const statRows = Object.entries(c.stats).map(([k, v]) => `
+        <div class="stat-row">
+          <span class="stat-label">${STAT_LABELS[k]}</span>
+          <div class="stat-track">
+            <div class="stat-fill" data-val="${v}" style="width:0;background:${STAT_COLORS[k]}"></div>
+          </div>
+          <span class="stat-val">${v}</span>
+        </div>`).join('');
+
+      const details = [];
+      if (c.conservation_status) details.push(detailRow('Conservation', c.conservation_status));
+      if (c.observations_count)  details.push(detailRow('iNat sightings', c.observations_count.toLocaleString()));
+      if (c.taxon_id)            details.push(detailRow('Taxon ID', c.taxon_id));
+      if (c.latitude != null)    details.push(detailRow('Captured at', `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`));
+      if (resp.identification_error && c.species_name === 'Pending identification') {
+        details.push(detailRow('ID status', resp.identification_error));
+      }
+      if (resp.db_error) {
+        details.push(detailRow('Save status', resp.db_error));
+      }
+
+      $('result-body').innerHTML = `
+        ${banner}
+        <div class="name-block">
+          <div class="common-name">${esc(c.species_name)}</div>
+          <div class="sci-name">${esc(c.scientific_name)}</div>
+        </div>
+        ${badges.length ? `<div class="badges">${badges.join('')}</div>` : ''}
+        <div class="conf-row">
+          <div class="conf-label">
+            <span>Confidence</span>
+            <span>${pct}%${c.provisional ? ' — uncertain' : ''}</span>
+          </div>
+          <div class="conf-track">
+            <div class="conf-fill" id="conf-fill" style="width:0;background:${confColor}"></div>
+          </div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-title">Stats</div>
+          ${statRows}
+        </div>
+        ${c.blurb ? `<div class="blurb">${esc(c.blurb)}</div>` : ''}
+        ${details.length ? `<div class="detail-card">${details.join('')}</div>` : ''}
+        <button class="btn btn-secondary" onclick="resetCapture()">Capture Another</button>
+        <a class="btn btn-secondary" href="/wildex" style="text-align:center;text-decoration:none;display:block;padding:15px">View WildDex</a>
+      `;
+
+      show('result-screen');
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const fill = $('conf-fill');
+        if (fill) fill.style.width = pct + '%';
+        document.querySelectorAll('.stat-fill').forEach(el => {
+          el.style.width = el.dataset.val + '%';
+        });
+      }));
+    }
+
+    function renderStyledCard(resp) {
+      return renderRenderedCard(resp);
+    }
+
+    function showError(msg) {
+      $('result-photo').src = capturedFile ? URL.createObjectURL(capturedFile) : '';
+      $('result-body').innerHTML = `
+        <div class="error-box">${esc(msg)}</div>
+        <button class="btn btn-secondary" style="margin-top:16px" onclick="resetCapture()">Try Again</button>`;
+      show('result-screen');
+    }
+
+    function renderRenderedCard(resp) {
+      const c = resp.card;
+      const banner = resp.saved
+        ? `<div class="save-banner saved">&#10003; Saved to WildDex</div>`
+        : `<div class="save-banner unsaved">&#9888; Card generated &mdash; database offline</div>`;
+      const details = [];
+      if (c.conservation_status) details.push(detailRow('Conservation', c.conservation_status));
+      if (c.observations_count) details.push(detailRow('iNat sightings', c.observations_count.toLocaleString()));
+      if (c.taxon_id) details.push(detailRow('Taxon ID', c.taxon_id));
+      if (c.latitude != null) details.push(detailRow('Captured at', `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`));
+      if (resp.identification_error && c.species_name === 'Pending identification') details.push(detailRow('ID status', resp.identification_error));
+      if (resp.db_error) details.push(detailRow('Save status', resp.db_error));
+
+      $('result-body').innerHTML = `
+        ${banner}
+        <div class="card-display">
+          <div id="result-card-host"></div>
+          <div class="flip-actions">
+            <button class="btn btn-secondary" onclick="flipResultCard()">Flip Card</button>
+            <button class="btn btn-secondary" onclick="printResultCard()">Print</button>
+            <button class="btn btn-secondary" onclick="downloadResultFace('front')">Front PNG</button>
+            <button class="btn btn-secondary" onclick="downloadResultFace('back')">Back PNG</button>
+            <button class="btn btn-secondary" onclick="downloadResultBoth()">Both PNG</button>
+            ${(c.render_card && c.render_card.sound_url) ? '<button class="btn btn-secondary" onclick="playResultCall()">Play Call</button>' : ''}
+          </div>
+        </div>
+        ${details.length ? `<div class="detail-card">${details.join('')}</div>` : ''}
+        <button class="btn btn-secondary" onclick="resetCapture()">Capture Another</button>
+        <a class="btn btn-secondary" href="/wildex" style="text-align:center;text-decoration:none;display:block;padding:15px">View WildDex</a>
+      `;
+      currentResultExportName = (c.render_card && c.render_card.dex_id) || c.dex_id || c.species_name || 'wildex-card';
+      show('result-screen');
+      requestAnimationFrame(() => {
+        if (!$('result-card-host')) return;
+        WildExCardRenderer.buildCard($('result-card-host'), c.render_card);
+      });
+    }
+
+    function resetCapture() {
+      capturedFile = null;
+      $('camera-input').value = '';
+      $('preview-img').src = '';
+      $('preview-img').classList.remove('visible');
+      const vid = $('preview-video');
+      vid.src = ''; vid.classList.remove('visible');
+      $('placeholder').style.display = '';
+      $('capture-btn').disabled = false;
+      $('capture-btn').textContent = 'Submit Photo';
+      $('capture-btn').classList.remove('visible');
+      show('capture-screen');
+    }
+
+    function detailRow(k, v) {
+      return `<div class="detail-row">
+        <span class="detail-key">${esc(String(k))}</span>
+        <span class="detail-val">${esc(String(v))}</span>
+      </div>`;
+    }
+
+    function esc(s) {
+      return String(s ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    document.addEventListener('click', event => {
+      const row = event.target.closest('.job-row[data-card-id]');
+      if (!row) return;
+      location.href = `/wildex?card=${row.dataset.cardId}`;
+    });
+
+    window.addEventListener('online', () => processQueuedCaptures());
+    window.addEventListener('focus', () => processQueuedCaptures());
+    window.setInterval(() => { processQueuedCaptures().catch(() => {}); }, 15000);
+    window.setInterval(() => { refreshCaptureJobs().catch(() => {}); }, 5000);
+    refreshQueueStatus(navigator.onLine ? '' : 'Offline mode active').catch(() => {});
+    processQueuedCaptures().catch(() => {});
+    refreshCaptureJobs().catch(() => {});
+  </script>
+</body>
+</html>

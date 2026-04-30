@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>WildEx Hub</title>
+  <link rel="stylesheet" href="/static/card_renderer.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #071015;
+      --surface: #0d1821;
+      --surface2: #162431;
+      --surface3: #1d3040;
+      --line: rgba(255,255,255,.08);
+      --text: #edf5ef;
+      --muted: #93aaa4;
+      --accent: #28c36b;
+      --accent2: #f1c36b;
+      --danger: #ef6666;
+      --locked: #344654;
+      --radius: 18px;
+      --shadow: 0 18px 60px rgba(0,0,0,.28);
+    }
+    html, body {
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(40,195,107,.08), transparent 34%),
+        linear-gradient(180deg, #0a141b 0%, #071015 60%, #050c11 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body { padding: 18px 14px 34px; }
+    .app {
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+    .panel {
+      background: rgba(13,24,33,.9);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 6px 2px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .02em;
+    }
+    .topline strong { color: var(--text); }
+    .hero {
+      position: relative;
+      min-height: 220px;
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      background:
+        linear-gradient(135deg, rgba(22,36,49,.92), rgba(8,17,24,.84)),
+        linear-gradient(180deg, rgba(40,195,107,.12), transparent 55%);
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: var(--hero-image, none) center/cover no-repeat;
+      opacity: .18;
+      filter: saturate(1.1) contrast(1.02);
+      pointer-events: none;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(7,16,21,.22), rgba(7,16,21,.78));
+      pointer-events: none;
+    }
+    .hero > * { position: relative; z-index: 1; }
+    .hero-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .wordmark {
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: #dff6e5;
+      line-height: 1;
+    }
+    .tagline {
+      margin-top: 8px;
+      max-width: 560px;
+      color: #c2d4cb;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+    .status-pills, .action-row, .stats-row, .chip-row, .family-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .pill, .chip {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+    .pill strong { color: var(--accent); }
+    .btn {
+      appearance: none;
+      border: none;
+      border-radius: 16px;
+      padding: 14px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: transform .12s ease, opacity .12s ease, background .12s ease;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: var(--accent); color: #06110b; }
+    .btn-secondary { background: rgba(255,255,255,.06); color: var(--text); border: 1px solid var(--line); }
+    .btn-danger { background: rgba(239,102,102,.1); color: #ffd1d1; border: 1px solid rgba(239,102,102,.25); }
+    .btn.small { padding: 9px 12px; border-radius: 12px; font-size: 12px; }
+    .stat-card {
+      min-width: 110px;
+      padding: 12px 13px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--line);
+    }
+    .stat-card strong {
+      display: block;
+      font-size: 19px;
+      color: var(--accent2);
+      margin-bottom: 4px;
+    }
+    .stat-card span { color: var(--muted); font-size: 12px; }
+    .layout {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1.05fr .95fr;
+      align-items: start;
+    }
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 16px 0;
+    }
+    .panel-head h2 {
+      font-size: 16px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .panel-head p {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .map-wrap { padding: 14px 14px 18px; }
+    .map-card {
+      border-radius: 24px;
+      border: 1px solid rgba(81, 64, 38, 0.28);
+      background:
+        radial-gradient(circle at 50% 44%, rgba(236,222,183,.42), rgba(110,83,48,.68) 55%, rgba(43,28,14,.94) 100%),
+        linear-gradient(180deg, #8f7046, #3c2816);
+      overflow: hidden;
+      padding: 12px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 16px 32px rgba(0,0,0,.22);
+    }
+    .map-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px 2px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    svg.world-map { width: 100%; height: auto; display: block; }
+    .map-frame { fill: rgba(117, 82, 44, .9); }
+    .map-sea {
+      fill: url(#seaWash);
+      stroke: rgba(92, 66, 32, .58);
+      stroke-width: 4;
+    }
+    .map-parchment {
+      fill: url(#paperTone);
+      opacity: .94;
+    }
+    .map-atlas-image {
+      opacity: .9;
+      filter: saturate(.82) contrast(1.02) brightness(.96);
+    }
+    .map-atlas-wash {
+      fill: rgba(72, 49, 24, .18);
+      mix-blend-mode: multiply;
+    }
+    .map-grid, .map-route {
+      fill: none;
+      stroke: rgba(109, 78, 43, .18);
+      stroke-width: 1.6;
+    }
+    .map-route { stroke-dasharray: 7 8; opacity: .7; }
+    .map-compass {
+      fill: rgba(121, 84, 44, .12);
+      stroke: rgba(111, 79, 43, .42);
+      stroke-width: 1.8;
+    }
+    .map-continent {
+      fill: rgba(159, 126, 78, .28);
+      stroke: rgba(101, 72, 38, .28);
+      stroke-width: 2.2;
+    }
+    .map-coast {
+      fill: rgba(161, 127, 78, .18);
+      stroke: rgba(101, 72, 38, .74);
+      stroke-width: 2.8;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+    }
+    .map-region {
+      fill: rgba(88, 92, 96, .3);
+      stroke: rgba(74, 53, 31, .62);
+      stroke-width: 2.4;
+      cursor: default;
+      transition: fill .15s ease, opacity .15s ease, transform .15s ease, filter .15s ease;
+      transform-origin: center;
+      opacity: .64;
+    }
+    .map-region.unlocked {
+      fill: rgba(92, 137, 95, .78);
+      opacity: .96;
+      cursor: pointer;
+      filter: drop-shadow(0 0 12px rgba(48,92,50,.22));
+    }
+    .map-region.active {
+      fill: rgba(221, 170, 81, .9);
+      opacity: 1;
+      filter: drop-shadow(0 0 16px rgba(190,136,42,.3));
+    }
+    .map-region:hover.unlocked { transform: translateY(-1px); }
+    .map-hit {
+      fill: transparent;
+      stroke: transparent;
+      stroke-width: 18;
+      pointer-events: all;
+      cursor: pointer;
+    }
+    .map-label {
+      fill: rgba(91, 61, 28, .82);
+      font-size: 14px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+    .region-strip {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 0 14px 14px;
+      scrollbar-width: none;
+    }
+    .region-strip::-webkit-scrollbar { display: none; }
+    .region-pill {
+      white-space: nowrap;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 10px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .region-pill.unlocked { color: var(--text); }
+    .region-pill.active { background: rgba(241,195,107,.12); color: #ffe5ae; border-color: rgba(241,195,107,.38); }
+    .explorer {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+    .selector-group {
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.035);
+    }
+    .selector-group h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .chip, .family-chip {
+      cursor: pointer;
+      background: rgba(255,255,255,.05);
+    }
+    .chip.active, .family-chip.active {
+      background: rgba(40,195,107,.13);
+      border-color: rgba(40,195,107,.28);
+      color: #d8f5df;
+    }
+    .entry-list {
+      display: grid;
+      gap: 8px;
+    }
+    .entry-row {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.035);
+      border-radius: 16px;
+      padding: 12px 13px;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .entry-row.locked { cursor: default; opacity: .78; }
+    .entry-row.evolution { border-left: 4px solid rgba(241,195,107,.5); }
+    .entry-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 7px;
+      align-items: center;
+    }
+    .entry-id {
+      color: var(--accent2);
+      font-size: 11px;
+      letter-spacing: .08em;
+      font-weight: 700;
+    }
+    .entry-state {
+      font-size: 11px;
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+    }
+    .entry-state.seen { color: #d2e5f1; }
+    .entry-state.captured { color: #dff7e6; background: rgba(40,195,107,.12); }
+    .entry-name { font-weight: 700; margin-bottom: 4px; }
+    .entry-meta { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    #card-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.74);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 100;
+    }
+    #card-modal.open { display: flex; }
+    .modal-shell {
+      width: min(100%, 920px);
+      max-height: 94vh;
+      overflow: auto;
+      background: #091118;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 14px;
+    }
+    .modal-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .modal-export {
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+    .card-stage {
+      display: grid;
+      gap: 12px;
+      justify-items: center;
+    }
+    #detail-card-host {
+      width: 100%;
+      display: grid;
+      justify-items: center;
+      --wx-card-viewport-offset: 220px;
+    }
+    .flip-card {
+      width: min(100%, 380px);
+      aspect-ratio: 63 / 88;
+      perspective: 1600px;
+    }
+    .flip-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform .45s ease;
+      transform-style: preserve-3d;
+    }
+    .flip-card.flipped .flip-inner { transform: rotateY(180deg); }
+    .card-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 22px;
+      overflow: hidden;
+      backface-visibility: hidden;
+      color: #291c12;
+      border: 4px solid #5f4330;
+      background:
+        radial-gradient(circle at top, rgba(255,255,255,.25), transparent 30%),
+        linear-gradient(180deg, #d7c4a0 0%, #c6b08a 48%, #b69871 100%);
+      box-shadow: inset 0 0 0 2px rgba(57,33,18,.22);
+    }
+    .card-face.back { transform: rotateY(180deg); }
+    .theme-reptile { border-color: #69412c; }
+    .theme-mammal { border-color: #655034; }
+    .theme-fish { border-color: #355a69; }
+    .theme-bird { border-color: #5f6878; }
+    .theme-insect { border-color: #66582e; }
+    .theme-plant { border-color: #3f6440; }
+    .face-inner { padding: 12px; height: 100%; display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 8px; }
+    .card-banner {
+      display: grid;
+      grid-template-columns: 56px 1fr 74px;
+      align-items: center;
+      gap: 8px;
+    }
+    .level-badge, .icon-badge {
+      height: 48px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      color: #f7f0df;
+      background: linear-gradient(180deg, #274e36, #163223);
+      border: 2px solid rgba(255,255,255,.22);
+    }
+    .icon-badge { background: linear-gradient(180deg, #56402c, #39291d); font-size: 12px; }
+    .banner-title {
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: linear-gradient(180deg, #83583f, #5a3d2d);
+      color: #f6ecd8;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+    .species-block { text-align: center; }
+    .species-block h3 { font-size: 19px; letter-spacing: .02em; }
+    .species-block p { font-style: italic; opacity: .9; margin-top: 2px; }
+    .front-main {
+      display: grid;
+      grid-template-columns: 1fr 1.05fr;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .info-panel, .photo-panel, .back-box, .strip-box, .lower-box, .environment-box, .call-box, .bottom-bar {
+      border: 2px solid rgba(66,40,20,.35);
+      background: rgba(248,239,219,.5);
+      border-radius: 14px;
+    }
+    .info-panel { padding: 10px; display: grid; gap: 8px; }
+    .info-row .label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #5d432f; }
+    .info-row .value { font-size: 13px; line-height: 1.28; }
+    .photo-panel { overflow: hidden; position: relative; }
+    .photo-panel img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .section-tag {
+      align-self: start;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #836145, #61432f);
+      color: #f7eedb;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+    .lore-box, .fact-box { border-radius: 14px; padding: 10px 12px; background: rgba(248,239,219,.56); border: 2px solid rgba(66,40,20,.35); }
+    .lore-box { font-size: 13px; line-height: 1.42; }
+    .fact-box strong { display: block; margin-bottom: 4px; text-transform: uppercase; font-size: 11px; letter-spacing: .08em; color: #5d432f; }
+    .back-grid {
+      display: grid;
+      grid-template-columns: .88fr 1.12fr;
+      gap: 10px;
+      align-items: start;
+    }
+    .back-col { display: grid; gap: 8px; }
+    .back-box, .strip-box, .lower-box, .environment-box, .call-box, .bottom-bar { padding: 9px 10px; }
+    .back-box h4, .strip-box h4, .lower-box h4, .environment-box h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #5d432f; margin-bottom: 4px; }
+    .status-grid { display: grid; gap: 4px; font-size: 13px; }
+    .status-grid div { display: flex; justify-content: space-between; gap: 8px; }
+    .map-panel { min-height: 122px; display: grid; place-items: center; }
+    .map-panel svg { width: 100%; height: auto; }
+    .strip-box .title { font-weight: 800; margin-bottom: 2px; }
+    .strip-box .effect { font-size: 12px; line-height: 1.35; }
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-weight: 800; }
+    .stat-grid div, .type-grid div { display: flex; justify-content: space-between; gap: 10px; }
+    .type-grid { display: grid; gap: 6px; font-size: 13px; }
+    .lower-box ul, .environment-box ul { padding-left: 16px; display: grid; gap: 4px; font-size: 12px; line-height: 1.35; }
+    .call-box button { width: 100%; }
+    .bottom-bar { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+    .job-banner {
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .job-banner.visible { display: flex; }
+    .job-banner strong { display: block; font-size: 13px; }
+    .job-banner span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .dr-panel {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+    .dr-panel textarea {
+      width: 100%;
+      min-height: 88px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      padding: 12px 14px;
+      font: inherit;
+      resize: vertical;
+    }
+    .dr-response {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      padding: 14px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .hidden { display: none !important; }
+    @media (max-width: 920px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      body { padding: 12px 10px 28px; }
+      .hero { min-height: 0; }
+      .hero-head { flex-direction: column; }
+      .wordmark { font-size: 28px; }
+      #detail-card-host { --wx-card-viewport-offset: 200px; }
+      .front-main, .back-grid { grid-template-columns: 1fr; }
+      .bottom-bar { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="topline">
+      <div id="signin-line">Checking session…</div>
+      <div id="mini-status">WildEx Hub</div>
+    </div>
+
+    <section class="panel hero" id="hero-panel">
+      <div class="hero-head">
+        <div>
+          <div class="wordmark">WildEx</div>
+          <p class="tagline">Photograph real wildlife to unlock regions, collect species cards, and build your personal WildDex.</p>
+        </div>
+        <div class="status-pills">
+          <div class="pill"><strong id="captures-count">0</strong> captures</div>
+          <div class="pill"><strong id="regions-count">0</strong> regions unlocked</div>
+          <div class="pill"><strong id="processing-count">0</strong> background jobs</div>
+          <div class="pill"><strong id="queue-count">0</strong> queued offline</div>
+        </div>
+      </div>
+      <div class="action-row">
+        <a class="btn btn-primary" href="/capture">Capture</a>
+        <a class="btn btn-secondary" href="/submissions">Submit Photo</a>
+        <button class="btn btn-secondary" id="share-app-btn" type="button">Share App</button>
+        <button class="btn btn-secondary" id="open-first-unlocked" type="button">Open Collection</button>
+        <button class="btn btn-secondary" id="logout-link" type="button">Sign Out</button>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><strong id="captured-total">0</strong><span>Captured entries</span></div>
+        <div class="stat-card"><strong id="seen-total">0</strong><span>Seen entries</span></div>
+        <div class="stat-card"><strong id="unknown-total">0</strong><span>Unknown slots</span></div>
+      </div>
+    </section>
+
+    <div class="job-banner" id="job-banner">
+      <div>
+        <strong id="job-banner-title">Background capture update</strong>
+        <span id="job-banner-body">New cards and region unlocks will appear here.</span>
+      </div>
+      <button class="btn btn-secondary small" type="button" id="job-banner-action">Open</button>
+    </div>
+
+    <section class="panel dr-panel">
+      <div class="panel-head" style="padding:0">
+        <div>
+          <h2>The Dr</h2>
+          <p>Ask anything about your collection, a specific card, or what to do next. Select a mode, then type your question.</p>
+        </div>
+      </div>
+      <div class="action-row">
+        <select id="dr-mode" class="btn btn-secondary" style="justify-content:flex-start">
+          <option value="card_explain">Card Explain</option>
+          <option value="feeding_advice">Feeding Advice</option>
+          <option value="biome_tip">Biome Tip</option>
+          <option value="what_next">What Next</option>
+          <option value="read_aloud">Read Aloud</option>
+        </select>
+      </div>
+      <textarea id="dr-question" placeholder="Why is this rare? What should I do next? What does this card mean?"></textarea>
+      <div class="action-row">
+        <button class="btn btn-secondary" id="dr-ask-btn" type="button">Ask The Dr</button>
+      </div>
+      <div class="dr-response" id="dr-response">The Dr is ready.</div>
+    </section>
+
+    <section class="layout">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>World Map</h2>
+            <p>Unlocked regions highlight. Tap a live region to open its Dex branches.</p>
+          </div>
+          <div class="pill">Favorite card background: <strong id="favorite-status">Default</strong></div>
+        </div>
+        <div class="map-wrap">
+          <div class="map-card">
+            <svg class="world-map" viewBox="0 0 1000 620" role="img" aria-label="WildEx world map">
+              <defs>
+                <radialGradient id="paperTone" cx="50%" cy="45%" r="60%">
+                  <stop offset="0%" stop-color="#f6e7c4"></stop>
+                  <stop offset="58%" stop-color="#e2c891"></stop>
+                  <stop offset="100%" stop-color="#c39b63"></stop>
+                </radialGradient>
+                <linearGradient id="seaWash" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#efe1bd"></stop>
+                  <stop offset="100%" stop-color="#d9bc82"></stop>
+                </linearGradient>
+                <clipPath id="atlasClip">
+                  <ellipse cx="500" cy="310" rx="422" ry="222"></ellipse>
+                </clipPath>
+              </defs>
+              <rect class="map-frame" x="8" y="8" width="984" height="604" rx="42"></rect>
+              <ellipse class="map-sea" cx="500" cy="310" rx="438" ry="238"></ellipse>
+              <ellipse class="map-parchment" cx="500" cy="310" rx="422" ry="222"></ellipse>
+              <g clip-path="url(#atlasClip)">
+                <image class="map-atlas-image" href="/static/maps/atlas_world_base.jpg" x="78" y="88" width="844" height="444" preserveAspectRatio="none"></image>
+                <ellipse class="map-atlas-wash" cx="500" cy="310" rx="422" ry="222"></ellipse>
+              </g>
+              <path class="map-grid" d="M130 310 H870 M188 238 C320 260,680 260,812 238 M188 382 C320 360,680 360,812 382"></path>
+              <path class="map-grid" d="M500 96 V524 M360 112 C384 204,384 416,360 508 M640 112 C616 204,616 416,640 508"></path>
+              <path class="map-route" d="M184 270 C292 184, 438 172, 552 222 S752 338, 824 288"></path>
+              <g class="map-compass" transform="translate(114 134)">
+                <circle cx="0" cy="0" r="42"></circle>
+                <path d="M0 -34 L7 -7 L0 34 L-7 -7 Z"></path>
+                <path d="M34 0 L7 7 L-34 0 L7 -7 Z"></path>
+                <text x="0" y="-52" text-anchor="middle" font-size="18" fill="rgba(91,61,28,.82)">N</text>
+              </g>
+              <path class="map-continent" d="M144 188 C178 148,236 126,308 136 C352 142,392 166,408 206 C404 234,392 256,370 274 C352 288,334 294,318 310 C300 330,270 342,236 340 C194 338,162 316,140 280 C126 250,126 216,144 188 Z"></path>
+              <path class="map-continent" d="M300 340 C324 346,344 362,358 388 C364 412,358 444,344 474 C330 504,316 526,300 542 C286 554,270 550,260 532 C252 512,250 488,252 458 C256 412,270 372,300 340 Z"></path>
+              <path class="map-continent" d="M482 178 C508 164,542 162,576 170 C592 178,602 194,600 210 C596 224,582 232,564 236 C532 240,498 236,480 222 C470 208,470 192,482 178 Z"></path>
+              <path class="map-continent" d="M506 242 C530 234,560 236,586 248 C606 266,616 296,614 334 C610 372,596 408,576 434 C556 450,532 446,516 426 C500 402,492 368,490 330 C490 294,494 264,506 242 Z"></path>
+              <path class="map-continent" d="M604 170 C646 154,700 146,760 150 C810 156,850 174,872 200 C882 220,878 246,862 266 C842 288,808 300,764 304 C718 308,672 300,634 286 C606 270,590 246,588 216 C588 196,592 180,604 170 Z"></path>
+              <path class="map-continent" d="M756 388 C778 378,806 372,838 374 C866 378,890 390,902 410 C906 430,898 448,878 462 C850 476,818 480,786 474 C762 466,746 452,740 430 C740 412,744 398,756 388 Z"></path>
+              <path class="map-coast" d="M156 190 C186 154,238 136,298 144 C336 148,370 164,388 188 C400 206,398 228,384 246 C366 268,344 276,324 284 C306 292,296 306,280 318 C258 330,228 334,198 326 C170 318,148 302,136 280 C128 258,130 220,156 190 Z"></path>
+              <path class="map-coast" d="M302 344 C320 352,336 366,346 384 C350 404,348 428,340 450 C332 474,320 500,308 522 C298 536,286 544,276 538 C264 526,260 504,262 478 C264 442,274 390,302 344 Z"></path>
+              <path class="map-coast" d="M486 182 C508 170,538 170,568 176 C584 182,592 194,590 206 C586 218,572 224,552 226 C524 228,498 226,486 214 C478 204,478 192,486 182 Z"></path>
+              <path class="map-coast" d="M510 246 C530 238,554 240,576 250 C592 266,600 294,600 326 C598 360,588 392,572 420 C556 438,536 440,522 422 C508 400,500 370,500 334 C500 298,502 268,510 246 Z"></path>
+              <path class="map-coast" d="M608 174 C646 160,694 154,748 156 C792 160,828 172,850 192 C862 208,862 228,850 244 C832 262,804 274,768 278 C722 284,682 282,646 272 C620 264,606 246,604 220 C602 202,602 184,608 174 Z"></path>
+              <path class="map-coast" d="M760 392 C780 384,806 382,834 384 C856 388,874 398,884 412 C886 426,880 440,864 450 C842 460,814 462,786 458 C766 454,754 444,750 430 C748 416,750 402,760 392 Z"></path>
+
+              <g data-region="NA">
+                <path class="map-region" data-region="NA" d="M164 188 C198 154,256 138,310 154 C342 164,366 188,378 218 C366 246,340 266,314 278 C298 298,280 314,254 320 C214 318,180 290,160 256 C150 230,150 206,164 188 Z"></path>
+                <path class="map-hit" data-region="NA" d="M164 188 C198 154,256 138,310 154 C342 164,366 188,378 218 C366 246,340 266,314 278 C298 298,280 314,254 320 C214 318,180 290,160 256 C150 230,150 206,164 188 Z"></path>
+              </g>
+              <g data-region="SA">
+                <path class="map-region" data-region="SA" d="M304 346 C330 358,348 382,354 410 C348 444,330 480,310 510 C292 526,272 512,266 482 C264 446,274 390,304 346 Z"></path>
+                <path class="map-hit" data-region="SA" d="M304 346 C330 358,348 382,354 410 C348 444,330 480,310 510 C292 526,272 512,266 482 C264 446,274 390,304 346 Z"></path>
+              </g>
+              <g data-region="EU">
+                <path class="map-region" data-region="EU" d="M482 180 C506 170,538 170,566 178 C582 186,588 204,580 216 C554 226,522 228,494 220 C482 208,476 194,482 180 Z"></path>
+                <path class="map-hit" data-region="EU" d="M482 180 C506 170,538 170,566 178 C582 186,588 204,580 216 C554 226,522 228,494 220 C482 208,476 194,482 180 Z"></path>
+              </g>
+              <g data-region="AF">
+                <path class="map-region" data-region="AF" d="M508 244 C536 238,562 244,582 262 C604 302,600 360,576 420 C554 442,526 432,508 388 C494 334,492 286,508 244 Z"></path>
+                <path class="map-hit" data-region="AF" d="M508 244 C536 238,562 244,582 262 C604 302,600 360,576 420 C554 442,526 432,508 388 C494 334,492 286,508 244 Z"></path>
+              </g>
+              <g data-region="AS">
+                <path class="map-region" data-region="AS" d="M610 176 C666 158,750 158,820 186 C850 212,854 248,828 278 C778 300,712 298,658 284 C626 270,604 230,610 176 Z"></path>
+                <path class="map-hit" data-region="AS" d="M610 176 C666 158,750 158,820 186 C850 212,854 248,828 278 C778 300,712 298,658 284 C626 270,604 230,610 176 Z"></path>
+              </g>
+              <g data-region="AU">
+                <path class="map-region" data-region="AU" d="M766 388 C794 380,836 382,868 402 C884 420,882 448,854 464 C816 474,776 464,752 442 C744 420,748 398,766 388 Z"></path>
+                <path class="map-hit" data-region="AU" d="M766 388 C794 380,836 382,868 402 C884 420,882 448,854 464 C816 474,776 464,752 442 C744 420,748 398,766 388 Z"></path>
+              </g>
+
+              <text class="map-label" x="230" y="208">North America</text>
+              <text class="map-label" x="270" y="432">South America</text>
+              <text class="map-label" x="514" y="164">Europe</text>
+              <text class="map-label" x="532" y="340">Africa</text>
+              <text class="map-label" x="730" y="214">Asia</text>
+              <text class="map-label" x="802" y="438">Australia</text>
+            </svg>
+          </div>
+          <div class="map-legend">
+            <span><span class="legend-dot" style="background:#3f9360"></span>Unlocked</span>
+            <span><span class="legend-dot" style="background:#f1c36b"></span>Active region</span>
+            <span><span class="legend-dot" style="background:#344654"></span>Locked</span>
+          </div>
+        </div>
+        <div class="region-strip" id="region-strip"></div>
+      </section>
+
+      <section class="panel" id="index-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Regional Index</h2>
+            <p>Browse your captured species by group. Unlock a region first by capturing something there.</p>
+          </div>
+        </div>
+        <div class="explorer">
+          <div class="selector-group">
+            <h3>Kingdom</h3>
+            <div class="chip-row" id="kingdom-row"></div>
+          </div>
+          <div class="selector-group">
+            <h3>Category</h3>
+            <div class="chip-row" id="category-row"></div>
+          </div>
+          <div class="selector-group">
+            <h3>Family / Subgroup</h3>
+            <div class="family-row" id="family-row"></div>
+          </div>
+          <div class="selector-group">
+            <h3>Entries</h3>
+            <div class="entry-list" id="entry-list"></div>
+            <p class="hint hidden" id="entry-hint">Head to Capture, photograph some wildlife, and your first region will unlock automatically.</p>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="card-modal">
+    <div class="modal-shell">
+      <div class="modal-toolbar">
+        <div>
+          <strong id="modal-title">Card</strong>
+          <div class="hint" id="modal-subtitle"></div>
+        </div>
+        <button class="btn btn-secondary small" type="button" id="close-btn">✕ Close</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary small" type="button" id="flip-btn">Flip Card</button>
+        <button class="btn btn-secondary small hidden" type="button" id="play-call-btn">♪ Play Call</button>
+        <button class="btn btn-secondary small" type="button" id="favorite-btn">★ Favourite</button>
+        <button class="btn btn-secondary small" type="button" id="share-card-btn">Share</button>
+      </div>
+      <div class="modal-actions modal-export">
+        <button class="btn btn-secondary small" type="button" id="download-front-btn">Front PNG</button>
+        <button class="btn btn-secondary small" type="button" id="download-back-btn">Back PNG</button>
+        <button class="btn btn-secondary small" type="button" id="download-both-btn">Both PNG</button>
+        <button class="btn btn-secondary small" type="button" id="print-btn">Print</button>
+        <button class="btn btn-secondary small hidden" type="button" id="reid-btn">Re-ID</button>
+        <button class="btn btn-danger small" type="button" id="release-btn">Release</button>
+      </div>
+      <div class="card-stage">
+        <div id="detail-card-host"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/card_renderer.js"></script>
+  <script>
+    const QUEUE_DB_NAME = 'wildex-offline';
+    const QUEUE_STORE = 'capture_queue';
+    const TERMINAL_STATUSES = new Set(['complete', 'failed', 'needs_review']);
+    const JOB_NOTICE_STORE = 'wildex_capture_notices_v1';
+    const pendingCardOpen = Number(new URLSearchParams(location.search).get('card') || 0) || null;
+    const REGION_LABELS = { AU: 'Australia', NA: 'North America', SA: 'South America', EU: 'Europe', AF: 'Africa', AS: 'Asia' };
+    const state = {
+      user: null,
+      entries: [],
+      selectedRegion: null,
+      selectedKingdom: null,
+      selectedCategory: null,
+      selectedFamily: null,
+      activeEntry: null,
+      captureJobs: [],
+      highlightedJob: null,
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function openQueueDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(QUEUE_DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(QUEUE_STORE)) {
+            db.createObjectStore(QUEUE_STORE, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('IndexedDB unavailable'));
+      });
+    }
+
+    async function queuedCount() {
+      const db = await openQueueDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(QUEUE_STORE, 'readonly');
+        const req = tx.objectStore(QUEUE_STORE).count();
+        req.onsuccess = () => { db.close(); resolve(req.result || 0); };
+        req.onerror = () => { db.close(); reject(req.error || new Error('Could not count queue')); };
+      });
+    }
+
+    function seenNoticeIds() {
+      try {
+        return JSON.parse(localStorage.getItem(JOB_NOTICE_STORE) || '[]');
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function markNoticeSeen(id) {
+      const seen = new Set(seenNoticeIds());
+      seen.add(id);
+      localStorage.setItem(JOB_NOTICE_STORE, JSON.stringify([...seen].slice(-200)));
+    }
+
+    function taxonomy(entry) {
+      return entry.taxonomy || { kingdom_root: 'Other', major_category: 'Other', family: entry.group_code || 'Group' };
+    }
+
+    function kingdomRoot(entry) {
+      return taxonomy(entry).kingdom_root;
+    }
+
+    function categoryLabel(entry) {
+      return taxonomy(entry).major_category;
+    }
+
+    function familyLabel(entry) {
+      return taxonomy(entry).family;
+    }
+
+    function discoveryRank(entry) {
+      if (entry.discovery_state === 'CAPTURED') return 2;
+      if (entry.discovery_state === 'SEEN') return 1;
+      return 0;
+    }
+
+    function bestLabel(rows, labelFn) {
+      const scores = new Map();
+      rows.forEach(entry => {
+        const label = labelFn(entry);
+        const next = discoveryRank(entry);
+        scores.set(label, Math.max(scores.get(label) || 0, next));
+      });
+      return [...scores.entries()]
+        .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))[0]?.[0] || null;
+    }
+
+    function activeEntries() {
+      let rows = state.entries.slice();
+      if (state.selectedRegion) rows = rows.filter(entry => entry.region === state.selectedRegion);
+      if (state.selectedKingdom) rows = rows.filter(entry => kingdomRoot(entry) === state.selectedKingdom);
+      if (state.selectedCategory) rows = rows.filter(entry => categoryLabel(entry) === state.selectedCategory);
+      if (state.selectedFamily) rows = rows.filter(entry => familyLabel(entry) === state.selectedFamily);
+      return rows;
+    }
+
+    function unlockedRegions() {
+      return [...new Set(state.entries.filter(entry => entry.discovery_state === 'CAPTURED').map(entry => entry.region))];
+    }
+
+    function setHeroBackground() {
+      const hero = document.getElementById('hero-panel');
+      const favoriteId = state.user?.favorite_card_id;
+      const favoriteEntry = state.entries.find(entry => entry.card && entry.card.id === favoriteId);
+      if (favoriteEntry?.card?.image_url) {
+        hero.style.setProperty('--hero-image', `url("${favoriteEntry.card.image_url}")`);
+        document.getElementById('favorite-status').textContent = favoriteEntry.card.species_name || 'Selected';
+      } else {
+        hero.style.removeProperty('--hero-image');
+        document.getElementById('favorite-status').textContent = 'Default';
+      }
+    }
+
+    function renderCounts() {
+      const captured = state.entries.filter(entry => entry.discovery_state === 'CAPTURED').length;
+      const seen = state.entries.filter(entry => entry.discovery_state === 'SEEN').length;
+      const unknown = state.entries.filter(entry => entry.discovery_state === 'UNKNOWN').length;
+      const regions = unlockedRegions();
+      const activeJobs = state.captureJobs.filter(job => !job.is_grouped_secondary && (job.status === 'queued' || job.status === 'processing')).length;
+      document.getElementById('captures-count').textContent = captured;
+      document.getElementById('captured-total').textContent = captured;
+      document.getElementById('seen-total').textContent = seen;
+      document.getElementById('unknown-total').textContent = unknown;
+      document.getElementById('regions-count').textContent = regions.length;
+      document.getElementById('processing-count').textContent = activeJobs;
+      document.getElementById('processing-count').closest('.pill').style.display = activeJobs ? '' : 'none';
+    }
+
+    function renderMap() {
+      const regions = new Set(unlockedRegions());
+      document.querySelectorAll('.map-region').forEach(node => {
+        const code = node.dataset.region;
+        node.classList.toggle('unlocked', regions.has(code));
+        node.classList.toggle('active', code === state.selectedRegion);
+      });
+      document.querySelectorAll('.map-hit').forEach(node => {
+        const code = node.dataset.region;
+        node.classList.toggle('unlocked', regions.has(code));
+        node.classList.toggle('active', code === state.selectedRegion);
+      });
+      const strip = document.getElementById('region-strip');
+      const all = ['AU','NA','SA','EU','AF','AS'];
+      strip.innerHTML = all.map(code => `
+        <button class="region-pill ${regions.has(code) ? 'unlocked' : ''} ${state.selectedRegion === code ? 'active' : ''}" type="button" data-region="${code}">
+          ${escapeHtml(REGION_LABELS[code])}${regions.has(code) ? '' : ' · Locked'}
+        </button>`).join('');
+    }
+
+    function ensureSelection() {
+      const unlocked = unlockedRegions();
+      if (!state.selectedRegion || !unlocked.includes(state.selectedRegion)) {
+        state.selectedRegion = unlocked[0] || null;
+      }
+      const regionEntries = state.entries.filter(entry => !state.selectedRegion || entry.region === state.selectedRegion);
+      const kingdoms = [...new Set(regionEntries.map(kingdomRoot))];
+      if (!state.selectedKingdom || !kingdoms.includes(state.selectedKingdom)) {
+        state.selectedKingdom = bestLabel(regionEntries, kingdomRoot) || kingdoms[0] || null;
+      }
+      const categoryEntries = regionEntries.filter(entry => !state.selectedKingdom || kingdomRoot(entry) === state.selectedKingdom);
+      const categories = [...new Set(categoryEntries.map(categoryLabel))];
+      if (!state.selectedCategory || !categories.includes(state.selectedCategory)) {
+        state.selectedCategory = bestLabel(categoryEntries, categoryLabel) || categories[0] || null;
+      }
+      const familyEntries = categoryEntries.filter(entry => !state.selectedCategory || categoryLabel(entry) === state.selectedCategory);
+      const families = [...new Set(familyEntries.map(familyLabel))];
+      if (!state.selectedFamily || !families.includes(state.selectedFamily)) {
+        state.selectedFamily = bestLabel(familyEntries, familyLabel) || families[0] || null;
+      }
+    }
+
+    function focusFirstCapturedPath() {
+      const captured = state.entries.filter(entry => entry.discovery_state === 'CAPTURED');
+      if (!captured.length) return false;
+      const first = captured
+        .slice()
+        .sort((a, b) => {
+          const byRegion = (a.region || '').localeCompare(b.region || '');
+          if (byRegion) return byRegion;
+          const byDex = (a.dex_id || '').localeCompare(b.dex_id || '');
+          if (byDex) return byDex;
+          return (a.id || 0) - (b.id || 0);
+        })[0];
+      state.selectedRegion = first.region || state.selectedRegion;
+      state.selectedKingdom = kingdomRoot(first);
+      state.selectedCategory = categoryLabel(first);
+      state.selectedFamily = familyLabel(first);
+      return true;
+    }
+
+    function renderSelectors() {
+      ensureSelection();
+      const regionEntries = state.entries.filter(entry => !state.selectedRegion || entry.region === state.selectedRegion);
+      const kingdoms = [...new Set(regionEntries.map(kingdomRoot))];
+      document.getElementById('kingdom-row').innerHTML = kingdoms.map(label => `
+        <button class="chip ${label === state.selectedKingdom ? 'active' : ''}" type="button" data-kingdom="${escapeHtml(label)}">${escapeHtml(label)}</button>
+      `).join('') || '<div class="hint">No regions unlocked yet — <a href="/capture" style="color:var(--accent)">capture something first</a>.</div>';
+
+      const categoryEntries = regionEntries.filter(entry => !state.selectedKingdom || kingdomRoot(entry) === state.selectedKingdom);
+      const categories = [...new Set(categoryEntries.map(categoryLabel))];
+      document.getElementById('category-row').innerHTML = categories.map(label => `
+        <button class="chip ${label === state.selectedCategory ? 'active' : ''}" type="button" data-category="${escapeHtml(label)}">${escapeHtml(label)}</button>
+      `).join('') || '<div class="hint">Select an unlocked region first.</div>';
+
+      const familyEntries = categoryEntries.filter(entry => !state.selectedCategory || categoryLabel(entry) === state.selectedCategory);
+      const families = [...new Set(familyEntries.map(familyLabel))];
+      document.getElementById('family-row').innerHTML = families.map(label => `
+        <button class="chip family-chip ${label === state.selectedFamily ? 'active' : ''}" type="button" data-family="${escapeHtml(label)}">${escapeHtml(label)}</button>
+      `).join('') || '<div class="hint">No active family branches in this path yet.</div>';
+    }
+
+    function renderEntries() {
+      const rows = activeEntries();
+      const hint = document.getElementById('entry-hint');
+      const list = document.getElementById('entry-list');
+      if (!state.selectedRegion) {
+        hint.classList.remove('hidden');
+        list.innerHTML = '';
+        return;
+      }
+      hint.classList.add('hidden');
+      list.innerHTML = rows.map(entry => {
+        const locked = entry.discovery_state === 'UNKNOWN';
+        const title = locked ? '???' : (entry.name || entry.card?.species_name || entry.scientific_name || 'Unknown');
+        const subtitle = `${familyLabel(entry)}${entry.evolution_chain_id ? ` · Evolution stage ${entry.evolution_stage || '?'}` : ''}`;
+        return `
+          <button class="entry-row ${locked ? 'locked' : ''} ${entry.evolution_chain_id ? 'evolution' : ''}" type="button" data-entry="${entry.id}">
+            <div class="entry-top">
+              <div class="entry-id">${escapeHtml(entry.dex_id)}</div>
+              <div class="entry-state ${entry.discovery_state.toLowerCase()}">${({ CAPTURED: 'Captured', SEEN: 'Seen', UNKNOWN: 'Undiscovered' }[entry.discovery_state] ?? escapeHtml(entry.discovery_state))}</div>
+            </div>
+            <div class="entry-name">${escapeHtml(title)}</div>
+            <div class="entry-meta">${escapeHtml(subtitle)}</div>
+          </button>`;
+      }).join('') || '<div class="hint">No Dex entries in this path yet.</div>';
+    }
+
+    // Legacy inline renderer helpers removed.
+    // Shared renderer in /static/card_renderer.js is the single maintained path.
+
+    function openEntry(entryId) {
+      const entry = state.entries.find(item => item.id === entryId);
+      if (!entry || !entry.card || entry.discovery_state !== 'CAPTURED') return;
+      state.activeEntry = entry;
+      const data = entry.card.render_card;
+      if (!data) return;
+      document.getElementById('modal-title').textContent = data.species_name;
+      document.getElementById('modal-subtitle').textContent = `${entry.dex_id} · ${familyLabel(entry)}`;
+      document.getElementById('favorite-btn').textContent = state.user?.favorite_card_id === entry.card.id ? 'Favorite Selected' : 'Set Favorite';
+      document.getElementById('reid-btn').classList.toggle('hidden', (entry.card.species_name || '') !== 'Pending identification');
+      document.getElementById('play-call-btn').classList.toggle('hidden', !data.sound_url);
+      document.getElementById('card-modal').classList.add('open');
+      requestAnimationFrame(() => {
+        if (state.activeEntry?.id !== entry.id) return;
+        WildExCardRenderer.buildCard(document.getElementById('detail-card-host'), data);
+      });
+    }
+
+    function closeModal() {
+      document.getElementById('card-modal').classList.remove('open');
+      state.activeEntry = null;
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    async function askDr() {
+      const question = document.getElementById('dr-question').value.trim();
+      const mode = document.getElementById('dr-mode').value;
+      if (!question && !mode) return;
+      const responseNode = document.getElementById('dr-response');
+      responseNode.textContent = 'The Dr is thinking...';
+      try {
+        const resp = await fetch('/dr/ask', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question,
+            mode,
+            card_id: state.activeEntry?.card?.id || null,
+            biome: state.activeEntry?.card?.render_card?.biome || null,
+            player_region: state.selectedRegion || state.activeEntry?.card?.region || null,
+            hunger_state: null,
+            feed_state: null,
+          }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data.detail || 'Could not reach The Dr');
+        const segments = [];
+        if (data.reply) segments.push(data.reply);
+        if (Array.isArray(data.missing_context) && data.missing_context.length) {
+          segments.push(`Missing: ${data.missing_context.join(', ')}`);
+        }
+        if (data.follow_up) segments.push(`More: ${data.follow_up}`);
+        responseNode.textContent = segments.join('\n\n') || 'The Dr has no answer right now.';
+      } catch (error) {
+        responseNode.textContent = error.message || 'Could not reach The Dr';
+      }
+    }
+
+    async function shareApp() {
+      const shareUrl = `${location.origin}/wildex`;
+      const payload = {
+        title: 'WildEx',
+        text: 'Capture real wildlife, unlock regions, and build your WildEx.',
+        url: shareUrl,
+      };
+      if (navigator.share) {
+        try {
+          await navigator.share(payload);
+          return;
+        } catch (_) {}
+      }
+      const copied = await copyText(shareUrl);
+      if (copied) alert('App link copied');
+    }
+
+    async function shareActiveCard() {
+      const entry = state.activeEntry;
+      if (!entry?.card?.render_card) return;
+      const shareUrl = `${location.origin}/wildex?card=${entry.card.id}`;
+      const title = `${entry.card.species_name || entry.name} • ${entry.card.rarity_display || 'WildEx'}`;
+      const text = `${title}\nCaptured in WildEx.`;
+      if (navigator.share && navigator.canShare) {
+        try {
+          const blob = await WildExCardRenderer.exportFaceBlob(document.getElementById('detail-card-host'), 'front');
+          if (blob) {
+            const file = new File([blob], `${(entry.card.dex_id || 'wildex-card').toLowerCase()}-front.png`, { type: 'image/png' });
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({ title, text, url: shareUrl, files: [file] });
+              return;
+            }
+          }
+        } catch (_) {}
+      }
+      if (navigator.share) {
+        try {
+          await navigator.share({ title, text, url: shareUrl });
+          return;
+        } catch (_) {}
+      }
+      const copied = await copyText(shareUrl);
+      if (copied) alert('Card link copied');
+    }
+
+    function repeatLabel(job) {
+      if (job.repeat_state === 'repeat_capture') return 'Previously caught species found again';
+      if (job.repeat_state === 'first_capture_after_seen') return 'Seen before, now captured';
+      return 'New species captured';
+    }
+
+    function showJobBanner(job) {
+      const banner = document.getElementById('job-banner');
+      document.getElementById('job-banner-title').textContent = job.status === 'complete'
+        ? repeatLabel(job)
+        : job.status === 'needs_review'
+          ? 'Capture needs review'
+          : 'Capture failed';
+      document.getElementById('job-banner-body').textContent = job.status === 'complete'
+        ? `${job.species_name || 'Capture ready'}${job.grouped_count > 1 ? ` • ${job.grouped_count} nearby shots grouped` : ''}${job.region_unlocked ? ' • region unlocked' : ''}`
+        : (job.review_reason || job.error_message || 'Processing finished with an issue.');
+      document.getElementById('job-banner-action').textContent = job.card_id ? 'Open card' : 'Dismiss';
+      banner.classList.add('visible');
+      state.highlightedJob = job;
+    }
+
+    function maybeOpenPendingCard() {
+      if (!pendingCardOpen) return;
+      const entry = state.entries.find(item => item.card && item.card.id === pendingCardOpen);
+      if (entry) {
+        openEntry(entry.id);
+        history.replaceState({}, '', '/wildex');
+      }
+    }
+
+    async function refreshCaptureJobs() {
+      try {
+        const resp = await fetch('/capture/jobs', { credentials: 'same-origin' });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        state.captureJobs = data.items || [];
+        renderCounts();
+        const seen = new Set(seenNoticeIds());
+        const latest = state.captureJobs.find(job => !job.is_grouped_secondary && TERMINAL_STATUSES.has(job.status) && !seen.has(`${job.id}:${job.status}:${job.completed_at || ''}`));
+        if (latest) {
+          markNoticeSeen(`${latest.id}:${latest.status}:${latest.completed_at || ''}`);
+          showJobBanner(latest);
+          await loadHub(false);
+        }
+      } catch (_) {}
+    }
+
+    async function setFavoriteCard() {
+      const entry = state.activeEntry;
+      if (!entry?.card?.id) return;
+      const res = await fetch(`/cards/${entry.card.id}/favorite`, { method: 'POST', credentials: 'same-origin' });
+      if (!res.ok) return;
+      state.user.favorite_card_id = entry.card.id;
+      setHeroBackground();
+      document.getElementById('favorite-btn').textContent = 'Favorite Selected';
+    }
+
+    async function reidentifyActive() {
+      const entry = state.activeEntry;
+      if (!entry?.card?.id) return;
+      const res = await fetch(`/cards/${entry.card.id}/reidentify`, { method: 'POST', credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.detail || 'Re-ID failed'); return; }
+      await loadHub();
+      const refreshed = state.entries.find(item => item.id === entry.id);
+      if (refreshed) openEntry(refreshed.id);
+    }
+
+    async function releaseActive() {
+      const entry = state.activeEntry;
+      if (!entry?.card?.id) return;
+      if (!confirm(`Release ${entry.card.species_name || entry.name}?`)) return;
+      const res = await fetch(`/cards/${entry.card.id}`, { method: 'DELETE', credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.detail || 'Release failed'); return; }
+      closeModal();
+      await loadHub();
+    }
+
+    async function loadHub(refreshJobs = true) {
+      const me = await fetch('/auth/me', { credentials: 'same-origin' });
+      if (me.status === 401) {
+        document.getElementById('signin-line').innerHTML = 'Not signed in';
+        document.getElementById('mini-status').textContent = 'Sign in required';
+        document.getElementById('hero-panel').style.removeProperty('--hero-image');
+        document.querySelector('.tagline').textContent = 'Sign in to open your map, regional index, and saved collection.';
+        document.querySelector('.action-row').innerHTML = `
+          <a class="btn btn-primary" href="/login">Sign In</a>
+          <a class="btn btn-secondary" href="/login">Create Account</a>`;
+        document.getElementById('region-strip').innerHTML = '';
+        document.getElementById('kingdom-row').innerHTML = '<div class="hint">Sign in to unlock your WildEx map and index.</div>';
+        document.getElementById('category-row').innerHTML = '';
+        document.getElementById('family-row').innerHTML = '';
+        document.getElementById('entry-list').innerHTML = '';
+        return;
+      }
+      state.user = await me.json();
+      document.getElementById('signin-line').innerHTML = `Signed in as <strong>${escapeHtml(state.user.email)}</strong>`;
+      const entriesRes = await fetch('/wilddex/entries', { credentials: 'same-origin' });
+      state.entries = entriesRes.ok ? await entriesRes.json() : [];
+      renderCounts();
+      renderMap();
+      renderSelectors();
+      renderEntries();
+      setHeroBackground();
+      document.getElementById('mini-status').textContent = state.selectedRegion ? `${REGION_LABELS[state.selectedRegion]} active` : 'No regions unlocked yet';
+      document.getElementById('open-first-unlocked').disabled = !state.selectedRegion;
+      maybeOpenPendingCard();
+      if (refreshJobs) await refreshCaptureJobs();
+    }
+
+    document.addEventListener('click', (event) => {
+      const regionNode = event.target.closest('.map-region,.map-hit,.region-pill');
+      if (regionNode) {
+        const region = regionNode.dataset.region;
+        if (unlockedRegions().includes(region)) {
+          state.selectedRegion = region;
+          renderMap();
+          renderSelectors();
+          renderEntries();
+          document.getElementById('mini-status').textContent = `${REGION_LABELS[region]} active`;
+          document.getElementById('index-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+      }
+      const k = event.target.closest('[data-kingdom]');
+      if (k) {
+        state.selectedKingdom = k.dataset.kingdom;
+        state.selectedCategory = null;
+        state.selectedFamily = null;
+        renderSelectors();
+        renderEntries();
+        return;
+      }
+      const c = event.target.closest('[data-category]');
+      if (c) {
+        state.selectedCategory = c.dataset.category;
+        state.selectedFamily = null;
+        renderSelectors();
+        renderEntries();
+        return;
+      }
+      const f = event.target.closest('[data-family]');
+      if (f) {
+        state.selectedFamily = f.dataset.family;
+        renderSelectors();
+        renderEntries();
+        return;
+      }
+      const entry = event.target.closest('[data-entry]');
+      if (entry) {
+        const row = state.entries.find(item => item.id === Number(entry.dataset.entry));
+        if (row?.discovery_state === 'CAPTURED') openEntry(row.id);
+        return;
+      }
+      if (event.target === document.getElementById('card-modal')) closeModal();
+    });
+
+    document.getElementById('flip-btn').addEventListener('click', () => {
+      WildExCardRenderer.flip(document.getElementById('detail-card-host'));
+    });
+    document.getElementById('print-btn').addEventListener('click', () => {
+      WildExCardRenderer.printNode(document.getElementById('detail-card-host'));
+    });
+    document.getElementById('download-front-btn').addEventListener('click', () => {
+      if (!state.activeEntry) return;
+      WildExCardRenderer.exportFace(document.getElementById('detail-card-host'), 'front', state.activeEntry.dex_id || 'wildex-card').catch(() => {});
+    });
+    document.getElementById('download-back-btn').addEventListener('click', () => {
+      if (!state.activeEntry) return;
+      WildExCardRenderer.exportFace(document.getElementById('detail-card-host'), 'back', state.activeEntry.dex_id || 'wildex-card').catch(() => {});
+    });
+    document.getElementById('download-both-btn').addEventListener('click', () => {
+      if (!state.activeEntry) return;
+      WildExCardRenderer.exportBoth(document.getElementById('detail-card-host'), state.activeEntry.dex_id || 'wildex-card').catch(() => {});
+    });
+    document.getElementById('play-call-btn').addEventListener('click', () => {
+      const sound = state.activeEntry?.card?.render_card?.sound_url || state.activeEntry?.card?.sound_url;
+      if (!sound) return;
+      new Audio(sound).play().catch(() => {});
+    });
+    document.getElementById('share-app-btn').addEventListener('click', () => shareApp().catch(() => {}));
+    document.getElementById('dr-ask-btn').addEventListener('click', () => askDr().catch(() => {}));
+    document.getElementById('share-card-btn').addEventListener('click', () => shareActiveCard().catch(() => {}));
+    document.getElementById('close-btn').addEventListener('click', closeModal);
+    document.getElementById('favorite-btn').addEventListener('click', () => setFavoriteCard().catch(() => {}));
+    document.getElementById('reid-btn').addEventListener('click', () => reidentifyActive().catch(() => {}));
+    document.getElementById('release-btn').addEventListener('click', () => releaseActive().catch(() => {}));
+    document.getElementById('job-banner-action').addEventListener('click', () => {
+      const job = state.highlightedJob;
+      document.getElementById('job-banner').classList.remove('visible');
+      if (!job?.card_id) return;
+      const entry = state.entries.find(item => item.card && item.card.id === job.card_id);
+      if (entry) openEntry(entry.id);
+    });
+    document.getElementById('logout-link').addEventListener('click', async () => {
+      await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+      location.href = '/login';
+    });
+    document.getElementById('open-first-unlocked').addEventListener('click', () => {
+      focusFirstCapturedPath();
+      renderMap();
+      renderSelectors();
+      renderEntries();
+      if (state.selectedRegion) {
+        document.getElementById('mini-status').textContent = `${REGION_LABELS[state.selectedRegion]} active`;
+        document.getElementById('index-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+
+    queuedCount().then(count => {
+      document.getElementById('queue-count').textContent = count;
+      document.getElementById('queue-count').closest('.pill').style.display = count ? '' : 'none';
+    }).catch(() => {});
+    window.setInterval(() => { refreshCaptureJobs().catch(() => {}); }, 5000);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+    loadHub().catch(() => {});
+  </script>
+</body>
+</html>

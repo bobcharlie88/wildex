@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Legacy WildDex page. /wildex now routes to the unified hub in home.html. -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>WildDex</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0f0a;
+    --surface: #111811;
+    --surface2: #1a221a;
+    --border: #2a362a;
+    --accent: #4caf50;
+    --accent2: #81c784;
+    --text: #e8f5e9;
+    --text2: #a5d6a7;
+    --text3: #6a9b6e;
+    --tab-h: 44px;
+    --subtab-h: 36px;
+    --header-h: 56px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    height: var(--header-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .back-btn {
+    color: var(--accent2);
+    text-decoration: none;
+    font-size: 22px;
+    line-height: 1;
+    padding: 4px 8px 4px 0;
+  }
+  header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    flex: 1;
+  }
+  #total-count {
+    font-size: 13px;
+    color: var(--text3);
+    background: var(--surface2);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Kingdom tabs ── */
+  .kingdom-tabs {
+    height: var(--tab-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+  }
+  .kingdom-tabs::-webkit-scrollbar { display: none; }
+  .kingdom-tabs button {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text3);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 0 16px;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+    white-space: nowrap;
+  }
+  .kingdom-tabs button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* ── Sub-tabs ── */
+  .sub-tabs {
+    height: var(--subtab-h);
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: none;
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+  }
+  .sub-tabs::-webkit-scrollbar { display: none; }
+  .sub-tabs.visible { display: flex; }
+  .sub-tabs button {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text3);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 0 12px;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    transition: color .15s, border-color .15s;
+  }
+  .sub-tabs button.active {
+    color: var(--accent2);
+    border-bottom-color: var(--accent2);
+  }
+
+  /* ── Card grid ── */
+  #grid-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  #card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+
+  .card-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .1s, border-color .1s;
+  }
+  .card-tile:active { transform: scale(0.97); }
+  .card-tile:hover { border-color: var(--accent); }
+
+  .card-thumb {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+  }
+  .card-thumb.landscape {
+    aspect-ratio: 4 / 3;
+  }
+  .card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .card-thumb.no-img { font-size: 40px; }
+
+  .card-info {
+    padding: 8px;
+  }
+  .card-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 4px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+  .badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    letter-spacing: 0.3px;
+  }
+  .badge-common    { background: #1a2e1a; color: #81c784; border: 1px solid #2e4e2e; }
+  .badge-uncommon  { background: #1a2a3a; color: #64b5f6; border: 1px solid #2a3a5a; }
+  .badge-rare      { background: #2a1a3a; color: #ce93d8; border: 1px solid #4a2a5a; }
+  .badge-legendary { background: #3a2a0a; color: #ffb74d; border: 1px solid #5a3a0a; }
+  .badge-invasive  { background: #3a1a1a; color: #ef9a9a; border: 1px solid #5a2a2a; }
+  .badge-unknown   { background: #1e2e1e; color: #6a9b6e; border: 1px solid #2e3e2e; }
+
+  /* ── Empty state ── */
+  #empty-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text3);
+    text-align: center;
+    gap: 12px;
+  }
+  #empty-state.visible { display: flex; }
+  #empty-state .empty-icon { font-size: 64px; }
+  #empty-state p { font-size: 15px; line-height: 1.5; }
+  #empty-state a {
+    margin-top: 8px;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 15px;
+    background: var(--surface);
+    padding: 10px 20px;
+    border-radius: 24px;
+    border: 1px solid var(--accent);
+  }
+
+  /* ── Loading ── */
+  #loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text3);
+    gap: 12px;
+    font-size: 15px;
+  }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Modal ── */
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.7);
+    z-index: 100;
+    align-items: flex-end;
+  }
+  #modal-overlay.open { display: flex; }
+  #modal {
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    width: 100%;
+    max-height: 90dvh;
+    overflow-y: auto;
+    padding: 0 0 env(safe-area-inset-bottom) 0;
+    animation: slideUp .25s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 12px auto 0;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px 0;
+  }
+  .modal-back {
+    background: none;
+    border: none;
+    color: var(--accent2);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px 8px 4px 0;
+    line-height: 1;
+  }
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    flex: 1;
+  }
+
+  #modal-photo {
+    width: 100%;
+    max-height: none;
+    object-fit: initial;
+    margin-top: 12px;
+    background: transparent;
+    min-height: 0;
+    display: block;
+    font-size: inherit;
+  }
+  #modal-photo img {
+    width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+  .modal-sci {
+    font-size: 13px;
+    color: var(--text3);
+    font-style: italic;
+    margin-bottom: 10px;
+  }
+  .modal-blurb {
+    font-size: 14px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .stat-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: 9px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+  }
+
+  .modal-meta {
+    font-size: 12px;
+    color: var(--text3);
+    line-height: 1.8;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .modal-meta span { color: var(--text2); }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin: 0 16px 16px;
+  }
+  .action-btn {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .action-btn.primary {
+    background: var(--accent);
+    color: #071107;
+    border-color: var(--accent);
+  }
+  .action-btn.danger {
+    background: rgba(127, 29, 29, 0.92);
+    color: #fee2e2;
+    border-color: rgba(239, 68, 68, 0.45);
+  }
+  .action-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+  .flip-card {
+    perspective: 1400px;
+    margin: 12px 16px 0;
+  }
+  .flip-card-inner {
+    position: relative;
+    min-height: 610px;
+    transform-style: preserve-3d;
+    transition: transform .7s ease;
+  }
+  .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+  .card-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.08);
+    box-shadow: 0 20px 54px rgba(0,0,0,.38);
+    display: flex;
+    flex-direction: column;
+  }
+  .card-face.back { transform: rotateY(180deg); }
+  .card-front-photo {
+    min-height: 260px;
+    position: relative;
+    background: rgba(255,255,255,.04);
+  }
+  .card-front-photo.landscape {
+    min-height: 210px;
+  }
+  .card-front-photo img {
+    width: 100%;
+    height: 100%;
+    min-height: 260px;
+    object-fit: cover;
+    display: block;
+  }
+  .card-front-photo.landscape img {
+    min-height: 210px;
+  }
+  .card-front-overlay {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,.06), transparent 38%, rgba(0,0,0,.7)),
+      radial-gradient(circle at top right, rgba(255,255,255,.14), transparent 30%);
+    pointer-events: none;
+  }
+  .card-ribbon {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(10,15,10,.72);
+    border: 1px solid rgba(255,255,255,.1);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .card-ribbon-icon { font-size: 15px; }
+  .card-front-title {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-end;
+  }
+  .score-chip {
+    min-width: 78px;
+    padding: 10px 12px;
+    border-radius: 16px;
+    text-align: center;
+    background: rgba(10,15,10,.78);
+    border: 1px solid rgba(255,255,255,.1);
+  }
+  .score-chip strong { display: block; font-size: 16px; }
+  .score-chip span {
+    display: block;
+    margin-top: 3px;
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+  .card-face-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    flex: 1;
+  }
+  .card-face-body::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,.05), transparent 36%),
+      linear-gradient(180deg, transparent, rgba(255,255,255,.03));
+    pointer-events: none;
+  }
+  .card-face-body > * { position: relative; z-index: 1; }
+  .card-meta-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .card-title-kicker {
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: rgba(232,245,233,.72);
+  }
+  .card-rank-pill {
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.08);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .modal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .modal-badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    background: rgba(255,255,255,.08);
+  }
+  .modal-badge.warn { background: rgba(245,158,11,.16); color: #ffd28c; }
+  .modal-badge.alert { background: rgba(239,68,68,.16); color: #ffb2b2; }
+  .modal-badge.good { background: rgba(34,197,94,.14); color: #b7f3c8; }
+  .stat-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .stat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .stat-name {
+    width: 36px;
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text3);
+    flex-shrink: 0;
+  }
+  .stat-track {
+    flex: 1;
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255,255,255,.08);
+  }
+  .stat-fill {
+    height: 100%;
+    border-radius: 999px;
+  }
+  .stat-number {
+    width: 24px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .card-back-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .card-back-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    font-size: 24px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.1);
+  }
+  .card-back-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .meta-chip {
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .meta-chip .label {
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+  .meta-chip .value {
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .theme-reptile { background: linear-gradient(160deg, rgba(104,36,18,.98), rgba(43,17,11,.98)); }
+  .theme-mammal { background: linear-gradient(160deg, rgba(51,63,35,.98), rgba(21,27,19,.98)); }
+  .theme-bird { background: linear-gradient(160deg, rgba(24,62,92,.98), rgba(15,28,44,.98)); }
+  .theme-fish { background: linear-gradient(160deg, rgba(7,74,99,.98), rgba(5,28,44,.98)); }
+  .theme-plant { background: linear-gradient(160deg, rgba(97,83,47,.98), rgba(51,44,24,.98)); }
+  .theme-fungi { background: linear-gradient(160deg, rgba(76,40,54,.98), rgba(32,18,28,.98)); }
+  .theme-terrain { background: linear-gradient(160deg, rgba(65,60,52,.98), rgba(26,24,23,.98)); }
+  .theme-pending { background: linear-gradient(160deg, rgba(35,35,49,.98), rgba(14,14,24,.98)); }
+  .reptile-template {
+    color: #322117;
+    background:
+      linear-gradient(180deg, rgba(103,59,38,0.22), transparent 18%),
+      linear-gradient(180deg, #d3bc9c 0%, #c9b08a 42%, #b89973 100%);
+  }
+  .reptile-template::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border: 3px solid rgba(77,45,28,0.85);
+    border-radius: 22px;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 2px rgba(213,182,139,0.35);
+  }
+  .reptile-template .card-face-body {
+    background: transparent;
+    gap: 12px;
+  }
+  .reptile-template .card-face-body::before {
+    background:
+      radial-gradient(circle at 12% 18%, rgba(255,255,255,0.18), transparent 18%),
+      radial-gradient(circle at 86% 88%, rgba(255,160,76,0.24), transparent 12%),
+      repeating-linear-gradient(0deg, rgba(58,36,24,0.05) 0 2px, transparent 2px 14px);
+    opacity: 0.85;
+  }
+  .reptile-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 14px 0;
+    color: #f4e5cf;
+  }
+  .reptile-level {
+    width: 54px;
+    height: 54px;
+    clip-path: polygon(25% 6%, 75% 6%, 96% 50%, 75% 94%, 25% 94%, 4% 50%);
+    background: linear-gradient(180deg, #295f37, #163820);
+    border: 3px solid #ccb793;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .reptile-banner {
+    flex: 1;
+    min-height: 44px;
+    border-radius: 10px;
+    border: 2px solid rgba(80,48,30,0.95);
+    background: linear-gradient(180deg, #6b4834, #4f3125);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    box-shadow: inset 0 0 0 2px rgba(223,194,151,0.18);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .reptile-banner strong { font-size: 17px; }
+  .reptile-banner span { font-size: 14px; color: #f6d9b0; }
+  .reptile-title {
+    padding: 0 18px;
+    text-align: left;
+  }
+  .reptile-title .modal-title {
+    font-size: 30px;
+    line-height: 1.05;
+    color: #4a2a1a;
+    text-transform: uppercase;
+  }
+  .reptile-title .modal-sci {
+    color: #5e3f2e;
+    font-size: 16px;
+    margin-top: 4px;
+  }
+  .reptile-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(150px, 0.95fr);
+    gap: 14px;
+    align-items: start;
+  }
+  .reptile-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+  .reptile-row {
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(74,42,26,0.16);
+  }
+  .reptile-row .label {
+    font-size: 13px;
+    font-weight: 800;
+    color: #4d2f1f;
+  }
+  .reptile-row .value {
+    margin-top: 3px;
+    font-size: 14px;
+    line-height: 1.35;
+    color: #3d291e;
+  }
+  .reptile-photo-frame {
+    border-radius: 14px;
+    padding: 8px;
+    background: linear-gradient(180deg, rgba(112,73,50,0.95), rgba(73,47,34,0.98));
+    border: 2px solid rgba(80,48,30,0.95);
+    box-shadow: inset 0 0 0 2px rgba(223,194,151,0.18);
+  }
+  .reptile-photo-frame img {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    display: block;
+    border-radius: 10px;
+    border: 1px solid rgba(222,197,161,0.42);
+  }
+  .reptile-section-tag {
+    align-self: flex-start;
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(96,58,39,0.95);
+    background: linear-gradient(180deg, #d2b083, #b98d61);
+    color: #4b2b1a;
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .reptile-lore {
+    font-size: 15px;
+    line-height: 1.55;
+    color: #382418;
+  }
+  .reptile-fact {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #513226, #362017);
+    border: 2px solid rgba(89,55,38,0.98);
+    color: #f2dec2;
+  }
+  .reptile-fact strong {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    color: #f6cf95;
+  }
+  .reptile-fact span {
+    font-size: 14px;
+    line-height: 1.4;
+    font-style: italic;
+  }
+  @media (max-width: 420px) {
+    .flip-card-inner { min-height: 580px; }
+    .card-back-grid { grid-template-columns: 1fr; }
+    .reptile-body { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back-btn" href="/">←</a>
+  <h1>WildDex</h1>
+  <div id="total-count">0 cards</div>
+</header>
+
+<!-- Kingdom tabs -->
+<div class="kingdom-tabs" id="kingdom-tabs">
+  <button class="active" data-kingdom="all">🌍 All</button>
+  <button data-kingdom="animal">🦁 Animals</button>
+  <button data-kingdom="plant">🌿 Plants</button>
+  <button data-kingdom="fungi">🍄 Fungi</button>
+  <button data-kingdom="terrain">🪨 Terrain</button>
+</div>
+
+<!-- Animal sub-tabs -->
+<div class="sub-tabs" id="sub-animal">
+  <button class="active" data-sub="all">All</button>
+  <button data-sub="mammal">Mammals</button>
+  <button data-sub="bird">Birds</button>
+  <button data-sub="reptile">Reptiles</button>
+  <button data-sub="insect">Insects</button>
+  <button data-sub="amphibian">Amphibians</button>
+  <button data-sub="fish">Fish</button>
+  <button data-sub="arachnid">Arachnids</button>
+  <button data-sub="marine">Marine</button>
+</div>
+
+<!-- Plant sub-tabs -->
+<div class="sub-tabs" id="sub-plant">
+  <button class="active" data-sub="all">All</button>
+  <button data-sub="tree">Trees</button>
+  <button data-sub="flower">Flowers</button>
+  <button data-sub="grass">Grasses</button>
+  <button data-sub="cactus">Cacti</button>
+  <button data-sub="aquatic_plant">Aquatic</button>
+  <button data-sub="shrub">Shrubs</button>
+</div>
+
+<!-- Terrain sub-tabs -->
+<div class="sub-tabs" id="sub-terrain">
+  <button class="active" data-sub="all">All</button>
+  <button data-sub="rock">Rock</button>
+  <button data-sub="soil">Soil</button>
+  <button data-sub="water">Water</button>
+  <button data-sub="landscape">Landscape</button>
+</div>
+
+<!-- Fungi sub-tabs -->
+<div class="sub-tabs" id="sub-fungi">
+  <button class="active" data-sub="all">All</button>
+  <button data-sub="mushroom">Mushrooms</button>
+  <button data-sub="bracket_fungus">Bracket</button>
+  <button data-sub="mould">Mould</button>
+</div>
+
+<div id="grid-scroll">
+  <div id="loading"><div class="spinner"></div>Loading WildDex…</div>
+  <div id="card-grid"></div>
+  <div id="empty-state">
+    <div class="empty-icon">🌍</div>
+    <p>No creatures here yet.<br>Go outside and capture some!</p>
+    <a href="/capture">📷 Capture Now</a>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <button class="modal-back" onclick="closeModal()">←</button>
+      <div class="modal-title" id="modal-name"></div>
+    </div>
+    <div id="modal-photo"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+    <div class="modal-body">
+      <div class="modal-sci" id="modal-sci"></div>
+      <div class="modal-blurb" id="modal-blurb"></div>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-val" id="s-spd">—</div><div class="stat-label">Speed</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-atk">—</div><div class="stat-label">Attack</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-def">—</div><div class="stat-label">Defence</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-hp">—</div><div class="stat-label">HP</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-sta">—</div><div class="stat-label">Stamina</div></div>
+      </div>
+      <div class="modal-meta" id="modal-meta"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TAXON_EMOJI = {
+  Mammalia: '🦁', Aves: '🐦', Reptilia: '🦎', Amphibia: '🐸',
+  Actinopterygii: '🐟', Insecta: '🦋', Arachnida: '🕷', Mollusca: '🐌',
+  Animalia: '🐾', Plantae: '🌿', Fungi: '🍄', Terrain: '🪨',
+  mammal: '🦁', bird: '🐦', reptile: '🦎', insect: '🦋',
+  amphibian: '🐸', fish: '🐟', arachnid: '🕷', marine: '🐠',
+  tree: '🌳', flower: '🌸', grass: '🌾', cactus: '🌵',
+  aquatic_plant: '🌊', shrub: '🌿',
+  rock: '🪨', soil: '🌍', water: '💧', landscape: '🏔',
+  mushroom: '🍄', bracket_fungus: '🍄', mould: '🦠',
+};
+const RARITY_CLASS = {
+  common: 'badge-common', uncommon: 'badge-uncommon',
+  rare: 'badge-rare', very_rare: 'badge-legendary'
+};
+
+let allCards = [];
+let activeKingdom = 'all';
+let activeSub = 'all';
+let activeModalCardId = null;
+let activeModalEntryId = null;
+
+function entryCard(entry) {
+  return entry && entry.card ? entry.card : null;
+}
+
+function entryTaxon(entry) {
+  const card = entryCard(entry) || {};
+  return {
+    category: String(card.category || entry.category || '').toLowerCase(),
+    sub: String(card.sub_category || entry.sub_category || '').toLowerCase(),
+    iconic: String(card.iconic_taxon || '').toLowerCase(),
+  };
+}
+
+function normalizeKingdom(c) {
+  const category = (c.category || '').toLowerCase();
+  const sub = (c.sub_category || '').toLowerCase();
+  const iconic = (c.iconic_taxon || '').toLowerCase();
+  if ((c.species_name || '').toLowerCase() === 'pending identification') return 'pending';
+  if (category === 'plant' || iconic === 'plantae') return 'plant';
+  if (category === 'fungi' || iconic === 'fungi') return 'fungi';
+  if (category === 'terrain' || iconic === 'terrain') return 'terrain';
+  if (sub === 'reptile' || iconic === 'reptilia') return 'reptile';
+  if (sub === 'bird' || iconic === 'aves') return 'bird';
+  if (sub === 'fish' || sub === 'marine' || iconic === 'actinopterygii') return 'fish';
+  if (category === 'animal' || iconic === 'mammalia') return 'mammal';
+  return 'mammal';
+}
+
+function biomeTheme(c, kingdom) {
+  const location = c.capture_country || ((c.latitude != null && c.longitude != null) ? `${Number(c.latitude).toFixed(2)}, ${Number(c.longitude).toFixed(2)}` : 'Unknown range');
+  const map = {
+    reptile: { label: 'Rocky Escarpment', icon: '🐉', frame: 'theme-reptile', habitat: 'Arid / rocky biome', location },
+    mammal: { label: 'Woodland Run', icon: '🐾', frame: 'theme-mammal', habitat: 'Earth / grassland biome', location },
+    bird: { label: 'Canopy Draft', icon: '🪶', frame: 'theme-bird', habitat: 'Sky / cliff biome', location },
+    fish: { label: 'Estuary Current', icon: '🌊', frame: 'theme-fish', habitat: 'Ocean / reef biome', location },
+    plant: { label: 'Herbarium Plate', icon: '🌿', frame: 'theme-plant', habitat: 'Botanical archive', location },
+    fungi: { label: 'Forest Floor', icon: '🍄', frame: 'theme-fungi', habitat: 'Shade / decay biome', location },
+    terrain: { label: 'Geostrata', icon: '🪨', frame: 'theme-terrain', habitat: 'Landform record', location },
+    pending: { label: 'Field Archive', icon: '⏳', frame: 'theme-pending', habitat: 'Awaiting classification', location },
+  };
+  return map[kingdom] || map.mammal;
+}
+
+function modalStatRows(stats) {
+  const colors = { speed:'#38bdf8', attack:'#f87171', defence:'#a78bfa', hp:'#34d399', stamina_regen:'#fb923c' };
+  const labels = { speed:'SPD', attack:'ATK', defence:'DEF', hp:'HP', stamina_regen:'STM' };
+  return Object.entries(stats || {}).map(([k, v]) => `
+    <div class="stat-row">
+      <div class="stat-name">${labels[k]}</div>
+      <div class="stat-track"><div class="stat-fill" style="width:${v}%;background:${colors[k]}"></div></div>
+      <div class="stat-number">${v}</div>
+    </div>`).join('');
+}
+
+function metaChip(label, value) {
+  return `<div class="meta-chip"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+}
+
+function factTextForCard(c, theme) {
+  if (c.invasive_at_location) return `${c.species_name} is flagged as invasive at this capture location.`;
+  if (c.conservation_status) return `Conservation status: ${c.conservation_status}.`;
+  if (c.observations_count) return `${c.species_name} has ${Number(c.observations_count).toLocaleString()} recorded iNaturalist sightings.`;
+  return `${c.species_name} is catalogued in ${theme.habitat.toLowerCase()} conditions.`;
+}
+
+function reptileFrontTemplate(c, theme, pct, displayPhoto) {
+  const locationText = c.capture_country || ((c.latitude != null && c.longitude != null)
+    ? `${Number(c.latitude).toFixed(2)}, ${Number(c.longitude).toFixed(2)}`
+    : 'Unknown zone');
+  const recordType = c.rank ? `${String(c.rank).replace(/_/g, ' ')} record` : `${pct}% match confidence`;
+  const statusText = c.provisional ? 'Provisional field identification' : (c.rarity_display || 'Confirmed field record');
+  return `
+    <section class="card-face front reptile-template">
+      <div class="reptile-header">
+        <div class="reptile-level">${Math.max(1, Math.min(99, Math.round(pct / 6) || 17))}</div>
+        <div class="reptile-banner">
+          <strong>WildEx</strong>
+          <span>Dragon</span>
+        </div>
+      </div>
+      <div class="card-face-body">
+        <div class="reptile-title">
+          <div class="modal-title">${c.species_name || c.scientific_name}</div>
+          <div class="modal-sci">${c.scientific_name || ''}</div>
+        </div>
+        <div class="reptile-body">
+          <div class="reptile-stats">
+            <div class="reptile-row"><div class="label">Common Name:</div><div class="value">${c.species_name || c.scientific_name}</div></div>
+            <div class="reptile-row"><div class="label">Scientific Name:</div><div class="value"><em>${c.scientific_name || ''}</em></div></div>
+            <div class="reptile-row"><div class="label">Record Type:</div><div class="value">${recordType}</div></div>
+            <div class="reptile-row"><div class="label">Habitat:</div><div class="value">${theme.habitat}<br>${locationText}</div></div>
+            <div class="reptile-row"><div class="label">Status:</div><div class="value">${statusText}</div></div>
+          </div>
+          <div class="reptile-photo-frame">
+            <img id="modal-card-photo" src="${displayPhoto}" alt="">
+          </div>
+        </div>
+        <div class="reptile-section-tag">Info</div>
+        <div class="reptile-lore">${c.blurb || `${c.species_name} was captured as a reptile field record in WildEx.`}</div>
+        <div class="reptile-fact">
+          <strong>Fact</strong>
+          <span>${factTextForCard(c, theme)}</span>
+        </div>
+      </div>
+    </section>`;
+}
+
+function applyOrientationClass(container, width, height) {
+  if (!container || !width || !height) return;
+  container.classList.remove('landscape', 'portrait', 'square');
+  const ratio = width / height;
+  if (ratio > 1.18) container.classList.add('landscape');
+  else if (ratio < 0.85) container.classList.add('portrait');
+  else container.classList.add('square');
+}
+
+function setThumbOrientation(img) {
+  if (!img) return;
+  applyOrientationClass(img.closest('.card-thumb'), img.naturalWidth, img.naturalHeight);
+}
+
+function bindModalOrientation() {
+  const img = document.getElementById('modal-card-photo');
+  if (!img) return;
+  const container = img.closest('.card-front-photo');
+  const apply = () => applyOrientationClass(container, img.naturalWidth, img.naturalHeight);
+  img.onload = apply;
+  img.onerror = () => applyOrientationClass(container, 1, 1);
+  if (img.complete) apply();
+}
+
+function flipModalCard() {
+  const card = document.getElementById('modal-flip-card');
+  if (card) card.classList.toggle('flipped');
+}
+
+function printModalCard() {
+  window.print();
+}
+
+async function loadCards() {
+  try {
+    const res = await fetch('/wilddex/entries', { credentials: 'same-origin' });
+    if (res.status === 401) {
+      location.href = '/login';
+      return;
+    }
+    if (!res.ok) throw new Error(res.status);
+    allCards = await res.json();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('total-count').textContent =
+      allCards.length + (allCards.length === 1 ? ' entry' : ' entries');
+    renderDexGrid();
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      '<p style="color:#ef9a9a">Could not load WildDex. Check your connection.</p>';
+  }
+}
+
+function filterCards() {
+  return allCards.filter(c => {
+    const taxon = entryTaxon(c);
+    const cat = taxon.category;
+    const sub = taxon.sub;
+    const iconic = taxon.iconic;
+
+    if (activeKingdom === 'all') return true;
+
+    if (activeKingdom === 'animal') {
+      const isAnimal = cat === 'animal' ||
+        (cat === '' && iconic !== 'plantae' && iconic !== 'fungi' && iconic !== 'terrain');
+      if (!isAnimal) return false;
+      return activeSub === 'all' || sub === activeSub;
+    }
+    if (activeKingdom === 'plant') {
+      const isPlant = cat === 'plant' || iconic === 'plantae';
+      if (!isPlant) return false;
+      return activeSub === 'all' || sub === activeSub;
+    }
+    if (activeKingdom === 'fungi') {
+      const isFungi = cat === 'fungi' || iconic === 'fungi';
+      if (!isFungi) return false;
+      return activeSub === 'all' || sub === activeSub;
+    }
+    if (activeKingdom === 'terrain') {
+      const isTerrain = cat === 'terrain' || iconic === 'terrain';
+      if (!isTerrain) return false;
+      return activeSub === 'all' || sub === activeSub;
+    }
+    return true;
+  });
+}
+
+function renderGrid() {
+  const cards = filterCards();
+  const grid = document.getElementById('card-grid');
+  const empty = document.getElementById('empty-state');
+
+  if (cards.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.add('visible');
+    return;
+  }
+  empty.classList.remove('visible');
+
+  grid.innerHTML = cards.map(c => {
+    const emoji = TAXON_EMOJI[c.sub_category] || TAXON_EMOJI[c.iconic_taxon] || '🌍';
+    const rarity = c.rarity_tier || 'unknown';
+    const rClass = RARITY_CLASS[rarity] || 'badge-unknown';
+    const rLabel = c.rarity_display || 'Unknown';
+    const invasiveBadge = c.invasive_at_location
+      ? `<span class="badge badge-invasive">Invasive</span>` : '';
+    const safeEmoji = emoji.replace(/'/g, '');
+    const thumb = c.image_url
+      ? `<img src="${c.image_url}" alt="" loading="lazy" onerror="this.parentNode.classList.add('no-img');this.parentNode.innerHTML='${safeEmoji}'">`
+      : '';
+
+    return `<div class="card-tile" onclick="openStyledModal(${c.id})">
+      <div class="card-thumb${thumb ? '' : ' no-img'}">${thumb || emoji}</div>
+      <div class="card-info">
+        <div class="card-name">${c.species_name || c.scientific_name}</div>
+        <div class="card-badges">
+          <span class="badge ${rClass}">${rLabel}</span>${invasiveBadge}
+        </div>
+      </div>
+    </div>`;
+
+  if (frontFace) {
+    const inner = document.querySelector('#modal-flip-card .flip-card-inner');
+    if (inner && inner.firstElementChild) {
+      inner.firstElementChild.outerHTML = frontFace;
+    }
+  }
+  }).join('');
+}
+
+function renderDexGrid() {
+  const entries = filterCards();
+  const grid = document.getElementById('card-grid');
+  const empty = document.getElementById('empty-state');
+
+  if (entries.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.add('visible');
+    return;
+  }
+  empty.classList.remove('visible');
+
+  grid.innerHTML = entries.map(entry => {
+    const card = entryCard(entry);
+    const emoji = TAXON_EMOJI[(card?.sub_category || entry.sub_category || '').trim()] || TAXON_EMOJI[(card?.iconic_taxon || '').trim()] || '🌍';
+    const rarity = card?.rarity_tier || 'unknown';
+    const rClass = RARITY_CLASS[rarity] || 'badge-unknown';
+    const rLabel = entry.discovery_state === 'UNKNOWN'
+      ? '???'
+      : entry.discovery_state === 'SEEN'
+        ? 'Seen'
+        : (card?.rarity_display || 'Captured');
+    const invasiveBadge = card?.invasive_at_location ? `<span class="badge badge-invasive">Invasive</span>` : '';
+    const safeEmoji = emoji.replace(/'/g, '');
+    const thumb = card?.image_url
+      ? `<img src="${card.image_url}" alt="" loading="lazy" onload="setThumbOrientation(this)" onerror="this.parentNode.classList.add('no-img');this.parentNode.innerHTML='${safeEmoji}'">`
+      : '';
+    const name = entry.discovery_state === 'UNKNOWN'
+      ? '???'
+      : (entry.name || card?.species_name || card?.scientific_name || 'Unknown');
+    const stateClass = entry.discovery_state === 'CAPTURED' ? rClass : 'badge-unknown';
+    const chainBadge = entry.evolution_chain_id ? `<span class="badge badge-unknown">Stage ${entry.evolution_stage || '?'}</span>` : '';
+
+    return `<div class="card-tile" ${card ? `onclick="openDexStyledModal(${entry.id})"` : ''} style="${card ? '' : 'cursor:default;'}">
+      <div class="card-thumb${thumb ? '' : ' no-img'}">${thumb || (entry.discovery_state === 'UNKNOWN' ? '???' : emoji)}</div>
+      <div class="card-info">
+        <div style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.5px;margin-bottom:4px">${entry.dex_id}</div>
+        <div class="card-name">${name}</div>
+        <div class="card-badges">
+          <span class="badge ${stateClass}">${rLabel}</span>${chainBadge}${invasiveBadge}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('kingdom-tabs').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  document.querySelectorAll('.kingdom-tabs button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeKingdom = btn.dataset.kingdom;
+  activeSub = 'all';
+
+  document.querySelectorAll('.sub-tabs').forEach(el => el.classList.remove('visible'));
+  const subEl = document.getElementById('sub-' + activeKingdom);
+  if (subEl) {
+    subEl.classList.add('visible');
+    subEl.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    subEl.querySelector('[data-sub="all"]').classList.add('active');
+  }
+  renderDexGrid();
+});
+
+document.querySelectorAll('.sub-tabs').forEach(panel => {
+  panel.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    panel.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeSub = btn.dataset.sub;
+    renderDexGrid();
+  });
+});
+
+function openModal(id) {
+  const c = allCards.find(x => x.id === id);
+  if (!c) return;
+  activeModalCardId = id;
+
+  const emoji = TAXON_EMOJI[c.sub_category] || TAXON_EMOJI[c.iconic_taxon] || '🌍';
+
+  document.getElementById('modal-name').textContent = c.species_name || c.scientific_name;
+  document.getElementById('modal-sci').textContent = c.scientific_name || '';
+  document.getElementById('modal-blurb').textContent = c.blurb || '';
+
+  const photo = document.getElementById('modal-photo');
+  if (c.image_url) {
+    photo.innerHTML = `<img src="${c.image_url}" alt="" onerror="this.parentNode.textContent='${emoji}'">`;
+  } else {
+    photo.textContent = emoji;
+  }
+
+  const actions = document.getElementById('modal-actions');
+  if ((c.species_name || '') === 'Pending identification') {
+    actions.innerHTML = `<button class="action-btn primary" id="reid-btn" onclick="reidentifyActiveCard()">Re-ID Now</button>`;
+  } else {
+    actions.innerHTML = '';
+  }
+
+  const stats = c.stats || {};
+  document.getElementById('s-spd').textContent = stats.speed ?? '—';
+  document.getElementById('s-atk').textContent = stats.attack ?? '—';
+  document.getElementById('s-def').textContent = stats.defence ?? '—';
+  document.getElementById('s-hp').textContent = stats.hp ?? '—';
+  document.getElementById('s-sta').textContent = stats.stamina_regen ?? '—';
+
+  const rarity = c.rarity_display || 'Unknown';
+  const invasive = c.invasive_at_location ? ' · ⚠️ Invasive' : '';
+  const date = c.captured_at ? new Date(c.captured_at).toLocaleDateString() : '—';
+  const location = (c.latitude && c.longitude)
+    ? `${Number(c.latitude).toFixed(4)}, ${Number(c.longitude).toFixed(4)}`
+    : (c.capture_country || '—');
+  const obs = c.observations_count
+    ? `${Number(c.observations_count).toLocaleString()} iNat sightings` : '';
+
+  document.getElementById('modal-meta').innerHTML = `
+    <div>Rarity: <span>${rarity}${invasive}</span></div>
+    ${c.conservation_status ? `<div>Conservation: <span>${c.conservation_status}</span></div>` : ''}
+    ${obs ? `<div>Sightings: <span>${obs}</span></div>` : ''}
+    <div>Captured: <span>${date}</span></div>
+    <div>Location: <span>${location}</span></div>
+    ${c.confidence ? `<div>Confidence: <span>${Math.round(c.confidence * 100)}%</span></div>` : ''}
+  `;
+
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function openDexStyledModal(entryId) {
+  const entry = allCards.find(x => x.id === entryId);
+  const c = entryCard(entry);
+  if (!c) return;
+  activeModalEntryId = entryId;
+  openStyledModal(c.id);
+}
+
+function openStyledModal(id) {
+  const entry = allCards.find(x => (x.card && x.card.id === id) || x.id === activeModalEntryId);
+  const c = entryCard(entry);
+  if (!c) return;
+  activeModalCardId = id;
+  if (entry) activeModalEntryId = entry.id;
+
+  const emoji = TAXON_EMOJI[c.sub_category] || TAXON_EMOJI[c.iconic_taxon] || '🌍';
+  const kingdom = normalizeKingdom(c);
+  const theme = biomeTheme(c, kingdom);
+  const pct = c.confidence ? Math.round(c.confidence * 100) : 0;
+  const rarity = c.rarity_display || 'Unknown';
+  const frontFace = kingdom === 'reptile'
+    ? reptileFrontTemplate(c, theme, pct, c.image_url || '')
+    : null;
+  const date = c.captured_at ? new Date(c.captured_at).toLocaleDateString() : '—';
+  const location = (c.latitude != null && c.longitude != null)
+    ? `${Number(c.latitude).toFixed(4)}, ${Number(c.longitude).toFixed(4)}`
+    : (c.capture_country || '—');
+
+  document.getElementById('modal-name').textContent = c.species_name || c.scientific_name;
+  document.querySelector('.modal-body').style.display = 'none';
+  document.getElementById('modal-photo').innerHTML = `
+    <div class="flip-card ${theme.frame}" id="modal-flip-card">
+      <div class="flip-card-inner">
+        <section class="card-face front">
+          <div class="card-front-photo">
+            ${c.image_url ? `<img src="${c.image_url}" alt="" onerror="this.parentNode.innerHTML='<div style=&quot;height:100%;display:grid;place-items:center;font-size:88px&quot;>${emoji}</div>'">` : `<div style="height:100%;display:grid;place-items:center;font-size:88px">${emoji}</div>`}
+            <div class="card-front-overlay"></div>
+            <div class="card-ribbon"><span class="card-ribbon-icon">${theme.icon}</span><span>${theme.label}</span></div>
+            <div class="card-front-title">
+              <div>
+                <div class="modal-title" style="font-size:28px">${c.species_name || c.scientific_name}</div>
+                <div class="modal-sci" style="margin:4px 0 0;color:rgba(232,245,233,.76)">${c.scientific_name || ''}</div>
+              </div>
+              <div class="score-chip"><strong>${pct}%</strong><span>${c.provisional ? 'uncertain' : 'verified'}</span></div>
+            </div>
+          </div>
+          <div class="card-face-body">
+            <div class="card-meta-row">
+              <div class="card-title-kicker">${theme.habitat}</div>
+              <div class="card-rank-pill">${(c.rank || 'unknown').replace(/_/g, ' ')}</div>
+            </div>
+            <div class="modal-badges">
+              <span class="modal-badge good">${rarity}</span>
+              ${c.provisional ? '<span class="modal-badge warn">Provisional</span>' : ''}
+              ${c.invasive_at_location ? '<span class="modal-badge alert">Invasive</span>' : ''}
+              ${c.iconic_taxon ? `<span class="modal-badge">${c.iconic_taxon}</span>` : ''}
+            </div>
+            <div class="modal-blurb">${c.blurb || ''}</div>
+            <div class="stat-stack">${modalStatRows(c.stats || {})}</div>
+          </div>
+        </section>
+        <section class="card-face back">
+          <div class="card-face-body">
+            <div class="card-back-top">
+              <div>
+                <div class="card-title-kicker">WildEx Collector Back</div>
+                <div class="modal-title" style="font-size:26px">${c.species_name || c.scientific_name}</div>
+                <div class="modal-sci" style="margin-top:4px">${c.scientific_name || ''}</div>
+              </div>
+              <div class="card-back-icon">${theme.icon}</div>
+            </div>
+            <div class="card-back-grid">
+              ${metaChip('Biome Theme', theme.habitat)}
+              ${metaChip('Capture Zone', theme.location)}
+              ${metaChip('Captured', date)}
+              ${metaChip('Location', location)}
+              ${metaChip('Rarity', rarity)}
+              ${metaChip('Confidence', `${pct}%`)}
+              ${c.conservation_status ? metaChip('Conservation', c.conservation_status) : ''}
+              ${c.observations_count ? metaChip('Sightings', `${Number(c.observations_count).toLocaleString()} iNat`) : ''}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>`;
+
+  const actions = document.getElementById('modal-actions');
+  const reidButton = (c.species_name || '') === 'Pending identification'
+    ? `<button class="action-btn primary" id="reid-btn" onclick="reidentifyActiveCard()">Re-ID Now</button>`
+    : '';
+  actions.innerHTML = `
+    <button class="action-btn" onclick="flipModalCard()">Flip Card</button>
+    <button class="action-btn" onclick="printModalCard()">Print / Save PDF</button>
+    ${reidButton}
+    <button class="action-btn danger" onclick="releaseActiveCard()">Release</button>
+  `;
+
+  document.getElementById('modal-sci').textContent = '';
+  document.getElementById('modal-blurb').textContent = '';
+  document.getElementById('s-spd').textContent = '—';
+  document.getElementById('s-atk').textContent = '—';
+  document.getElementById('s-def').textContent = '—';
+  document.getElementById('s-hp').textContent = '—';
+  document.getElementById('s-sta').textContent = '—';
+  document.getElementById('modal-meta').innerHTML = '';
+  bindModalOrientation();
+
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  activeModalCardId = null;
+  activeModalEntryId = null;
+  document.querySelector('.modal-body').style.display = '';
+}
+
+async function reidentifyActiveCard() {
+  if (!activeModalCardId) return;
+  const btn = document.getElementById('reid-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Re-identifying...';
+  }
+  try {
+    const res = await fetch(`/cards/${activeModalCardId}/reidentify`, {
+      method: 'POST',
+      credentials: 'same-origin',
+    });
+    if (res.status === 401) {
+      location.href = '/login';
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || `Re-ID failed (${res.status})`);
+    }
+    await loadCards();
+    if (activeModalEntryId) openDexStyledModal(activeModalEntryId);
+  } catch (err) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Re-ID Now';
+    }
+    alert(err.message || 'Re-identification failed');
+  }
+}
+
+async function releaseActiveCard() {
+  if (!activeModalCardId) return;
+  const entry = allCards.find(item => item.id === activeModalEntryId);
+  const c = entryCard(entry);
+  const name = c?.species_name || c?.scientific_name || entry?.name || 'this card';
+  if (!confirm(`Release ${name}? This will delete the card from your WildDex.`)) return;
+
+  try {
+    const res = await fetch(`/cards/${activeModalCardId}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    if (res.status === 401) {
+      location.href = '/login';
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || `Release failed (${res.status})`);
+    }
+    await loadCards();
+    closeModal();
+  } catch (err) {
+    alert(err.message || 'Release failed');
+  }
+}
+
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+loadCards();
+</script>
+</body>
+</html>

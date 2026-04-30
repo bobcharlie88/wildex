@@ -1,0 +1,15 @@
+Wildex transfer package
+
+Created from E:\wildex for moving the project to another PC.
+
+Recommended setup on the new PC:
+1. Install Python 3.10 or newer.
+2. Open a terminal in this folder.
+3. Create and activate a virtual environment.
+4. Run: pip install -r requirements.txt
+5. Start the app using the command documented in read me.txt or DEPLOY.md.
+
+Notes:
+- .git, __pycache__, .pyc files, and the old wildex.zip archive were not included.
+- The .env file is included because it may be needed for local development. Keep it private.
+- Uploaded files were included from the uploads folder.
