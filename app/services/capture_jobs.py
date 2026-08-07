@@ -842,6 +842,19 @@ def _save_completed_card(
     _, previous_state = sync_card_to_dex(db, row)
     row.discovery_state = DISCOVERY_CAPTURED
     db.flush()
+
+    try:
+        from app.services.quests import process_discovery_event
+        process_discovery_event(
+            db,
+            user_id=owner_id,
+            card=row,
+            is_new_species=(previous_state != DISCOVERY_CAPTURED),
+            is_region_unlock=not region_was_unlocked and bool(row.region),
+        )
+    except Exception as exc:
+        log.warning("Quest/XP discovery event processing error for user_id=%s: %s", owner_id, exc)
+
     run_agent_task(
         agent_name="map",
         task_type="sync_progress",

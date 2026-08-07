@@ -3,7 +3,7 @@ uvicorn[standard]
 python-dotenv
 psycopg2-binary
 sqlalchemy
-opencv-python
+opencv-python-headless
 pillow
 requests
 httpx

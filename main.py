@@ -18,10 +18,14 @@ from app.auth import get_current_user
 from app.routers.agents import router as agents_router
 from app.routers.admin import router as admin_router
 from app.routers.auth import router as auth_router
+from app.routers.battles import router as battles_router
 from app.routers.capture import router as capture_router
 from app.routers.cards import router as cards_router
 from app.routers.dex import router as dex_router
+from app.routers.explore import router as explore_router
+from app.routers.external_identify import router as external_identify_router
 from app.routers.media import router as media_router
+from app.routers.quests import router as quests_router
 from app.routers.submissions import router as submissions_router
 from app.routers.wildex import router as wildex_router
 from app.services.capture_jobs import start_capture_worker, stop_capture_worker
@@ -32,10 +36,14 @@ app = FastAPI(title="WildEx API", version="0.1.0")
 app.include_router(agents_router)
 app.include_router(admin_router)
 app.include_router(auth_router)
+app.include_router(battles_router)
 app.include_router(capture_router)
 app.include_router(cards_router)
 app.include_router(dex_router)
+app.include_router(explore_router)
+app.include_router(external_identify_router)
 app.include_router(media_router)
+app.include_router(quests_router)
 app.include_router(submissions_router)
 app.include_router(wildex_router)
 Path("uploads").mkdir(parents=True, exist_ok=True)
@@ -227,6 +235,11 @@ def shutdown():
 @app.get("/")
 def root():
     return FileResponse("app/static/home.html")
+
+
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse("app/static/sw.js", media_type="application/javascript")
 
 
 @app.get("/capture")

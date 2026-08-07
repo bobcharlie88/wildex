@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -45,24 +46,30 @@ def _candidate_payload(
     }
 
 
+def _identify_one(shot: dict[str, Any], *, lat: float | None, lon: float | None) -> RawImageIdentification:
+    candidates = identify_species_candidates(shot["image_path"], lat=shot.get("latitude", lat), lon=shot.get("longitude", lon))
+    return RawImageIdentification(
+        job_id=int(shot["job_id"]),
+        image_url=shot.get("image_url"),
+        top_species=candidates[0],
+        candidates=candidates,
+    )
+
+
 def identify_group_candidates(
     shots: list[dict[str, Any]],
     *,
     lat: float | None = None,
     lon: float | None = None,
 ) -> list[RawImageIdentification]:
-    raw: list[RawImageIdentification] = []
-    for shot in shots:
-        candidates = identify_species_candidates(shot["image_path"], lat=shot.get("latitude", lat), lon=shot.get("longitude", lon))
-        raw.append(
-            RawImageIdentification(
-                job_id=int(shot["job_id"]),
-                image_url=shot.get("image_url"),
-                top_species=candidates[0],
-                candidates=candidates,
-            )
-        )
-    return raw
+    if len(shots) <= 1:
+        return [_identify_one(shot, lat=lat, lon=lon) for shot in shots]
+
+    # Each shot is I/O-bound (Gemini + iNaturalist/GBIF HTTP calls), so
+    # running them on worker threads cuts wall-clock time roughly linearly
+    # with photo count instead of processing one photo after another.
+    with ThreadPoolExecutor(max_workers=min(len(shots), 6)) as executor:
+        return list(executor.map(lambda shot: _identify_one(shot, lat=lat, lon=lon), shots))
 
 
 def build_consensus_payload(

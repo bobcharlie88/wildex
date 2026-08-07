@@ -106,8 +106,23 @@ def _value(source, key, default=None):
 def _stats(source) -> dict:
     stats = _value(source, "stats") or {}
     if is_dataclass(stats):
-        return asdict(stats)
-    return stats
+        stats = asdict(stats)
+    elif not isinstance(stats, dict):
+        stats = {}
+    
+    speed = stats.get("speed") if stats.get("speed") is not None else _value(source, "speed")
+    attack = stats.get("attack") if stats.get("attack") is not None else _value(source, "attack")
+    defence = stats.get("defence") if stats.get("defence") is not None else _value(source, "defence")
+    hp = stats.get("hp") if stats.get("hp") is not None else _value(source, "hp")
+    stamina_regen = stats.get("stamina_regen") if stats.get("stamina_regen") is not None else _value(source, "stamina_regen")
+
+    return {
+        "speed": 50 if speed is None else speed,
+        "attack": 50 if attack is None else attack,
+        "defence": 50 if defence is None else defence,
+        "hp": 50 if hp is None else hp,
+        "stamina_regen": 50 if stamina_regen is None else stamina_regen,
+    }
 
 
 def _kingdom(category: str | None, sub_category: str | None, iconic_taxon: str | None) -> str:
@@ -129,9 +144,15 @@ def _kingdom(category: str | None, sub_category: str | None, iconic_taxon: str |
 
 def _rarity(source) -> str:
     display = str(_value(source, "rarity_display") or "").strip()
-    if display in {"Common", "Uncommon", "Rare", "Legendary", "Mythic", "Cryptic", "Extinct"}:
-        return display
-    return RARITY_VALUES.get(str(_value(source, "rarity_tier") or "").strip().lower(), "Common")
+    tier = str(_value(source, "rarity_tier") or "").strip()
+    if display:
+        lowered_display = display.lower()
+        if lowered_display in RARITY_VALUES:
+            return RARITY_VALUES[lowered_display]
+        for std in RARITY_VALUES.values():
+            if lowered_display == std.lower():
+                return std
+    return RARITY_VALUES.get(tier.lower(), "Common")
 
 
 def _stored_or(default, source, key):
@@ -144,17 +165,19 @@ def _stored_or(default, source, key):
 
 
 def _primary_image(source) -> str | None:
-    value = _value(source, "primary_card_image_url")
-    if not value:
-        value = _value(source, "primary_image_url")
-    if not value:
-        value = _value(source, "image_url")
-    return value
+    for key in ("primary_card_image_url", "primary_image_url", "image_url", "original_image_url"):
+        value = _value(source, key)
+        if value and isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def _original_image(source) -> str | None:
-    value = _value(source, "original_image_url")
-    return value or _primary_image(source)
+    for key in ("original_image_url", "primary_card_image_url", "primary_image_url", "image_url"):
+        value = _value(source, key)
+        if value and isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def _threat_level(attack: int, hp: int) -> str:

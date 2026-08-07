@@ -15,9 +15,13 @@ htmlcov/
 .venv/
 venv/
 
-uploads/
+uploads/*
+!uploads/.gitkeep
 tmp/
 models/
+wildex_transfer*
+scratch/
+database.db
 
 .DS_Store
 Thumbs.db

@@ -99,7 +99,7 @@ def retry_capture_species(job_id: int, current_user: User = Depends(require_user
 
 
 @router.post("/identify")
-async def identify(file: UploadFile = File(...)):
+async def identify(file: UploadFile = File(...), current_user: User = Depends(require_user)):
     if file.content_type and file.content_type.lower() not in ALLOWED_TYPES:
         raise HTTPException(415, f"Unsupported image type: {file.content_type}")
 

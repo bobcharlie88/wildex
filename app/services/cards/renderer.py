@@ -171,15 +171,15 @@ def apply_render_fields(target, render_data: dict) -> None:
     target.strength_effect = render_data.get("strength_effect")
     target.weakness_name = render_data.get("weakness_name")
     target.weakness_effect = render_data.get("weakness_effect")
-    if getattr(target, "original_image_url", None) is None:
+    if not getattr(target, "original_image_url", None) and render_data.get("original_image_url"):
         target.original_image_url = render_data.get("original_image_url")
-    if getattr(target, "primary_card_image_url", None) is None:
+    if not getattr(target, "primary_card_image_url", None) and render_data.get("image_url"):
         target.primary_card_image_url = render_data.get("image_url")
-    if getattr(target, "image_url", None) is None:
+    if not getattr(target, "image_url", None) and render_data.get("image_url"):
         target.image_url = render_data.get("image_url")
     target.front_template_name = render_data.get("front_template", {}).get("name")
     target.front_template_version = render_data.get("front_template", {}).get("version")
     target.back_template_name = render_data.get("back_template", {}).get("name")
     target.back_template_version = render_data.get("back_template", {}).get("version")
-    if getattr(target, "sound_url", None) is None:
+    if not getattr(target, "sound_url", None) and render_data.get("sound_url"):
         target.sound_url = render_data.get("sound_url")

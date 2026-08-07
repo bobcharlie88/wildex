@@ -79,9 +79,11 @@
   }
 
   function rarityFilledCount(rarity) {
-    return ({
-      common: 1, uncommon: 2, rare: 3, legendary: 4, mythic: 5, cryptic: 5, extinct: 5,
-    })[String(rarity || '').trim().toLowerCase()] || 1;
+    const key = String(rarity || '').trim().toLowerCase();
+    const counts = {
+      common: 1, uncommon: 2, rare: 3, very_rare: 4, legendary: 4, mythic: 5, cryptic: 5, extinct: 5,
+    };
+    return counts[key] || 1;
   }
 
   function formatDiscoveredText(data) {
@@ -213,7 +215,7 @@
 
   function frontSvg(data, template, imageHref) {
     const t = getTheme(data.theme_class);
-    const artHref = imageHref || data.image_url || '';
+    const artHref = imageHref || data.image_url || data.primary_card_image_url || data.original_image_url || '';
     const speciesName = data.species_name || 'Unknown';
     const scientificName = data.scientific_name || '';
     const cardNum = esc(String(data.card_number || data.dex_id || ''));
@@ -222,13 +224,13 @@
     const filledDots = rarityFilledCount(data.rarity);
     const namePlate = slotContent(data, 'name_plate', { title: speciesName, subtitle: scientificName });
     const displayName = esc(namePlate.title || speciesName);
-    const nameFontSize = displayName.length > 22 ? 24 : displayName.length > 16 ? 28 : displayName.length > 12 ? 33 : 38;
+    const nameFontSize = displayName.length > 32 ? 20 : displayName.length > 24 ? 24 : displayName.length > 18 ? 28 : displayName.length > 12 ? 33 : 38;
     const abilities = (data.abilities || []).slice(0, 3);
     const habitatLines = chunkText(data.habitat_text || '', 48, 2);
-    const hp = Number(data.hp) || 0;
-    const atk = Number(data.atk) || 0;
-    const def = Number(data.def) || 0;
-    const spd = Number(data.spd) || 0;
+    const hp = Number(data.hp ?? data.stats?.hp) || 0;
+    const atk = Number(data.atk ?? data.stats?.attack ?? data.stats?.atk) || 0;
+    const def = Number(data.def ?? data.stats?.defence ?? data.stats?.def) || 0;
+    const spd = Number(data.spd ?? data.stats?.speed ?? data.stats?.spd) || 0;
 
     return `<svg xmlns="${SVG_NS}" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}">
 <defs>
@@ -408,14 +410,14 @@
 
   function backSvg(data, template, imageHref, qrHref) {
     const t = getTheme(data.theme_class);
-    const mediaHref = imageHref || data.image_url || '';
+    const mediaHref = imageHref || data.image_url || data.primary_card_image_url || data.original_image_url || '';
     const qrImageHref = qrHref || data.qr_url || '';
     const speciesName = data.species_name || 'Unknown';
     const scientificName = data.scientific_name || '';
     const cardNum = esc(String(data.card_number || data.dex_id || ''));
     const filledDots = rarityFilledCount(data.rarity);
     const displayName = esc(speciesName);
-    const nameFontSize = displayName.length > 22 ? 20 : displayName.length > 16 ? 24 : displayName.length > 12 ? 28 : 32;
+    const nameFontSize = displayName.length > 30 ? 18 : displayName.length > 22 ? 22 : displayName.length > 16 ? 26 : displayName.length > 12 ? 28 : 32;
 
     const aboutLines = chunkText(data.info_text || '', 36, 6);
     const dietLines = chunkText(data.diet_text || '', 38, 3);
@@ -536,13 +538,19 @@
   <!-- Stats column (y 564–720) -->
   <text x="36" y="576" font-size="10" font-family="Segoe UI,sans-serif" font-weight="800"
         fill="${t.accent2}" letter-spacing="3">STATS</text>
-  ${[['HP', data.hp], ['ATK', data.atk], ['DEF', data.def], ['SPD', data.spd]].map(([label, val], i) =>
-    `<text x="36" y="${594 + i * 32}" font-size="10" font-family="Segoe UI,sans-serif"
-           font-weight="800" fill="${t.textMuted}" letter-spacing="2">${label}</text>
-    ${statBarSvg(80, 582 + i * 32, 172, 9, val, 100, t.accent)}
-    <text x="260" y="${594 + i * 32}" font-size="13" font-family="Segoe UI,sans-serif"
-           font-weight="700" fill="${t.text}">${Number(val) || 0}</text>`
-  ).join('')}
+  ${(() => {
+    const hpVal = Number(data.hp ?? data.stats?.hp) || 0;
+    const atkVal = Number(data.atk ?? data.stats?.attack ?? data.stats?.atk) || 0;
+    const defVal = Number(data.def ?? data.stats?.defence ?? data.stats?.def) || 0;
+    const spdVal = Number(data.spd ?? data.stats?.speed ?? data.stats?.spd) || 0;
+    return [['HP', hpVal], ['ATK', atkVal], ['DEF', defVal], ['SPD', spdVal]].map(([label, val], i) =>
+      `<text x="36" y="${594 + i * 32}" font-size="10" font-family="Segoe UI,sans-serif"
+             font-weight="800" fill="${t.textMuted}" letter-spacing="2">${label}</text>
+      ${statBarSvg(80, 582 + i * 32, 172, 9, val, 100, t.accent)}
+      <text x="260" y="${594 + i * 32}" font-size="13" font-family="Segoe UI,sans-serif"
+             font-weight="700" fill="${t.text}">${val}</text>`
+    ).join('');
+  })()}
 
   <!-- Threat / Aggression badges -->
   <rect x="36" y="726" width="230" height="24" rx="12" fill="${t.panel}" stroke="${t.accent}" stroke-width="1" opacity="0.9"/>

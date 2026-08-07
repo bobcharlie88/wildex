@@ -48,3 +48,8 @@ DR_AGENT_ENGINE = os.getenv("DR_AGENT_ENGINE", "gemma").strip().lower()
 DR_GEMMA_MODEL = os.getenv("DR_GEMMA_MODEL", "models/gemma-2-2b-it")
 DR_GEMMA_LOCAL_FILES_ONLY = os.getenv("DR_GEMMA_LOCAL_FILES_ONLY", "true").lower() in {"1", "true", "yes", "on"}
 DR_GEMMA_MAX_NEW_TOKENS = int(os.getenv("DR_GEMMA_MAX_NEW_TOKENS", "220"))
+
+# Shared-secret key for the /external/identify route used by external
+# clients (e.g. the WildChef Survival app) that can't do cookie-session
+# login. Not tied to any user account — scoped to identification only.
+EXTERNAL_API_KEY = os.getenv("WILDCHEF_EXTERNAL_API_KEY", "")

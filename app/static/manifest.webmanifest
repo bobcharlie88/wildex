@@ -1,0 +1,30 @@
+{
+  "name": "WildEx",
+  "short_name": "WildEx",
+  "description": "Capture real wildlife and build a WildDex.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#071015",
+  "theme_color": "#071015",
+  "icons": [
+    {
+      "src": "/static/icons/wildex-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/wildex-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/wildex.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

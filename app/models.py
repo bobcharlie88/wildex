@@ -426,3 +426,109 @@ class SubmissionVerificationReport(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     request: Mapped[SubmissionRequest] = relationship(back_populates="verification_report")
+
+
+class UserProgression(Base):
+    __tablename__ = "user_progressions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True, nullable=False)
+    level: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    xp: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    unlocked_badges_json: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user: Mapped[User] = relationship()
+
+
+class Quest(Base):
+    __tablename__ = "quests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    quest_key: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    quest_type: Mapped[str] = mapped_column(String(32), default="daily", index=True, nullable=False)
+    target_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    target_value: Mapped[str | None] = mapped_column(String(100))
+    required_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    reward_xp: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class UserQuestProgress(Base):
+    __tablename__ = "user_quest_progress"
+    __table_args__ = (
+        UniqueConstraint("user_id", "quest_id", name="uq_user_quest_progress"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    quest_id: Mapped[int] = mapped_column(ForeignKey("quests.id"), index=True, nullable=False)
+    current_progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    claimed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user: Mapped[User] = relationship()
+    quest: Mapped[Quest] = relationship()
+
+
+class UserBadge(Base):
+    __tablename__ = "user_badges"
+    __table_args__ = (
+        UniqueConstraint("user_id", "badge_key", name="uq_user_badge_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    badge_key: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    badge_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    badge_description: Mapped[str | None] = mapped_column(Text)
+    icon_name: Mapped[str | None] = mapped_column(String(64))
+    unlocked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped[User] = relationship()
+
+
+class BattleMatch(Base):
+    __tablename__ = "battle_matches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    match_code: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    player1_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    player2_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="coin_flip", index=True, nullable=False)
+    arena_biome: Mapped[str | None] = mapped_column(String(32), index=True)
+    coin_flip_seed: Mapped[str | None] = mapped_column(String(64))
+    player1_roster_json: Mapped[str | None] = mapped_column(Text)
+    player2_roster_json: Mapped[str | None] = mapped_column(Text)
+    winner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+    transferred_card_id: Mapped[int | None] = mapped_column(ForeignKey("cards.id"), index=True)
+    combat_log_json: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    player1: Mapped[User] = relationship(foreign_keys=[player1_id])
+    player2: Mapped[User | None] = relationship(foreign_keys=[player2_id])
+    winner: Mapped[User | None] = relationship(foreign_keys=[winner_id])
+    transferred_card: Mapped[Card | None] = relationship(foreign_keys=[transferred_card_id])
+
+
+class CardProtection(Base):
+    __tablename__ = "card_protection"
+    __table_args__ = (
+        UniqueConstraint("user_id", "card_id", name="uq_card_protection"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    card_id: Mapped[int] = mapped_column(ForeignKey("cards.id"), index=True, nullable=False)
+    is_protected: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped[User] = relationship()
+    card: Mapped[Card] = relationship()
+
