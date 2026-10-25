@@ -11,5 +11,5 @@ Recommended setup on the new PC:
 
 Notes:
 - .git, __pycache__, .pyc files, and the old wildex.zip archive were not included.
-- The .env file is included because it may be needed for local development. Keep it private.
+- Never commit .env; copy it manually and keep it private.
 - Uploaded files were included from the uploads folder.

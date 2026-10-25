@@ -23,6 +23,19 @@ R2_PUBLIC_BASE_URL=
 
 Do not commit real values for these variables.
 
+## Database
+
+Use an external Postgres and paste its URL into `DATABASE_URL`:
+- **Neon** (free tier): create a project, copy the connection string
+  (`postgresql://...?sslmode=require`).
+- or **Render Postgres**: create a database and use its *Internal Database URL*.
+
+## Build
+
+`requirements.txt` is slim (no torch/transformers/accelerate) so Render builds
+fast and fits small instances. Gemma deps live in `requirements-gemma.txt` and
+must **not** be installed on Render.
+
 ## Storage
 
 WildEx uses Cloudflare R2 through the S3-compatible `boto3` client. The app does
@@ -54,7 +67,10 @@ See `OFFLINE_GEMMA.md` for local Gemma setup.
 2. In Render, create a new Blueprint from this repo.
 3. Fill in all secret environment variables when prompted.
 4. Deploy the web service.
-5. Open `/health`; production should return `{"status":"healthy","database":true}`.
+5. `curl https://<service>.onrender.com/health` → expect `{"status":"healthy","database":true}`
+   (`database:false` means `DATABASE_URL` is wrong/unreachable).
+
+See `DEPLOY_CHECKLIST.md` for the short version.
 
 ## Local Development
 

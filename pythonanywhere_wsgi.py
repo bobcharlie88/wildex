@@ -1,3 +1,4 @@
+# LEGACY: PythonAnywhere WSGI entry (see LEGACY.md). Current target is Render (render.yaml).
 # PythonAnywhere WSGI configuration for WildEx
 # Copy the contents of this file into your PythonAnywhere WSGI config file at:
 #   /var/www/<yourusername>_pythonanywhere_com_wsgi.py

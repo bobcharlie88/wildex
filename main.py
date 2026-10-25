@@ -251,6 +251,7 @@ def capture_page(request: Request):
 
 @app.get("/health")
 def health():
+    """Liveness/readiness. Returns {"status": "healthy", "database": bool}."""
     from app.database import db_available
     return {"status": "healthy", "database": db_available()}
 

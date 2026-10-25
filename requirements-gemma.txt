@@ -1,0 +1,5 @@
+# Optional: local offline Gemma Dr Agent (DR_AGENT_ENGINE=gemma). NOT for Render.
+-r requirements.txt
+torch
+transformers
+accelerate

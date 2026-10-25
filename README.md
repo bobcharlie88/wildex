@@ -1,46 +1,36 @@
 # WildEx
-A real-world wildlife discovery and battle game where players film actual animals to build their collection.
 
-## Features
-- Live video capture with GPS and device metadata
-- AI-powered species identification using iNaturalist and Google Vision
-- Dynamic card generation with biology-based stats
-- Personal WildDex encyclopedia
-- Collection milestones and achievements
-- **Offline AI Dr Agent** powered by Google Gemma for contextual wildlife guidance
+A real-world wildlife discovery game: film or photograph a real animal, get it
+identified, and collect it as a card in your personal **WildDex**.
 
-## Tech Stack
-- **Backend**: Python FastAPI
-- **Database**: PostgreSQL
-- **AI Services**: Gemini Flash, Grok Imagine, Google Vision, **Google Gemma (offline)**
-- **Species Data**: iNaturalist API, GBIF API
-- **Deployment**: Render (with Cloudflare R2-compatible object storage)
+**MVP loop:** capture → species ID → card → WildDex. Everything else
+(battles, quests, explore map, Gemma, Flutter, advanced anti-cheat, AI art) is
+parked — see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
-## Local Development
-1. Install dependencies: `pip install -r requirements.txt`
-2. Set up environment variables in `.env`
-3. Run: `uvicorn main:app --reload`
+## Stack
+FastAPI · PostgreSQL · static-HTML PWA · Gemini · iNaturalist / GBIF · Cloudflare R2
 
-## Dr Agent (AI Assistant)
-The Dr Agent provides contextual wildlife guidance and can run offline using Google Gemma:
+## Run locally
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt          # slim, no torch
+cp .env.example .env  # if present; otherwise set DATABASE_URL, SESSION_SECRET, GEMINI_API_KEY
+uvicorn main:app --reload
+```
+Open http://localhost:8000 and check http://localhost:8000/health.
 
-### Rule-Based Mode
-Use `DR_AGENT_ENGINE=rule_based` for a lightweight deterministic assistant. This
-is the Render default because production servers do not include local Gemma
-weights.
+Without R2 vars, uploads fall back to local `uploads/`.
 
-### Offline Mode (Gemma)
-Set `DR_AGENT_ENGINE=gemma` in environment variables for fully offline operation.
-
-**Environment Variables for Offline Mode:**
-```env
-DR_AGENT_ENGINE=gemma
-DR_GEMMA_MODEL=models/gemma-2-2b-it
-DR_GEMMA_LOCAL_FILES_ONLY=true
-DR_GEMMA_MAX_NEW_TOKENS=220
+### Tests
+```bash
+DATABASE_URL=postgresql://postgres:x@localhost:5432/wildex pytest -q
+# live API tests: WILDEX_LIVE_TESTS=1 (needs real keys)
 ```
 
-The system automatically falls back to rule-based responses if the Gemma model cannot be loaded.
+### Optional: offline Gemma Dr Agent
+`pip install -r requirements-gemma.txt` and set `DR_AGENT_ENGINE=gemma`
+(see `OFFLINE_GEMMA.md`). Not used on Render; default is `rule_based`.
 
-## Deployment
-See `DEPLOY.md` for Render deployment instructions. Keep API keys and database URLs in Render environment variables, not in Git.
+## Deploy
+Render Blueprint (`render.yaml`). See [DEPLOY.md](DEPLOY.md) and
+[DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md). Keep keys in Render env vars, never in Git.

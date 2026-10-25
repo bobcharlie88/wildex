@@ -1,8 +1,15 @@
+# WildEx Render Blueprint.
+# Secrets marked sync:false are prompted in the Render dashboard; never commit values.
+# DATABASE_URL: Neon (postgresql://...?sslmode=require) or Render Postgres internal URL.
+# Required for MVP: DATABASE_URL, GEMINI_API_KEY, R2_* (5 vars). SESSION_SECRET auto-generated.
+# Optional: INATURALIST/GOOGLE_VISION/GOOGLE_PLACES keys. GROK_API_KEY parked (template cards).
+# Health check: GET /health -> {"status":"healthy","database":true}
 services:
   - type: web
     name: wildex-api
     env: python
     buildCommand: pip install -r requirements.txt
+    healthCheckPath: /health
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: APP_ENV
