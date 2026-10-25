@@ -5,12 +5,7 @@ load_dotenv()
 
 GOOGLE_VISION_API_KEY = os.getenv("GOOGLE_VISION_API_KEY")
 GOOGLE_PLACES_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY")
-_gemini_b64 = os.getenv("GEMINI_API_KEY_B64")
-if _gemini_b64:
-    import base64
-    GEMINI_API_KEY = base64.b64decode(_gemini_b64).decode("utf-8")
-else:
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_FALLBACK_MODELS = [
     model.strip()
