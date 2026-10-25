@@ -41,4 +41,4 @@ PythonAnywhere deployment files — see `LEGACY.md`.
 
 ## Not this project
 WildChef / Survival Chefs is a **separate, independent project** and has been
-removed from this repo. Planned repo: `bobcharlie88/survival-chefs` (pending creation).
+removed from this repo. Repo: https://github.com/bobcharlie88/survival-chefs
