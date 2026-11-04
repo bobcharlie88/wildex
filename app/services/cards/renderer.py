@@ -15,6 +15,8 @@ def _kingdom(category: str | None, sub_category: str | None, iconic_taxon: str |
     category = (category or "").lower()
     sub_category = (sub_category or "").lower()
     iconic_taxon = (iconic_taxon or "").lower()
+    if category == "terrain" or sub_category in {"rock", "soil", "water", "landscape"}:
+        return "terrain"
     if sub_category == "reptile" or iconic_taxon == "reptilia":
         return "reptile"
     if sub_category == "bird" or iconic_taxon == "aves":
@@ -134,6 +136,9 @@ def build_render_card(source) -> dict:
         "def": payload["stats"]["def"],
         "spd": payload["stats"]["spd"],
         "type_label": payload["type_label"],
+        "buffs": payload.get("buffs", []),
+        "debuffs": payload.get("debuffs", []),
+        "area_info": payload.get("area_info", {}),
         "biome": payload["biome"],
         "biome_bonus": payload["biome_bonus"],
         "strength_name": payload["strength_name"],

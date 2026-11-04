@@ -37,6 +37,12 @@
       panel: 'rgba(18,14,4,0.92)', panelBorder: 'rgba(176,136,8,0.45)',
       text: '#f5ecc0', textMuted: '#c8b058', divider: 'rgba(176,136,8,0.4)',
     },
+    'theme-terrain': {
+      bg1: '#120a05', bg2: '#2a160a', bg3: '#45260f',
+      accent: '#d0743a', accent2: '#e8a060', accent3: '#f5cfa0',
+      panel: 'rgba(36,18,8,0.92)', panelBorder: 'rgba(208,116,58,0.45)',
+      text: '#f8e6d2', textMuted: '#d0a078', divider: 'rgba(208,116,58,0.4)',
+    },
     'theme-plant': {
       bg1: '#030e06', bg2: '#081c0c', bg3: '#0c2e12',
       accent: '#209830', accent2: '#50c058', accent3: '#90e090',
@@ -213,6 +219,42 @@
     });
   }
 
+  function effectRowsSvg(items, x, y0, w, t, color, sign) {
+    return (items || []).slice(0, 2).map((it, i) => {
+      const y = y0 + i * 62;
+      const lines = chunkText(it.effect || '', 40, 2);
+      return `<rect x="${x}" y="${y}" width="${w}" height="54" rx="10" fill="${t.panel}" stroke="${color}" stroke-width="1.2" opacity="0.95"/>
+      <text x="${x + 14}" y="${y + 21}" font-size="15" font-family="Segoe UI,sans-serif" font-weight="800" fill="${color}">${sign}</text>
+      <text x="${x + 32}" y="${y + 21}" font-size="14" font-family="Segoe UI,sans-serif" font-weight="700" fill="${t.text}">${esc(it.name || '')}</text>
+      ${lines.map((ln, k) => `<text x="${x + 14}" y="${y + 37 + k * 13}" font-size="10.5" font-family="Segoe UI,sans-serif" fill="${t.textMuted}">${esc(ln)}</text>`).join('')}`;
+    }).join('');
+  }
+
+  function biomeEffectsSvg(data, t) {
+    const good = '#7fd48a', bad = '#f07a5a';
+    return `<text x="46" y="610" font-size="11" font-family="Segoe UI,sans-serif" font-weight="800" fill="${good}" letter-spacing="3">BUFFS</text>
+  ${effectRowsSvg(data.buffs, 40, 620, 326, t, good, '+')}
+  <text x="390" y="610" font-size="11" font-family="Segoe UI,sans-serif" font-weight="800" fill="${bad}" letter-spacing="3">DEBUFFS</text>
+  ${effectRowsSvg(data.debuffs, 384, 620, 326, t, bad, '–')}
+  <text x="${CARD_W / 2}" y="830" text-anchor="middle" font-size="11" font-family="Segoe UI,sans-serif" fill="${t.textMuted}" letter-spacing="1">Effects apply to anything exploring this biome</text>`;
+  }
+
+  function biomeAreaSvg(data, t) {
+    const a = data.area_info || {};
+    const section = (label, text, y, lines) => `<text x="36" y="${y}" font-size="10" font-family="Segoe UI,sans-serif" font-weight="800" fill="${t.accent2}" letter-spacing="3">${label}</text>
+      ${chunkText(text || '', 80, lines).map((ln, i) => `<text x="36" y="${y + 18 + i * 18}" font-size="13" font-family="Segoe UI,sans-serif" fill="${t.text}" opacity="0.88">${esc(ln)}</text>`).join('')}`;
+    const hz = (data.debuffs || []).map(d => d.name).join(' · ');
+    return `${section('CLIMATE', a.climate, 350, 2)}
+  ${section('HAZARDS', a.hazards, 420, 2)}
+  ${section('WHAT LIVES HERE', a.life, 490, 2)}
+  ${section('BIOME', data.habitat_text || data.biome, 560, 1)}
+  <rect x="36" y="610" width="${CARD_W - 290}" height="110" rx="11" fill="${t.panel}" stroke="${t.accent}" stroke-width="1" opacity="0.92"/>
+  <text x="52" y="634" font-size="10" font-family="Segoe UI,sans-serif" font-weight="800" fill="${t.accent2}" letter-spacing="2">FIELD WARNING</text>
+  ${chunkText('Watch for ' + (hz || 'heat and fatigue') + '. Carry water, rest in shade and plan your route.', 52, 4).map((ln, i) => `<text x="52" y="${656 + i * 17}" font-size="12" font-family="Segoe UI,sans-serif" fill="${t.text}">${esc(ln)}</text>`).join('')}
+
+  `;
+  }
+
   function frontSvg(data, template, imageHref) {
     const t = getTheme(data.theme_class);
     const artHref = imageHref || data.image_url || data.primary_card_image_url || data.original_image_url || '';
@@ -324,7 +366,7 @@
   <!-- Thin divider -->
   <line x1="38" y1="582" x2="${CARD_W - 38}" y2="582" stroke="${t.divider}" stroke-width="1"/>
 
-  <!-- Stats section (y 592–700) -->
+  ${data.buffs && data.buffs.length ? biomeEffectsSvg(data, t) : `<!-- Stats section (y 592–700) -->
   <!-- HP row -->
   <text x="46" y="610" font-size="10" font-family="Segoe UI,sans-serif" font-weight="800"
         fill="${t.accent2}" letter-spacing="2">HP</text>
@@ -369,6 +411,8 @@
     ${desc ? `<text x="62" y="${y0 + 27}" font-size="11" font-family="Segoe UI,sans-serif"
           fill="${t.textMuted}">${esc(String(desc).slice(0, 60))}</text>` : ''}`;
   }).join('')}
+
+  `}
 
   <!-- Divider -->
   <line x1="38" y1="852" x2="${CARD_W - 38}" y2="852" stroke="${t.divider}" stroke-width="1"/>
@@ -493,7 +537,7 @@
   <!-- Divider -->
   <line x1="36" y1="328" x2="${CARD_W - 36}" y2="328" stroke="${t.divider}" stroke-width="1"/>
 
-  <!-- Diet + Habitat columns (y 336–440) -->
+  ${data.buffs && data.buffs.length ? biomeAreaSvg(data, t) : `<!-- Diet + Habitat columns (y 336–440) -->
   <text x="36" y="350" font-size="10" font-family="Segoe UI,sans-serif" font-weight="800"
         fill="${t.accent2}" letter-spacing="3">DIET</text>
   ${dietLines.map((line, i) =>
@@ -564,6 +608,8 @@
         font-weight="700" fill="${t.textMuted}">AGGRESSION</text>
   <text x="395" y="742" font-size="12" font-family="Segoe UI,sans-serif"
         font-weight="800" fill="${t.text}">${esc(data.aggression || 'Low')}</text>
+
+  `}
 
   <!-- Range map (right side, y 564–740) -->
   <g transform="translate(${CARD_W - 220},564)">

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
 
+from app.services.cards.terrain import terrain_profile
 from app.services.cards.validators import validate_card_payload
 
 RARITY_VALUES = {
@@ -94,6 +95,19 @@ THEMES = {
         "weakness_name": "Transplant Shock",
         "weakness_effect": "Reduced vitality outside native habitat",
     },
+    "terrain": {
+        "theme_class": "theme-terrain",
+        "accent": "#a0623a",
+        "accent_dark": "#6b3f24",
+        "banner_text": "BIOME",
+        "type_label": "Biome",
+        "biome": "Open Landscape",
+        "biome_bonus": "",
+        "strength_name": "",
+        "strength_effect": "",
+        "weakness_name": "",
+        "weakness_effect": "",
+    },
 }
 
 
@@ -129,6 +143,8 @@ def _kingdom(category: str | None, sub_category: str | None, iconic_taxon: str |
     category = (category or "").lower()
     sub_category = (sub_category or "").lower()
     iconic_taxon = (iconic_taxon or "").lower()
+    if category == "terrain" or sub_category in {"rock", "soil", "water", "landscape"}:
+        return "terrain"
     if sub_category == "reptile" or iconic_taxon == "reptilia":
         return "reptile"
     if sub_category == "bird" or iconic_taxon == "aves":
@@ -310,6 +326,21 @@ def build_card_payload(source) -> dict:
     habitat_text = _stored_or(_habitat_text(species_name, kingdom_key, capture_country), source, "habitat_text")
     diet_text = _stored_or(_diet_text(species_name, kingdom_key), source, "diet")
     flavor_text = _value(source, "blurb") or f"{species_name} is logged as a WildEx field record."
+    buffs: list[dict] = []
+    debuffs: list[dict] = []
+    area_info: dict = {}
+    if kingdom_key == "terrain":
+        profile = terrain_profile(species_name, scientific_name, _value(source, "sub_category"), _value(source, "blurb"))
+        buffs = [dict(x) for x in profile["buffs"]]
+        debuffs = [dict(x) for x in profile["debuffs"]]
+        biome = profile["biome"]
+        biome_bonus = f"{buffs[0]['name']}: {buffs[0]['effect']}"
+        strength_name, strength_effect = buffs[0]["name"], buffs[0]["effect"]
+        weakness_name, weakness_effect = debuffs[0]["name"], debuffs[0]["effect"]
+        moves = [x["name"] for x in buffs]
+        area_info = {"climate": profile["climate"], "hazards": profile["hazards"], "life": profile["life"]}
+        habitat_text = f"{biome}{f' - {capture_country}' if capture_country else ''}"
+        diet_text = profile["life"]
     wildex_id = _value(source, "wildex_id")
     dex_id = _value(source, "dex_id")
     card_number = wildex_id or str(dex_id or "").split("-")[-1] or str(_value(source, "id") or "")
@@ -339,6 +370,9 @@ def build_card_payload(source) -> dict:
         "weakness_name": weakness_name,
         "weakness_effect": weakness_effect,
         "type_label": theme["type_label"],
+        "buffs": buffs,
+        "debuffs": debuffs,
+        "area_info": area_info,
         "banner_text": theme["banner_text"],
         "length_text": _length_text(species_name, kingdom_key),
         "original_image_url": _original_image(source),

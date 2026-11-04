@@ -57,6 +57,9 @@ class CardPayloadSchema(BaseModel):
     weakness_name: str
     weakness_effect: str
     type_label: str
+    buffs: list[dict[str, str]] = Field(default_factory=list)
+    debuffs: list[dict[str, str]] = Field(default_factory=list)
+    area_info: dict[str, str] = Field(default_factory=dict)
     banner_text: str
     length_text: str
     original_image_url: str | None = None

@@ -19,8 +19,12 @@ def card_to_dict(c: Card) -> dict:
     original_image_url = c.original_image_url or primary_image_url
     client_primary_image_url = media_url_for_client(primary_image_url)
     client_original_image_url = media_url_for_client(original_image_url)
-    if c.render_card_json and c.render_status == "ready":
-        render_card = json.loads(c.render_card_json)
+    is_terrain = (c.category or "").lower() == "terrain"
+    cached = json.loads(c.render_card_json) if c.render_card_json and c.render_status == "ready" else None
+    if cached is not None and is_terrain and not cached.get("buffs"):
+        cached = None  # stale pre-biome-redesign render; rebuild live
+    if cached is not None:
+        render_card = cached
         render_card["image_url"] = client_primary_image_url
         render_card["original_image_url"] = client_original_image_url
         slot_content = render_card.setdefault("slot_content", {})
