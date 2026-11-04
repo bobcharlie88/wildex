@@ -249,13 +249,13 @@
       stroke-linecap: round;
     }
     .map-region {
-      fill: rgba(88, 92, 96, .3);
-      stroke: rgba(74, 53, 31, .62);
+      fill: rgba(196, 186, 168, .55);
+      stroke: rgba(240, 228, 205, .7);
       stroke-width: 2.4;
       cursor: default;
       transition: fill .15s ease, opacity .15s ease, transform .15s ease, filter .15s ease;
       transform-origin: center;
-      opacity: .64;
+      opacity: .85;
     }
     .map-region.unlocked {
       fill: rgba(92, 137, 95, .78);
@@ -269,6 +269,7 @@
       filter: drop-shadow(0 0 16px rgba(190,136,42,.3));
     }
     .map-region:hover.unlocked { transform: translateY(-1px); }
+    .map-atlas-image, .map-atlas-wash { display: none; }
     .map-hit {
       fill: transparent;
       stroke: transparent;
