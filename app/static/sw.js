@@ -1,4 +1,4 @@
-const CACHE_NAME = "wildex-v1";
+const CACHE_NAME = "wildex-v2";
 const CORE_ASSETS = [
   "/",
   "/static/home.html",

@@ -827,7 +827,7 @@
     const TERMINAL_STATUSES = new Set(['complete', 'failed', 'needs_review']);
     const JOB_NOTICE_STORE = 'wildex_capture_notices_v1';
     const pendingCardOpen = Number(new URLSearchParams(location.search).get('card') || 0) || null;
-    const REGION_LABELS = { AU: 'Australia', NA: 'North America', SA: 'South America', EU: 'Europe', AF: 'Africa', AS: 'Asia' };
+    const REGION_LABELS = { AU: 'Australia', NA: 'North America', SA: 'South America', EU: 'Europe', AF: 'Africa', AS: 'Asia', UNK: 'No location' };
     const state = {
       user: null,
       entries: [],
@@ -973,7 +973,7 @@
         node.classList.toggle('active', code === state.selectedRegion);
       });
       const strip = document.getElementById('region-strip');
-      const all = ['AU','NA','SA','EU','AF','AS'];
+      const all = ['AU','NA','SA','EU','AF','AS'].concat(regions.has('UNK') ? ['UNK'] : []);
       strip.innerHTML = all.map(code => `
         <button class="region-pill ${regions.has(code) ? 'unlocked' : ''} ${state.selectedRegion === code ? 'active' : ''}" type="button" data-region="${code}">
           ${escapeHtml(REGION_LABELS[code])}${regions.has(code) ? '' : ' · Locked'}

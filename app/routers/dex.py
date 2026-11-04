@@ -46,7 +46,7 @@ def list_wilddex_entries(current_user: User = Depends(require_user)):
 
         entries = (
             db.query(DexEntry)
-            .filter(DexEntry.region.in_(REGION_LABELS.keys()))
+            .filter(DexEntry.region.in_(list(REGION_LABELS.keys()) + ["UNK"]))
             .order_by(
                 DexEntry.region.asc(),
                 DexEntry.kingdom.asc(),
@@ -99,7 +99,7 @@ def list_wilddex_entries(current_user: User = Depends(require_user)):
                     "id": entry.id,
                     "dex_id": entry.dex_id,
                     "region": entry.region,
-                    "region_label": REGION_LABELS.get(entry.region, entry.region),
+                    "region_label": REGION_LABELS.get(entry.region, "No location" if entry.region == "UNK" else entry.region),
                     "kingdom": entry.kingdom,
                     "group_code": entry.group_code,
                     "number": entry.number,
