@@ -516,3 +516,55 @@
   flex-wrap: wrap;
   justify-content: center;
 }
+
+/* ---- Field-guide card front (turtle/beetle style, Nov 2026) ---- */
+@font-face{font-family:'WXCinzel';src:url('/static/cards/fg/fonts/cinzel.woff2') format('woff2');font-weight:400 900;font-display:swap}
+@font-face{font-family:'WXAlegreyaSC';src:url('/static/cards/fg/fonts/alegreya-sc-xb.woff2') format('woff2');font-weight:800;font-display:swap}
+@font-face{font-family:'WXAlegreya';src:url('/static/cards/fg/fonts/alegreya.woff2') format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
+@font-face{font-family:'WXAlegreya';src:url('/static/cards/fg/fonts/alegreya-italic.woff2') format('woff2');font-weight:400 900;font-style:italic;font-display:swap}
+.wx-face.fieldguide{background:#2a1d13;border-radius:16px}
+.wxfg{position:absolute;left:0;top:0;width:1054px;height:1492px;transform-origin:0 0;background:var(--fg-frame) 0 0/1054px 1492px no-repeat,#d9c49a;font-family:'WXAlegreya',Georgia,serif;color:#2b1a0e;overflow:hidden;-webkit-user-select:none;user-select:none}
+.wxfg *{box-sizing:border-box}
+.wxfg>*{position:absolute}
+.wxfg .grain{inset:0;pointer-events:none;opacity:.45;mix-blend-mode:multiply;background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 55%,rgba(70,35,10,.45) 100%)}
+.wxfg:after{content:'';position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 120px rgba(70,35,10,.45),inset 0 0 36px rgba(30,15,5,.5)}
+.wxfg .hdr{left:118px;top:58px;width:640px;height:78px;background:linear-gradient(180deg,#3b2a1d,#2a1d14 60%,#20160f);border:2px solid #8a6a43;border-left:none;border-radius:0 6px 6px 0;box-shadow:inset 0 0 18px rgba(0,0,0,.6),0 3px 6px rgba(0,0,0,.4)}
+.wxfg .hdr span{position:absolute;left:96px;top:6px;font-family:'WXCinzel',serif;font-weight:700;font-size:54px;letter-spacing:3px;color:#e9d6ac;text-shadow:0 2px 2px #000}
+.wxfg .hex{left:20px;top:22px;width:158px;height:158px}
+.wxfg .hexn{left:20px;top:22px;width:158px;height:158px;display:flex;align-items:center;justify-content:center;padding-top:4px;font-family:'WXCinzel',serif;font-weight:700;color:#ecdcb4;text-shadow:0 2px 3px #000}
+.wxfg .med{width:150px;height:150px;border-radius:50%;box-shadow:0 4px 10px rgba(0,0,0,.6),0 0 0 4px #3a2716,0 0 0 6px #a07a45}
+.wxfg .med.top{left:862px;top:34px}
+.wxfg .med.bot{left:866px;top:1318px}
+.wxfg .title{left:177px;width:700px;top:168px;height:84px;display:flex;align-items:center;justify-content:center;text-align:center;font-family:'WXAlegreyaSC',serif;font-weight:800;line-height:.95;color:#24150b;text-shadow:0 1px 0 #f3e5c2;white-space:nowrap}
+.wxfg .sci{left:0;width:1054px;top:258px;text-align:center;font-style:italic;font-size:34px;color:#3a2614}
+.wxfg .col{left:64px;top:312px;width:262px;height:430px;border:2px solid #6b4d2e;outline:1px solid #6b4d2e;outline-offset:3px;padding:12px 18px;background:rgba(233,214,170,.35)}
+.wxfg .tx{border-bottom:1.5px solid #8a6a43;padding:5px 0 7px;margin-bottom:6px}
+.wxfg .tx:last-child{border-bottom:none}
+.wxfg .tx b{display:block;font-weight:800;font-size:30px;line-height:1.05}
+.wxfg .tx i{display:block;font-style:normal;font-size:28px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wxfg .stats{left:64px;top:752px;width:262px;height:290px;border:2px solid #6b4d2e;outline:1px solid #6b4d2e;outline-offset:3px;padding:14px 16px;background:rgba(233,214,170,.38)}
+.wxfg .st{display:flex;align-items:center;height:56px;border-bottom:1.5px solid #9b7a51}
+.wxfg .st svg,.wxfg .rar svg{width:38px;height:38px;flex:none}
+.wxfg .l{font-family:'WXAlegreyaSC',serif;font-weight:800;font-size:25px;margin-left:12px;flex:1}
+.wxfg .v{font-weight:800;font-size:38px}
+.wxfg .rar{padding-top:6px}
+.wxfg .rar .row{display:flex;align-items:center}
+.wxfg .rar .u{text-align:right;font-family:'WXAlegreyaSC',serif;font-weight:800;font-size:24px;color:#6a4a12;margin-top:-4px}
+.wxfg .photo{left:352px;top:312px;width:640px;height:500px;border:3px solid #3a2716;box-shadow:0 0 0 2px #b08a55,0 0 0 6px #3a2716,0 6px 14px rgba(0,0,0,.45);overflow:hidden;background:#3a2716}
+.wxfg .photo .ph{width:100%;height:100%;object-fit:cover;display:block}
+.wxfg .photo .ph.none{display:flex;align-items:center;justify-content:center;color:#d9c49a;font-size:34px}
+.wxfg .photo:after{content:'';position:absolute;inset:0;box-shadow:inset 0 0 60px rgba(40,20,5,.5)}
+.wxfg .map{left:352px;top:828px;width:640px;height:250px;border:2px solid #6b4d2e;outline:1px solid #6b4d2e;outline-offset:3px;background:rgba(222,200,150,.5);overflow:hidden}
+.wxfg .map .lab{position:absolute;left:12px;top:6px;z-index:1;font-family:'WXAlegreyaSC',serif;font-weight:800;font-size:22px;letter-spacing:1px}
+.wxfg .map svg{position:absolute;inset:0;display:block}
+.wxfg .info{left:96px;top:1100px;width:770px;height:226px;line-height:1.26;overflow:hidden;padding:4px 10px;background:rgba(232,214,172,.8);border-radius:14px;box-shadow:0 0 16px 10px rgba(232,214,172,.8)}
+.wxfg.has-sketch .info{left:368px;width:512px;height:236px;padding:0;background:transparent;box-shadow:none}
+.wxfg .info .dc{float:left;font-family:'WXAlegreyaSC',serif;font-weight:800;font-size:3em;line-height:.82;margin:6px 8px 0 0;color:#24150b}
+.wxfg .skbg{left:18px;top:1066px;width:345px;height:260px;background:radial-gradient(ellipse at 50% 55%,rgba(226,204,158,.97) 0%,rgba(222,198,150,.9) 45%,rgba(222,198,150,0) 72%)}
+.wxfg .sketch{left:36px;top:1112px;width:312px}
+.wxfg .fact{left:70px;top:1346px;width:840px;height:96px;background:linear-gradient(180deg,#3d2c1f,#251910);border:2px solid #8a6a43;border-radius:6px;box-shadow:inset 0 0 20px rgba(0,0,0,.7),0 3px 8px rgba(0,0,0,.45);display:flex;align-items:center;padding:0 130px 0 30px}
+.wxfg .fact b{font-family:'WXCinzel',serif;font-weight:700;font-size:36px;color:#ead7a9;margin-right:22px;letter-spacing:1px;flex:none}
+.wxfg .fact i{line-height:1.2;color:#ead7a9;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wxfg.biome-polar .hdr,.wxfg.biome-polar .fact{background:linear-gradient(180deg,#2c3a4a,#1b2633)}
+.wxfg.biome-marine .hdr,.wxfg.biome-marine .fact{background:linear-gradient(180deg,#1f3442,#13222c)}
+.wxfg.biome-forest .hdr,.wxfg.biome-forest .fact{background:linear-gradient(180deg,#2c3a24,#1b2616)}

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from app.services.cards.builder import THEMES, build_card_payload
+from app.services.cards.curated import curated_for
+from app.services.cards.gbif_taxonomy import taxonomy_for
 from app.services.cards.templates import select_template_payload
 from app.services.cards.validators import validate_template_parts
 
@@ -105,7 +107,7 @@ def build_render_card(source) -> dict:
         environment_key=environment_key,
     )
 
-    return {
+    card = {
         "card_id": _value(source, "id"),
         "wildex_id": wildex_id,
         "species_name": species_name,
@@ -163,7 +165,15 @@ def build_render_card(source) -> dict:
         "confidence": _value(source, "confidence"),
         "provisional": _value(source, "provisional"),
         "rank": _value(source, "rank"),
+        "taxonomy": {},
+        "range_polygons": [],
     }
+    curated = curated_for(scientific_name)
+    if curated:
+        card.update(curated)
+    if not card.get("taxonomy"):
+        card["taxonomy"] = taxonomy_for(scientific_name) if kingdom_key != "terrain" else {}
+    return card
 
 
 def apply_render_fields(target, render_data: dict) -> None:

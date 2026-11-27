@@ -723,22 +723,200 @@
 </svg>`;
   }
 
+  // ---- Field-guide card (Mitch's turtle/beetle style, Nov 2026) ----
+  const FG_BASE = '/static/cards/fg';
+  const FG_W = 1054;
+  const FG_H = 1492;
+  const FG_BIOMES = [
+    [/polar|ice|snow|tundra|antarctic|arctic/i, 'polar'],
+    [/urban|city|suburb|town|garden|park/i, 'urban'],
+    [/coast|beach|dune|mangrove|estuar|shore|intertidal/i, 'coastal'],
+    [/marine|ocean|reef|sea\b|pelagic|current/i, 'marine'],
+    [/fresh|river|lake|wetland|swamp|creek|pond|billabong/i, 'freshwater'],
+    [/rock|range|gorge|escarpment|outcrop|ironstone|pilbara/i, 'rocky'],
+    [/mountain|alpine|highland|cliff|montane/i, 'mountain'],
+    [/arid|desert|spinifex|sand|outback|grassland|savann|mallee|plain/i, 'arid'],
+    [/forest|wood|rainforest|eucalypt|bush|jungle|scrub|canopy|botanical/i, 'forest'],
+  ];
+  const FG_CLASS_TAXON = {
+    reptile: 'Reptilia', bird: 'Aves', mammal: 'Mammalia', fish: 'Actinopterygii',
+    insect: 'Insecta', arachnid: 'Arachnida', amphibian: 'Amphibia', plant: 'Magnoliopsida',
+  };
+
+  function fgBiome(data) {
+    if (data.biome_frame) return String(data.biome_frame);
+    for (const hay of [data.biome || '', data.habitat_text || '']) {
+      for (const [re, key] of FG_BIOMES) if (re.test(hay)) return key;
+    }
+    const k = String(data.kingdom || data.type_label || '').toLowerCase();
+    if (k === 'fish' || data.range_mode === 'ocean') return 'marine';
+    if (k === 'reptile') return 'rocky';
+    return 'forest';
+  }
+
+  function fgGroup(data) {
+    const k = String(data.kingdom || data.type_label || '').toLowerCase();
+    const name = `${data.species_name || ''} ${data.common_name || ''}`.toLowerCase();
+    const fam = String((data.taxonomy && data.taxonomy.family) || '').toLowerCase();
+    if (/python|snake|adder|taipan|boa|viper|cobra|serpent/.test(name) || /pythonidae|elapidae|colubridae|boidae|viperidae|typhlopidae/.test(fam)) return 'snake';
+    if (/spider|scorpion|tick|mite/.test(name) || String((data.taxonomy && data.taxonomy.class) || '') === 'Arachnida') return 'arachnid';
+    if (/butterfly|moth/.test(name)) return 'butterfly';
+    if (/frog|toad|salamander|newt/.test(name) || k === 'amphibian') return 'amphibian';
+    if (/eagle|hawk|falcon|kite|owl|osprey|harrier/.test(name)) return 'raptor';
+    if (/whale|dolphin|seal|dugong|sea lion|porpoise/.test(name)) return 'marine-mammal';
+    if (['reptile', 'bird', 'mammal', 'fish', 'insect', 'plant'].includes(k)) return k;
+    return 'other';
+  }
+
+  function fgClassKey(group) {
+    return ({ snake: 'reptile', raptor: 'bird', butterfly: 'insect', 'marine-mammal': 'mammal' })[group] || group;
+  }
+
+  function fgTaxonomy(data, group) {
+    const t = data.taxonomy || {};
+    const cls = fgClassKey(group);
+    const plant = cls === 'plant';
+    return [
+      ['Kingdom', t.kingdom || (plant ? 'Plantae' : 'Animalia')],
+      ['Phylum', t.phylum || (plant ? 'Tracheophyta' : (['insect', 'arachnid'].includes(cls) ? 'Arthropoda' : (cls === 'other' ? '—' : 'Chordata')))],
+      ['Class', t.class || FG_CLASS_TAXON[cls] || '—'],
+      ['Order', t.order || '—'],
+      ['Family', t.family || '—'],
+    ];
+  }
+
+  function fgNumber(data) {
+    const raw = String(data.card_number || data.wildex_id || data.dex_id || data.card_id || '');
+    const m = raw.match(/(\d+)\s*$/);
+    return m ? String(parseInt(m[1], 10)) : (raw.slice(-3) || '?');
+  }
+
+  function fgMap(data) {
+    const col = rangeColour(data, null);
+    const regs = new Set(data.range_regions || []);
+    const hl = new Set();
+    if (data.range_mode !== 'ocean') {
+      if (!regs.size || regs.has('GLOBAL')) Object.keys(MAP_WORLD).forEach((k) => hl.add(k));
+      regs.forEach((r) => { if (MAP_WORLD[r]) hl.add(r); else if (MAP_ISO_CONTINENT[r]) hl.add(MAP_ISO_CONTINENT[r]); });
+    }
+    const polys = Array.isArray(data.range_polygons) ? data.range_polygons : [];
+    const usePolys = polys.length && hl.has('AU');
+    const conts = Object.keys(MAP_WORLD).map((k) => {
+      const on = hl.has(k);
+      const fill = on ? (usePolys ? '#d7b98a' : col) : '#bfa575';
+      return `<path d="${MAP_WORLD[k]}" fill="${fill}" stroke="${on ? '#3a2410' : '#7a5d3a'}" stroke-width="${on ? 0.5 : 0.35}" stroke-linejoin="round"${on && !usePolys ? ' fill-opacity="0.85"' : ''}/>`;
+    }).join('');
+    const X = (lon) => (Number(lon) + 180) * 200 / 360;
+    const Y = (lat) => 56.4 + (-Number(lat)) * 0.768; // calibrated for Australia
+    let extra = '';
+    let ring = null;
+    if (usePolys) {
+      const d = polys.map((poly) => 'M' + poly.map((p) => `${X(p[0]).toFixed(1)} ${Y(p[1]).toFixed(1)}`).join('L') + 'Z').join('');
+      extra = `<path d="${d}" fill="#8e2f12" stroke="#3a1606" stroke-width="0.4"/>`;
+      const pts = polys.flat();
+      ring = [pts.reduce((s, p) => s + X(p[0]), 0) / pts.length, pts.reduce((s, p) => s + Y(p[1]), 0) / pts.length];
+    } else if (hl.size === 1) {
+      const nums = (MAP_WORLD[[...hl][0]].match(/-?\d+\.?\d*/g) || []).map(Number);
+      const xs = nums.filter((_, i) => i % 2 === 0), ys = nums.filter((_, i) => i % 2 === 1);
+      ring = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+    }
+    const ocean = data.range_mode === 'ocean' ? `<rect x="0" y="0" width="200" height="130" fill="${col}" opacity="0.28"/>` : '';
+    const ringSvg = ring ? `<circle cx="${ring[0].toFixed(1)}" cy="${ring[1].toFixed(1)}" r="5.4" fill="none" stroke="#2b1a0e" stroke-width="0.9"/>` : '';
+    return `<svg viewBox="0 27 200 78" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+      ${ocean}<g opacity=".22" stroke="#7a5d3a" stroke-width=".25"><path d="M0 40H200M0 60H200M0 80H200M0 100H200M40 0V130M80 0V130M120 0V130M160 0V130"/></g>
+      <g transform="translate(0,10)">${conts}${extra}${ringSvg}</g></svg>`;
+  }
+
+  function fgStatIcon(kind) {
+    const s = '#2b1a0e';
+    if (kind === 'spd') return `<svg viewBox="0 0 40 40" fill="none" stroke="${s}" stroke-width="3"><path d="M6 28a14 14 0 1 1 28 0"/><path d="M20 28 L28 15" stroke-linecap="round"/><circle cx="20" cy="28" r="3" fill="${s}"/><path d="M9 21l3 1M20 12v3M31 21l-3 1" stroke-width="2"/></svg>`;
+    if (kind === 'def') return `<svg viewBox="0 0 40 40"><path d="M20 4 L34 9 V19 C34 28 28 34 20 37 C12 34 6 28 6 19 V9 Z" fill="${s}"/><path d="M20 8 V33 C14 30 10 25 10 19 V11.5 Z" fill="#cdb48a"/></svg>`;
+    if (kind === 'atk') return `<svg viewBox="0 0 40 40" fill="none" stroke="${s}" stroke-width="3"><circle cx="20" cy="20" r="12"/><circle cx="20" cy="20" r="4" fill="${s}"/><path d="M20 3v8M20 29v8M3 20h8M29 20h8"/></svg>`;
+    return `<svg viewBox="0 0 40 40"><path d="M20 3 L25 15 L38 15.5 L28 24 L31.5 37 L20 29.5 L8.5 37 L12 24 L2 15.5 L15 15 Z" fill="${s}"/></svg>`;
+  }
+
+  function fgFit(text, sizes) {
+    const n = String(text || '').length;
+    for (const [max, px] of sizes) if (n <= max) return px;
+    return sizes[sizes.length - 1][1];
+  }
+
+  function fieldGuideFront(data, imageHref) {
+    const biome = fgBiome(data);
+    const group = fgGroup(data);
+    const title = data.species_name || data.common_name || data.scientific_name || 'Unknown species';
+    const sci = data.scientific_name && data.scientific_name !== title ? data.scientific_name : '';
+    const info = data.info_text || '';
+    const fact = data.fact_text || '';
+    const sketch = data.sketch_url || (group === 'snake' ? `${FG_BASE}/sketch-snake.webp` : '');
+    const titlePx = Math.max(30, Math.min(80, Math.floor(1150 / Math.max(1, title.length))));
+    const infoPx = fgFit(info, [[260, 27], [340, 25], [430, 23], [520, 21], [999, 19]]);
+    const factPx = fgFit(fact, [[90, 27], [130, 24], [170, 21], [999, 19]]);
+    const tax = fgTaxonomy(data, group).map(([k, v]) => `<div class="tx"><b>${esc(k)}:</b><i>${esc(v)}</i></div>`).join('');
+    const stat = (kind, label, val) => `<div class="st">${fgStatIcon(kind)}<span class="l">${label}</span><span class="v">${esc(val ?? '—')}</span></div>`;
+    const photo = imageHref ? `<img class="ph" src="${esc(imageHref)}" alt="" draggable="false">` : '<div class="ph none">No photo</div>';
+    const infoFirst = esc(info.slice(0, 1));
+    const infoRest = esc(info.slice(1));
+    return `<div class="wxfg biome-${esc(biome)}${sketch ? ' has-sketch' : ''}" style="--fg-frame:url('${FG_BASE}/frame-${esc(biome)}.webp')">
+  <div class="grain"></div>
+  <div class="hdr"><span>WILDEX</span></div>
+  <svg class="hex" viewBox="0 0 100 100"><polygon points="50,3 91,26.5 91,73.5 50,97 9,73.5 9,26.5" fill="#a98250" stroke="#2a1b10" stroke-width="2"/><polygon points="50,9 86,29.5 86,70.5 50,91 14,70.5 14,29.5" fill="#2a1d13" stroke="#c9a46a" stroke-width="1.2"/></svg>
+  <div class="hexn" style="font-size:${fgNumber(data).length > 3 ? 46 : fgNumber(data).length > 2 ? 56 : 70}px">${esc(fgNumber(data))}</div>
+  <img class="med top" src="${FG_BASE}/med-${esc(group)}.webp" alt="">
+  <div class="title" style="font-size:${titlePx}px">${esc(title)}</div>
+  ${sci ? `<div class="sci">${esc(sci)}</div>` : ''}
+  <div class="col">${tax}</div>
+  <div class="stats">
+    ${stat('spd', 'Speed', data.spd)}
+    ${stat('def', 'Defence', data.def)}
+    ${stat('atk', 'Attack', data.atk)}
+    <div class="rar"><div class="row">${fgStatIcon('star')}<span class="l">Rarity</span></div><div class="u">${esc(data.rarity || 'Common')}</div></div>
+  </div>
+  <div class="photo">${photo}</div>
+  <div class="map"><div class="lab">Found In</div>${fgMap(data)}</div>
+  ${sketch ? `<div class="skbg"></div><img class="sketch" src="${esc(sketch)}" alt="">` : ''}
+  <div class="info" style="font-size:${infoPx}px">${info ? `<span class="dc">${infoFirst}</span>${infoRest}` : ''}</div>
+  <div class="fact"><b>FACT:</b><i style="font-size:${factPx}px">${esc(fact)}</i></div>
+  <img class="med bot" src="${FG_BASE}/med-b-${esc(biome)}.webp" alt="">
+</div>`;
+  }
+
+  function fgFitScale(face) {
+    const inner = face && face.querySelector('.wxfg');
+    if (!inner) return;
+    const apply = () => {
+      const w = face.clientWidth, h = face.clientHeight;
+      if (!w || !h) return;
+      inner.style.transform = `scale(${w / FG_W}, ${h / FG_H})`;
+    };
+    apply();
+    if (window.ResizeObserver) {
+      if (face.__fgRO) face.__fgRO.disconnect();
+      face.__fgRO = new ResizeObserver(apply);
+      face.__fgRO.observe(face);
+    }
+  }
+
   function buildCard(target, data) {
     if (!target) return null;
     try {
       if (!data) throw new Error('Card data missing');
-      const frontMarkup = frontSvg(data, data.front_template, data.image_url || '');
+      const useFieldGuide = data.card_style !== 'classic';
+      const frontMarkup = useFieldGuide
+        ? fieldGuideFront(data, data.image_url || '')
+        : frontSvg(data, data.front_template, data.image_url || '');
       const backMarkup = backSvg(data, data.back_template, data.image_url || '', data.qr_url || '');
       target.innerHTML = `
         <div class="wx-card-shell">
           <div class="wx-flip-card">
             <div class="wx-flip-inner">
-              <div class="wx-face front ${esc(data.theme_class || '')}">${frontMarkup}</div>
+              <div class="wx-face front ${useFieldGuide ? 'fieldguide' : ''} ${esc(data.theme_class || '')}">${frontMarkup}</div>
               <div class="wx-face back ${esc(data.theme_class || '')}">${backMarkup}</div>
             </div>
           </div>
         </div>`;
       target.__wxData = data;
+      if (useFieldGuide) fgFitScale(target.querySelector('.wx-face.front'));
       if (!data.image_url) {
         console.warn('WildEx card render: no image_url', { dexId: data.dex_id, species: data.species_name });
       }
@@ -961,6 +1139,7 @@
     sampleCards,
     frontSvg,
     backSvg,
+    fieldGuideFront,
     CARD_W,
     CARD_H,
   };
