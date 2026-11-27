@@ -208,7 +208,14 @@ def retry_capture_job(*, user_id: int, job_id: int) -> dict:
         db.close()
 
 
-def confirm_capture_job_species(*, user_id: int, job_id: int, scientific_name: str | None = None) -> dict:
+def confirm_capture_job_species(
+    *,
+    user_id: int,
+    job_id: int,
+    scientific_name: str | None = None,
+    common_name: str | None = None,
+    sub_category: str | None = None,
+) -> dict:
     if not db_available() or SessionLocal is None:
         raise RuntimeError("Database unavailable")
 
@@ -246,6 +253,24 @@ def confirm_capture_job_species(*, user_id: int, job_id: int, scientific_name: s
                 "taxon_id": None,
                 "iconic_taxon": None,
                 "reason": job.identification_reasoning or "User confirmed stored capture result.",
+            }
+        if chosen is None and scientific_name and scientific_name.strip():
+            # Manual ID: the player knows what it is (e.g. ID providers were down).
+            sci = " ".join(scientific_name.strip().split())[:200]
+            common = " ".join((common_name or "").strip().split())[:200] or sci
+            sub = (sub_category or "").strip().lower()
+            if sub not in {"mammal", "bird", "reptile", "amphibian", "fish", "insect", "arachnid", "marine", "other"}:
+                sub = ""
+            chosen = {
+                "common_name": common,
+                "scientific_name": sci,
+                "confidence": 0.9,
+                "category": "animal",
+                "sub_category": sub or None,
+                "rank": "species",
+                "taxon_id": None,
+                "iconic_taxon": None,
+                "reason": "Identified by the player (manual ID).",
             }
         if chosen is None:
             raise ValueError("No candidate species is available to confirm")

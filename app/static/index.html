@@ -1096,13 +1096,14 @@ function renderJobQueue() {
           : hasSpecies
             ? `<button type="button" class="primary" data-confirm-job="${job.id}" data-scientific-name="${esc(job.scientific_name || '')}">Confirm current result</button>`
             : `<button type="button" class="primary" data-retry-job="${job.id}">Retry Identification</button>`;
+        const manualBtn = `<button type="button" data-manual-job="${job.id}">I know what it is</button>`;
         return `
           <div class="job-row review">
             ${thumb}
             <div>
               <div class="job-title">${esc(job.species_name || (hasSpecies ? 'Species confirmation needed' : 'Identification failed — tap to retry'))}</div>
               <div class="job-meta">${esc(job.identification_reasoning || job.review_reason || (hasSpecies ? 'Multiple possible species were found. Choose the best match to finish this capture.' : 'The identification service was unavailable. Tap retry to try again.'))}</div>
-              <div class="review-actions">${buttons}</div>
+              <div class="review-actions">${buttons}${manualBtn}</div>
             </div>
           </div>`;
       }).join('');
@@ -1114,6 +1115,31 @@ function renderJobQueue() {
       document.querySelectorAll('[data-retry-job]').forEach(btn => btn.addEventListener('click', () => {
         retryIdentificationForJob(Number(btn.dataset.retryJob)).catch(() => {});
       }));
+      document.querySelectorAll('[data-manual-job]').forEach(btn => btn.addEventListener('click', () => {
+        manualIdForJob(Number(btn.dataset.manualJob)).catch(err => alert(err.message || 'Could not save that ID'));
+      }));
+    }
+
+    async function manualIdForJob(jobId) {
+      const common = (prompt('Common name (e.g. Pygmy Python)') || '').trim();
+      if (!common) return;
+      const sci = (prompt('Scientific name (e.g. Antaresia perthensis)') || '').trim();
+      if (!sci) return;
+      const group = (prompt('Group: mammal, bird, reptile, amphibian, fish, insect, arachnid, marine or other', 'reptile') || '').trim().toLowerCase();
+      const res = await fetch(`/capture/jobs/${jobId}/confirm-species`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scientific_name: sci, common_name: common, sub_category: group }),
+      });
+      if (!res.ok) {
+        let detail = '';
+        try { detail = (await res.json()).detail || ''; } catch (_) {}
+        throw new Error(detail || `Could not save that ID (${res.status})`);
+      }
+      const data = await res.json();
+      await refreshCaptureJobs();
+      if (data.card_id) location.href = `/wildex?card=${data.card_id}`;
     }
 
     async function confirmSpeciesForJob(jobId, scientificName) {

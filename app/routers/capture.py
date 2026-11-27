@@ -79,6 +79,8 @@ async def confirm_capture_species(
             user_id=current_user.id,
             job_id=job_id,
             scientific_name=(payload or {}).get("scientific_name"),
+            common_name=(payload or {}).get("common_name"),
+            sub_category=(payload or {}).get("sub_category"),
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc))
