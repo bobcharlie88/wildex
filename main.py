@@ -25,6 +25,7 @@ from app.routers.dex import router as dex_router
 from app.routers.explore import router as explore_router
 from app.routers.external_identify import router as external_identify_router
 from app.routers.media import router as media_router
+from app.routers.mobile_api import router as mobile_api_router
 from app.routers.quests import router as quests_router
 from app.routers.submissions import router as submissions_router
 from app.routers.wildex import router as wildex_router
@@ -43,6 +44,7 @@ app.include_router(dex_router)
 app.include_router(explore_router)
 app.include_router(external_identify_router)
 app.include_router(media_router)
+app.include_router(mobile_api_router)
 app.include_router(quests_router)
 app.include_router(submissions_router)
 app.include_router(wildex_router)
