@@ -168,11 +168,19 @@ def build_render_card(source) -> dict:
         "taxonomy": {},
         "range_polygons": [],
     }
+    return enrich_render_card(card)
+
+
+def enrich_render_card(card: dict) -> dict:
+    """Apply curated copy/range and taxonomy. Safe on cached render_card dicts (no DB writes)."""
+    card.setdefault("taxonomy", {})
+    card.setdefault("range_polygons", [])
+    scientific_name = card.get("scientific_name")
     curated = curated_for(scientific_name)
     if curated:
         card.update(curated)
-    if not card.get("taxonomy"):
-        card["taxonomy"] = taxonomy_for(scientific_name) if kingdom_key != "terrain" else {}
+    if not card.get("taxonomy") and str(card.get("kingdom") or "").lower() != "terrain":
+        card["taxonomy"] = taxonomy_for(scientific_name)
     return card
 
 

@@ -4,6 +4,7 @@ import json
 
 from app.models import Card
 from app.services.card_render import build_render_card
+from app.services.cards.renderer import enrich_render_card
 from app.utils.media_urls import media_url_for_client
 
 _RARITY_DISPLAY = {
@@ -24,7 +25,7 @@ def card_to_dict(c: Card) -> dict:
     if cached is not None and is_terrain and not cached.get("buffs"):
         cached = None  # stale pre-biome-redesign render; rebuild live
     if cached is not None:
-        render_card = cached
+        render_card = enrich_render_card(cached)
         render_card["image_url"] = client_primary_image_url
         render_card["original_image_url"] = client_original_image_url
         slot_content = render_card.setdefault("slot_content", {})
