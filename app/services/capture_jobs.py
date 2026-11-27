@@ -45,6 +45,11 @@ GROUP_TIME_WINDOW_SECONDS = 90
 GROUP_TIME_WINDOW_WITHOUT_GPS_SECONDS = 20
 GROUP_DISTANCE_METERS = 150
 WORKER_POLL_SECONDS = 3
+# After this long with no captures/retries the worker stops polling the DB every
+# few seconds and sleeps until woken (new capture, retry, list) or the idle poll
+# fires. This lets Neon scale to zero instead of burning free-tier compute 24/7.
+WORKER_ACTIVE_WINDOW_SECONDS = 600
+WORKER_IDLE_POLL_SECONDS = 1800
 PROCESSING_STALE_MINUTES = 3
 REVIEW_CONFIDENCE_THRESHOLD = 0.70
 FAIL_CONFIDENCE_THRESHOLD = 0.45
@@ -53,6 +58,8 @@ TEMPORARY_ID_RETRY_DELAY_SECONDS = 60
 
 _worker_thread: threading.Thread | None = None
 _worker_stop = threading.Event()
+_worker_wake = threading.Event()
+_last_worker_activity: float = 0.0
 _last_stale_requeue: float = 0.0
 _STALE_REQUEUE_INTERVAL = 60.0
 
@@ -432,8 +439,23 @@ def create_capture_job(*, owner_id: int, content: bytes, content_type: str | Non
             os.unlink(frame_path)
 
 
+def _mark_worker_activity() -> None:
+    global _last_worker_activity
+    _last_worker_activity = time.monotonic()
+    _worker_wake.set()
+
+
+def _worker_idle_wait() -> None:
+    """Sleep between polls: fast while there's recent activity, long when idle."""
+    idle_for = time.monotonic() - _last_worker_activity
+    timeout = WORKER_POLL_SECONDS if idle_for < WORKER_ACTIVE_WINDOW_SECONDS else WORKER_IDLE_POLL_SECONDS
+    _worker_wake.wait(timeout)
+    _worker_wake.clear()
+
+
 def start_capture_worker() -> None:
     global _worker_thread
+    _mark_worker_activity()
     if _worker_thread and _worker_thread.is_alive():
         return
     if not db_available() or SessionLocal is None:
@@ -445,6 +467,7 @@ def start_capture_worker() -> None:
 
 def stop_capture_worker() -> None:
     _worker_stop.set()
+    _worker_wake.set()
     if _worker_thread and _worker_thread.is_alive():
         _worker_thread.join(timeout=20)
         if _worker_thread.is_alive():
@@ -457,12 +480,13 @@ def _worker_loop() -> None:
             _requeue_stale_jobs()
             seed_id = _claim_seed_job_id()
             if seed_id is None:
-                _worker_stop.wait(WORKER_POLL_SECONDS)
+                _worker_idle_wait()
                 continue
+            _mark_worker_activity()
             _process_seed_job(seed_id)
         except Exception:
             log.exception("Capture worker loop failed")
-            _worker_stop.wait(WORKER_POLL_SECONDS)
+            _worker_idle_wait()
 
 
 def _requeue_stale_jobs() -> None:
