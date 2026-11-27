@@ -167,6 +167,20 @@
     const markers = markerSvg(data, ink);
     const regs = new Set(data.range_regions || []);
     const auOnly = (data.range_mode === 'region' || data.range_mode === 'local') && regs.has('AU');
+    const polys = Array.isArray(data.range_polygons) ? data.range_polygons : [];
+    if (auOnly && polys.length) {
+      // Precise AU sub-range: [[lon,lat],...] polygons, clipped to the AU silhouette.
+      const px = (lon) => (32.3 + (Number(lon) - 113.2) * 3.3).toFixed(1);
+      const py = (lat) => (8.1 + (-10.7 - Number(lat)) * 3.3).toFixed(1);
+      const d = polys.map((poly) => 'M' + poly.map((pt) => `${px(pt[0])} ${py(pt[1])}`).join('L') + 'Z').join('');
+      const cid = 'auclip' + Math.random().toString(36).slice(2, 8);
+      return `${frame}
+        <defs><clipPath id="${cid}"><path d="${MAP_AU}"/></clipPath></defs>
+        <path d="${MAP_AU}" fill="${land}" stroke="${landEdge}" stroke-width="1" stroke-linejoin="round"/>
+        <path d="${d}" fill="${col}" fill-opacity="0.95" clip-path="url(#${cid})"/>
+        <path d="${MAP_AU}" fill="none" stroke="${ink}" stroke-width="1.1" stroke-linejoin="round"/>
+        ${markers}`;
+    }
     if (auOnly) {
       return `${frame}
         <path d="${MAP_AU}" fill="${col}" fill-opacity="0.92" stroke="${ink}" stroke-width="1.1" stroke-linejoin="round"/>
